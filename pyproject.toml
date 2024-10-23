@@ -35,11 +35,13 @@ classifiers = [
     "Topic :: Scientific/Engineering"
 ]
 dependencies = [
+    "importlib-metadata",
     "ipykernel",
     "ipython",
     "joblib",
     "numpy",
-    "polars[numpy, excel, database, async]"
+    "polars[numpy, excel, database, async]",
+    "tqdm",
 ]
 
 [project.urls]
