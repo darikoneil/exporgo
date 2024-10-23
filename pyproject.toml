@@ -34,10 +34,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering"
 ]
-[project.urls]
-documentation = ""
-repository = ""
-
 dependencies = [
     "ipykernel",
     "ipython",
@@ -45,6 +41,10 @@ dependencies = [
     "numpy",
     "polars[numpy, excel, database, async]"
 ]
+
+[project.urls]
+documentation = "https://github.com/darikoneil/exporgo"
+repository = "https://github.com/darikoneil/exporgo"
 
 [project.optional-dependencies]
 testing = [
@@ -80,6 +80,11 @@ documentation = [
     "sphinx-rtd-theme",
     "sphinx-autodoc-typehints",
 ]
+
+[tool.setuptools]
+packages = [
+    "exporgo",
+    ]
 
 [tool.pytest.ini_options]
 addopts = [
