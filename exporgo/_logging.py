@@ -108,7 +108,7 @@ class ModificationLogger(deque):
 
         :param __x: The item to append
         """
-        __x = (__x, get_timestamp())
+        __x = (__x, _get_timestamp())
         super().append(__x)
 
     # noinspection SpellCheckingInspection
@@ -118,7 +118,7 @@ class ModificationLogger(deque):
 
         :param __x: The item to append
         """
-        __x = (__x, get_timestamp())
+        __x = (__x, _get_timestamp())
         super().appendleft(__x)
 
     def extend(self, __iterable: Iterable[Any]) -> None:
@@ -128,7 +128,7 @@ class ModificationLogger(deque):
         :param __iterable: An iterable of items to append
         """
         for iter_ in __iterable:
-            iter_ = (iter_, get_timestamp())
+            iter_ = (iter_, _get_timestamp())
             self.append(iter_)
 
     # noinspection SpellCheckingInspection
@@ -139,7 +139,7 @@ class ModificationLogger(deque):
         :param __iterable: An iterable of items to append
         """
         for iter_ in __iterable:
-            iter_ = (iter_, get_timestamp())
+            iter_ = (iter_, _get_timestamp())
             self.appendleft(iter_)
 
     def load(self, value: Any) -> None:
@@ -168,7 +168,7 @@ class ModificationLogger(deque):
             self.load(tuple(value))
 
 
-def get_timestamp() -> str:
+def _get_timestamp() -> str:
     """
     Uses datetime to return date/time str. Simply a function to guarantee consistency
 
