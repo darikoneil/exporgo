@@ -39,6 +39,7 @@ dependencies = [
     "ipykernel",
     "ipython",
     "joblib",
+    "json-tricks",
     "numpy",
     "polars[numpy, excel, database, async]",
     "tqdm",
