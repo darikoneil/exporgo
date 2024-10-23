@@ -10,11 +10,6 @@ from joblib import Parallel, delayed
 from ._validators import convert_permitted_types_to_required
 
 
-"""
-Some useful functions for file I/O operations (with user interaction where applicable).
-"""
-
-
 def select_file(**kwargs) -> Path:
     """
     Interactive tool for file selection. All keyword arguments are
