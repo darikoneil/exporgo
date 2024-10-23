@@ -8,7 +8,6 @@ from ._io import select_directory
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from .experiment import Experiment, ExperimentFactory
 
-
 _DEFAULT_PATH = Path.cwd()
 
 
