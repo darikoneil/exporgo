@@ -1,0 +1,127 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "exporgo"
+version = "0.0.1"
+description = "Experiment organizer"
+readme = "README.md"
+requires-python = ">=3.10, <=4.0"
+license = {file = "LICENSE"}
+keywords = [
+    "experiment",
+    "organizer",
+    "data",
+    "management",
+    "science",
+    "neuroscience"
+]
+authors = [
+  {name = "Darik A. O'Neil"}
+]
+maintainers = [
+    {name = "Darik A. O'Neil"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX",
+    "Operating System :: Unix",
+    "Programming Language :: Python :: 3.10",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering"
+]
+[project.urls]
+documentation = ""
+repository = ""
+
+dependencies = [
+    "ipykernel",
+    "ipython",
+    "joblib",
+    "numpy",
+    "polars[numpy, excel, database, async]"
+]
+
+[project.optional-dependencies]
+testing = [
+    "pytest",
+    "pytest-sugar",
+    "pytest-clarity",
+    "pytest-timeout",
+    "pytest-html"
+]
+development = [
+    "boltons",
+    "build",
+    "coverage[toml]",
+    "coveralls",
+    "flake8",
+    "flake8-annotations",
+    "flake8-bugbear",
+    "flake8-class-attributes-order",
+    "flake8-comprehensions",
+    "flake8-html",
+    "flake8-unused-arguments",
+    "flake8-mutable",
+    "flake8-simplify",
+    "flake8-eradicate",
+    "flake8-isort",
+    "tryceratops",
+    "icecream",
+    "toml",
+    "twine"
+]
+documentation = [
+"sphinx",
+    "sphinx-rtd-theme",
+    "sphinx-autodoc-typehints",
+]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+    "-s",
+    "--color=yes",
+    "-vv",
+    "--diff-width=120",
+    "--disable-warnings",
+    "--html=./reports/pytest-report.html",
+]
+tests = "tests"
+console_output_style = "progress"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::FutureWarning"
+]
+
+[tool.coverage.run]
+branch = true
+command_line = "-m pytest"
+
+dynamic_context = "test_function"
+
+[tool.coverage.report]
+fail_under = 75
+exclude_also = [
+    "def __repr__",
+    "def __name__",
+    "def __del__",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "except ImportError",
+    "@(abc\\.)?abstractmethod",
+    "@(abc\\.)?abstractproperty",
+    "@(abc\\.)?abstractclassmethod",
+    "@(abc\\.)?abstractstaticmethod",
+]
+
+[tool.coverage.json]
+pretty_print = true
+
+[tool.coverage.html]
+show_contexts = true
