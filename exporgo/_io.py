@@ -7,6 +7,8 @@ from functools import partial
 from tqdm import tqdm
 from joblib import Parallel, delayed
 
+from ._validators import convert_permitted_types_to_required
+
 
 """
 Some useful functions for file I/O operations (with user interaction where applicable).
@@ -57,15 +59,19 @@ def select_directory(**kwargs) -> Path:
     return directory_path.resolve()
 
 
-def verbose_copy(source: Path,
-                 destination: Path,
+@convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=0, key="source")
+@convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=1, key="destination")
+def verbose_copy(source: str | Path,
+                 destination: str | Path,
                  feedback: Optional[str] = None) -> bool:
     """
     Copy a file from source to destination. If verbose is True, print feedback.
 
     :param source: source file path
+    :type source: :class:`str` or :class:`Path <pathlib.Path>`
 
     :param destination: destination file path
+    :type destination: :class:`str` or :class:`Path <pathlib.Path>`
 
     :param feedback: feedback message
     :type feedback: :class:`Optional <typing.Optional>`\[:class:`str`\], default: ``None``
