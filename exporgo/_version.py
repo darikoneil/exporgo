@@ -5,7 +5,7 @@ _meta = _metadata("exporgo")
 
 
 #: str: The name of the package.
-name = _meta["name"]
+__package_name__ = _meta["name"]
 
 #: str: The version of the package.
-version = _meta["version"]
+__current_version__ = _meta["version"]
