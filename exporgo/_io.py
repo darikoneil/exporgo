@@ -1,14 +1,14 @@
-from typing import Optional
-from tkinter import Tk
-from tkinter.filedialog import askdirectory, askopenfilename
+from functools import partial
 from pathlib import Path
 from shutil import copy2
-from functools import partial
-from tqdm import tqdm
+from tkinter import Tk
+from tkinter.filedialog import askdirectory, askopenfilename
+from typing import Optional
+
 from joblib import Parallel, delayed
+from tqdm import tqdm
 
 from ._validators import convert_permitted_types_to_required
-
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

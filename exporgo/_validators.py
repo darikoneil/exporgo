@@ -6,8 +6,10 @@ from typing import Any, Callable, Tuple
 
 from . import __current_version__
 from .exceptions import (InvalidExtensionWarning, InvalidFilenameError,
-                          NotPermittedTypeError, VersionForwardCompatibilityWarning, VersionBackwardCompatibilityError,
-                          VersionBackwardCompatibilityWarning, UpdateVersionWarning)
+                         NotPermittedTypeError, UpdateVersionWarning,
+                         VersionBackwardCompatibilityError,
+                         VersionBackwardCompatibilityWarning,
+                         VersionForwardCompatibilityWarning)
 
 """
 Some functions useful for validation. Most of these functions are parameterized decorators that can be used to

@@ -1,14 +1,14 @@
 from __future__ import annotations
-from typing import Any, Iterable, Tuple
+
 from pathlib import Path
-from json_tricks import load, dump
+from typing import Any, Iterable, Tuple
+
+from json_tricks import dump, load
 
 from ._color import TERMINAL_FORMATTER
-
 from ._io import select_directory
-from .experiment import Experiment, ExperimentFactory
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
-
+from .experiment import Experiment, ExperimentFactory
 
 DEFAULT_SUBJECT = "default_subject"
 DEFAULT_PATH = Path.cwd()

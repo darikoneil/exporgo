@@ -1,11 +1,14 @@
 from __future__ import annotations
-from typing import Any, Iterable
+
+import warnings
+from collections import deque
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Iterable
+
 # noinspection PyProtectedMember
 from IPython import get_ipython
-from collections import deque
-from pathlib import Path
-import warnings
+
 from ._validators import convert_permitted_types_to_required
 
 

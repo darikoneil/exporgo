@@ -1,6 +1,5 @@
 from importlib_metadata import metadata as _metadata
 
-
 _meta = _metadata("exporgo")
 
 

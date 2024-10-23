@@ -1,6 +1,6 @@
-from typing import Iterator, Optional, Union, Mapping, Iterable, Generator
-from pathlib import Path
 from contextlib import suppress
+from pathlib import Path
+from typing import Generator, Iterable, Iterator, Mapping, Optional, Union
 
 from ._validators import convert_permitted_types_to_required
 

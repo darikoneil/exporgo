@@ -1,4 +1,7 @@
 @echo off
+:: format imports
+isort . ./exporgo ./tests
+
 :: run test suite
 coverage run
 :: export coverage to json / lcov for processing

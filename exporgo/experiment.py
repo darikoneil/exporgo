@@ -1,12 +1,13 @@
 from __future__ import annotations
-from typing import Iterable
-from pathlib import Path
+
 from abc import abstractmethod
 from importlib import import_module
+from pathlib import Path
+from typing import Iterable
 
-from .files import FileTree, FileSet
 from ._logging import get_timestamp
 from ._validators import convert_permitted_types_to_required
+from .files import FileSet, FileTree
 
 
 def _import_mix_in_string(json_string: str) -> "Experiment":

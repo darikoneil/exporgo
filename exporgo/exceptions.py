@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Optional
-from . import __current_version__, __package_name__
 
+from . import __current_version__, __package_name__
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
