@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from pathlib import Path
-from typing import Any, Iterable, Tuple
+from typing import Any, Iterable, Optional
 
 from json_tricks import dump, load
 
@@ -10,16 +8,17 @@ from ._io import select_directory
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from .experiment import Experiment, ExperimentFactory
 
-DEFAULT_SUBJECT = "default_subject"
-DEFAULT_PATH = Path.cwd()
+
+_DEFAULT_PATH = Path.cwd()
 
 
 class Subject:
 
-    #: list: modifications to this object
-    _modifications = ModificationLogger()
-
-    def __init__(self, name: str = DEFAULT_SUBJECT, directory: Path = DEFAULT_PATH, species: str = None, study: str = None,
+    def __init__(self,
+                 name: str = "Subject",
+                 directory: str | Path = _DEFAULT_PATH,
+                 species: str = "Mouse",
+                 study: str = None,
                  condition: str = None):
         """
         Class for organizing experiments for a single subject
@@ -33,6 +32,9 @@ class Subject:
         :param condition: experimental condition
         :type condition: str
         """
+
+        #: list: modifications to this object
+        self._modifications = ModificationLogger()
 
         # if directory doesn't contain mouse, we ought to add it
         if name not in directory.name:
@@ -49,6 +51,8 @@ class Subject:
         self.directory = directory
         #: str: mouse
         self.name = name
+        #: str: species
+        self.species = species
         #: str: name of study
         self.study = study
         #: str: condition
@@ -86,11 +90,9 @@ class Subject:
 
         return string_to_print
 
-    def save(self) -> Mouse:
+    def save(self) -> None:
         """
         Saves mouse to file
-
-        :rtype: Mouse
         """
         # temporarily close logging
         self._logger.end_log()
@@ -102,19 +104,19 @@ class Subject:
         self._logger.start_log()
 
     @property
-    def modifications(self) -> Tuple:
+    def modifications(self) -> tuple:
         return tuple(self._modifications)
 
     @property
-    def experiments(self) -> Tuple:
+    def experiments(self) -> tuple["Experiment", ...]:
         return tuple([name for name, experiment in vars(self).items() if isinstance(experiment, Experiment)])
 
     @property
-    def organization_file(self) -> Tuple:
+    def organization_file(self) -> tuple:
         return self.directory.joinpath("organization_file.json")
 
     @classmethod
-    def load(cls: Mouse, directory: str = None) -> Mouse:
+    def load(cls, directory: Optional[str | Path] = None) -> "Subject":
         """
         Function that loads a mouse
 
@@ -144,12 +146,12 @@ class Subject:
 
         return mouse
 
-    def create_experiment(self, name: str, mix_ins: Iterable[Experiment]) -> Mouse:
+    def create_experiment(self, name: str, mix_ins: Iterable[Experiment]) -> "Subject":
         factory = ExperimentFactory(name=name, base_directory=self.directory)
         factory.add_mix_ins(mix_ins=mix_ins)
         setattr(self, name, factory.instance_constructor())
 
-    def record(self, info: str = None) -> Mouse:
+    def record(self, info: str = None) -> "Subject":
         """
         Record some modification
 
@@ -159,7 +161,7 @@ class Subject:
         """
         self._modifications.appendleft(info)
 
-    def reindex(self) -> Mouse:
+    def reindex(self) -> "Subject":
         """
         Updates dictionary for any all experiments
 
@@ -169,7 +171,7 @@ class Subject:
             experiment = getattr(self, experiment_name)
             experiment.reindex()
 
-    def validate(self) -> Mouse:
+    def validate(self) -> "Subject":
         """
         Validates all experimental files are accounted for
 
@@ -179,7 +181,7 @@ class Subject:
             experiment = getattr(self, experiment_name)
             experiment.validate()
 
-    def log_status(self) -> Mouse:
+    def log_status(self) -> "Subject":
         return self._logger.check_log_status()
 
     def __json_encode__(self):
@@ -196,7 +198,7 @@ class Subject:
                 }
         return serialized_mouse
 
-    def __setattr__(self, key: Any, value: Any) -> Mouse:
+    def __setattr__(self, key: Any, value: Any) -> "Subject":
         """
         Override magic to auto-record modifications
 
@@ -221,54 +223,3 @@ class Subject:
         """
         if "_logger" in vars(self):
             self._logger.end_log()
-
-
-class Fish(Subject):
-    def __init__(self,
-                 name: str = DEFAULT_SUBJECT,
-                 directory: Path = DEFAULT_PATH,
-                 species: str = "fish",
-                 study: str = None,
-                 condition: str = None):
-        super().__init__(name, directory, species, study, condition)
-
-
-class Fly(Subject):
-    def __init__(self,
-                 name: str = DEFAULT_SUBJECT,
-                 directory: Path = DEFAULT_PATH,
-                 species: str = "fly",
-                 study: str = None,
-                 condition: str = None):
-        super().__init__(name, directory, species, study, condition)
-
-
-# LOL IS THIS LEGAL
-class Human(Subject):
-    def __init__(self,
-                 name: str = DEFAULT_SUBJECT,
-                 directory: Path = DEFAULT_PATH,
-                 species: str = "human",
-                 study: str = None,
-                 condition: str = None):
-        super().__init__(name, directory, species, study, condition)
-
-
-class Mouse(Subject):
-    def __init__(self,
-                 name: str = DEFAULT_SUBJECT,
-                 directory: Path = DEFAULT_PATH,
-                 species: str = "mouse",
-                 study: str = None,
-                 condition: str = None):
-        super().__init__(name, directory, species, study, condition)
-
-
-class Rat(Subject):
-    def __init__(self,
-                 name: str = DEFAULT_SUBJECT,
-                 directory: Path = DEFAULT_PATH,
-                 species: str = "rat",
-                 study: str = None,
-                 condition: str = None):
-        super().__init__(name, directory, species, study, condition)
