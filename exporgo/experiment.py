@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from abc import abstractmethod
 from importlib import import_module
 from pathlib import Path
@@ -14,7 +12,7 @@ def _import_mix_in_string(json_string: str) -> "Experiment":
     """
     Import experiment mix-in from string. Usually this is taken from the serialized object but not always.
     For this to always work, we have to make sure that the mix-in follows PEP naming conventions and they always reside
-    in its own module
+    in their own module
 
     :param json_string: string indicating mix-in to import
 
@@ -24,7 +22,8 @@ def _import_mix_in_string(json_string: str) -> "Experiment":
                    for char_ in json_string if char_.lower()]
     module_name = "".join(module_name)
     module_name = "".join(module_name[1:])
-    return getattr(import_module("".join(["CalSciPy.organization.", module_name])), json_string)
+    return getattr(import_module("".join(["exporgo.", module_name])), json_string)
+    # TODO: This is a hacky way to import the mix-ins. We should find a better way to do this
 
 
 class Experiment:
@@ -61,7 +60,7 @@ class Experiment:
         return "Experiment"
 
     @classmethod
-    def __json_construct__(cls: object, self: object) -> Experiment:
+    def __json_construct__(cls: object, self: object) -> "Experiment":
         """
         Constructs the experiment from serialized form
 
@@ -103,7 +102,7 @@ class Experiment:
         self.file_tree.validate()
 
     @abstractmethod
-    def collect_data(self) -> Experiment:
+    def collect_data(self) -> "Experiment":
         """
         Abstract method for collecting experimental data and organizing into the file tree
 
@@ -112,7 +111,7 @@ class Experiment:
         pass
 
     @abstractmethod
-    def analyze_data(self) -> Experiment:
+    def analyze_data(self) -> "Experiment":
         """
         Abstract method for analyzing the data within the file tree
 
@@ -121,7 +120,7 @@ class Experiment:
         pass
 
     @abstractmethod
-    def generate_class_files(self) -> Experiment:
+    def generate_class_files(self) -> "Experiment":
         """
         Abstract method for generating any file sets within the file tree that are specific to some mix-in
 
@@ -181,7 +180,7 @@ class ExperimentFactory:
                 mix_in = _import_mix_in_string(mix_in)
             self._mix_ins.append(mix_in)
 
-    def object_constructor(self) -> Experiment:
+    def object_constructor(self) -> "Experiment":
         """
         Construct a concrete experiment object using the mix-ins
 
@@ -192,7 +191,7 @@ class ExperimentFactory:
         params.pop("base_directory")
         return type(self._name, tuple(self._mix_ins), params)
 
-    def instance_constructor(self) -> Experiment:
+    def instance_constructor(self) -> "Experiment":
         """
         Construct an instance of a concrete experiment object using the mix-ins
 

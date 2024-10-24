@@ -11,7 +11,7 @@ from joblib import parallel_config
 from exporgo._io import select_directory, select_file, verbose_copy
 
 
-@patch('exporgo._io.askopenfilename', return_value=Path.cwd().joinpath("file.txt"))
+@patch('exporgo._io.askopenfilename', return_value=Path.cwd().joinpath("tests").joinpath("test_io.py"))
 @patch('exporgo._io.Tk')
 def test_select_file_returns_correct_path(mock_tk, mock_askopenfilename):
     result = select_file()
@@ -26,7 +26,7 @@ def test_select_file_raises_file_not_found_error(mock_tk, mock_askopenfilename):
     mock_tk.return_value.destroy.assert_called_once()
 
 
-@patch('exporgo._io.askdirectory', return_value=Path.cwd().joinpath("folder"))
+@patch('exporgo._io.askdirectory', return_value=Path.cwd().joinpath("tests"))
 @patch('exporgo._io.Tk')
 def test_directory_selection_returns_correct_path(mock_tk, mock_askdirectory):
     result = select_directory()
@@ -34,10 +34,10 @@ def test_directory_selection_returns_correct_path(mock_tk, mock_askdirectory):
     mock_tk.return_value.destroy.assert_called_once()
 
 
-@patch('exporgo._io.askdirectory', return_value='.')
+@patch('exporgo._io.askdirectory', return_value=".")
 @patch('exporgo._io.Tk')
 def test_directory_selection_raises_io_error(mock_tk, mock_askdirectory):
-    with pytest.raises(IOError):
+    with pytest.raises(FileNotFoundError):
         select_directory()
     mock_tk.return_value.destroy.assert_called_once()
 

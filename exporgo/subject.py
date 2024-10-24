@@ -8,6 +8,7 @@ from ._io import select_directory
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from .experiment import Experiment, ExperimentFactory
 
+
 _DEFAULT_PATH = Path.cwd()
 
 
@@ -145,12 +146,12 @@ class Subject:
 
         return mouse
 
-    def create_experiment(self, name: str, mix_ins: Iterable[Experiment]) -> "Subject":
+    def create_experiment(self, name: str, mix_ins: Iterable[Experiment]) -> None:
         factory = ExperimentFactory(name=name, base_directory=self.directory)
         factory.add_mix_ins(mix_ins=mix_ins)
         setattr(self, name, factory.instance_constructor())
 
-    def record(self, info: str = None) -> "Subject":
+    def record(self, info: str = None) -> None:
         """
         Record some modification
 
@@ -160,7 +161,7 @@ class Subject:
         """
         self._modifications.appendleft(info)
 
-    def reindex(self) -> "Subject":
+    def reindex(self) -> None:
         """
         Updates dictionary for any all experiments
 
@@ -170,7 +171,7 @@ class Subject:
             experiment = getattr(self, experiment_name)
             experiment.reindex()
 
-    def validate(self) -> "Subject":
+    def validate(self) -> None:
         """
         Validates all experimental files are accounted for
 
@@ -180,7 +181,7 @@ class Subject:
             experiment = getattr(self, experiment_name)
             experiment.validate()
 
-    def log_status(self) -> "Subject":
+    def log_status(self) -> None:
         return self._logger.check_log_status()
 
     def __json_encode__(self):
@@ -197,7 +198,7 @@ class Subject:
                 }
         return serialized_mouse
 
-    def __setattr__(self, key: Any, value: Any) -> "Subject":
+    def __setattr__(self, key: Any, value: Any) -> None:
         """
         Override magic to auto-record modifications
 

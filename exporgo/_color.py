@@ -2,9 +2,8 @@ from operator import eq
 from typing import Any
 from warnings import warn
 
-from sqlalchemy.testing.plugin.plugin_base import warnings
-
 from .exceptions import ImmutableInstanceWarning, SingletonError
+
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
