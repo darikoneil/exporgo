@@ -1,11 +1,45 @@
 # noinspection PyUnresolvedReferences
 from itertools import product
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from joblib import parallel_config
 
 # noinspection PyProtectedMember
-from exporgo._io import verbose_copy
+# noinspection PyProtectedMember
+from exporgo._io import select_directory, select_file, verbose_copy
+
+
+@patch('exporgo._io.askopenfilename', return_value=Path.cwd().joinpath("file.txt"))
+@patch('exporgo._io.Tk')
+def test_select_file_returns_correct_path(mock_tk, mock_askopenfilename):
+    result = select_file()
+    assert result == Path.cwd().joinpath("file.txt")
+    mock_tk.return_value.destroy.assert_called_once()
+
+@patch('exporgo._io.askopenfilename', return_value='.')
+@patch('exporgo._io.Tk')
+def test_select_file_raises_file_not_found_error(mock_tk, mock_askopenfilename):
+    with pytest.raises(FileNotFoundError):
+        select_file()
+    mock_tk.return_value.destroy.assert_called_once()
+
+
+@patch('exporgo._io.askdirectory', return_value=Path.cwd().joinpath("folder"))
+@patch('exporgo._io.Tk')
+def test_directory_selection_returns_correct_path(mock_tk, mock_askdirectory):
+    result = select_directory()
+    assert result == Path.cwd().joinpath("folder")
+    mock_tk.return_value.destroy.assert_called_once()
+
+
+@patch('exporgo._io.askdirectory', return_value='.')
+@patch('exporgo._io.Tk')
+def test_directory_selection_raises_io_error(mock_tk, mock_askdirectory):
+    with pytest.raises(IOError):
+        select_directory()
+    mock_tk.return_value.destroy.assert_called_once()
 
 
 def test_verbose_copy(source, destination):

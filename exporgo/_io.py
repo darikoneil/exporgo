@@ -39,7 +39,7 @@ def select_file(**kwargs) -> Path:
     return file_path.resolve()
 
 
-def select_directory(**kwargs) -> Path:
+def select_directory(**kwargs) -> Path: # pragma: no cover
     """
     Interactive tool for directory selection. All keyword arguments are
     passed to `tkinter.filedialog.askdirectory <https://docs.python.org/3/library/tk.html>`_
@@ -94,7 +94,7 @@ def verbose_copy(source: str | Path,
     # file paths they run out of system RAM, so not exposing the joblib backend to allow threading as an alternative.
     # The list of the file paths is wrapped in tqdm to provide verbose feedback (progress bar).
 
-    def _copy(source_: Path, destination_: Path, file: Path) -> Path:
+    def _copy(source_: Path, destination_: Path, file: Path) -> Path: # pragma: no cover
         """
         Copy a file from source to destination (single file function, parallelized). Should call the system fast-copy
         regardless of the OS.

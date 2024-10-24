@@ -1,5 +1,8 @@
 from operator import eq
 from typing import Any
+from warnings import warn
+
+from sqlalchemy.testing.plugin.plugin_base import warnings
 
 from .exceptions import ImmutableInstanceWarning, SingletonError
 
@@ -80,7 +83,7 @@ class _TerminalFormatter:
         """
         Prevent setting of attributes
         """
-        raise ImmutableInstanceWarning(self)
+        warn(ImmutableInstanceWarning(self), stacklevel=2)
 
     def __repr__(self):
         return "Terminal Formatter"
