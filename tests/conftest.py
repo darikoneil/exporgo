@@ -1,34 +1,22 @@
 import sys
 from itertools import product
 from os import devnull
-from pathlib import Path
 from shutil import rmtree
 
 import pytest
+
 
 """
 CONFIGURATION FOR TESTING
 """
 
 
-# MANUALLY MAKE TEMP DIRECTORY SINCE PYTEST'S TMP_PATH IS SOLELY FUNCTION SCOPE
-_TEMPORARY_DIRECTORY = Path().cwd().joinpath("temp")
-if not _TEMPORARY_DIRECTORY.exists():
-    _TEMPORARY_DIRECTORY.mkdir(exist_ok=True)
-
-
-@pytest.fixture(scope="session")
-def temp_path():
-    return _TEMPORARY_DIRECTORY
-
-
 @pytest.fixture(scope="function")
-def source(request):
+def source(request, tmp_path):
     """
     Create dummy files for testing
     """
-
-    source = _TEMPORARY_DIRECTORY.joinpath("source")
+    source = tmp_path.joinpath("source")
     source.mkdir(exist_ok=True, parents=True)
 
     for file, folder in product(range(3), range(3)):
@@ -46,12 +34,12 @@ def source(request):
 
 
 @pytest.fixture(scope="function")
-def destination(request):
+def destination(request, tmp_path):
     """
     Create dummy files for testing
     """
 
-    destination = _TEMPORARY_DIRECTORY.joinpath("destination")
+    destination = tmp_path.joinpath("destination")
     destination.mkdir(exist_ok=True, parents=True)
 
     def cleanup():

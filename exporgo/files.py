@@ -141,7 +141,7 @@ class FileTree:
         Reindex the file tree to find newly added files
         """
         for key, _ in self.items():  # items call guarantees filesets only
-            self.get(key).reindex()
+            self.get(key).index()
 
     @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=1, key="base_directory")
     def remap(self, base_directory: str | Path) -> None:
@@ -212,7 +212,10 @@ class FileSet:
     """
 
     @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=2, key="parent_directory")
-    def __init__(self, name: str, parent_directory: str | Path):
+    def __init__(self,
+                 name: str,
+                 parent_directory: str | Path,
+                 index: bool = True):
         """
         Organizing class for a set of files. Contents may be only files or a collection of folders and files.
         This class is useful in managing coherent sets of data like experimental sessions or a calendar day. It offers
@@ -221,6 +224,8 @@ class FileSet:
         :param name: Name of file set
 
         :param parent_directory: Parent directory (filetree)
+
+        :param index: Whether to index the files and folders in the directory upon initialization
         """
         #: str: name of file set
         self._name = name
@@ -228,27 +233,30 @@ class FileSet:
         #: :class:`Path <pathlib.Path>`: File set directory
         self.directory = parent_directory.joinpath(name)
 
-        #: :class:`dict`: Files cache
-        self._files = {}  # files cache
+        #: :class:`FileMap <exporgo.files.FileMap>`: Files cache
+        self._files = FileMap()  # files cache
 
-        #: :class:`dict`: Folders cache
-        self._folders = {}  # folders cache
+        #: :class:`FileMap <exporgo.files.FileMap>`: Folders cache
+        self._folders = FileMap()  # folders cache
+
+        if index:
+            self.index()
 
     @property
-    def files(self) -> dict:
+    def files(self) -> "FileMap":
         """
         :Getter: Returns the files in the file set (cached)
-        :Getter Type: :class:`dict`
+        :Getter Type: :class:`FileMap <exporgo.files.FileMap>`
         :Setter: This property cannot be set
 
         """
         return self._files
 
     @property
-    def folders(self) -> dict:
+    def folders(self) -> "FileMap":
         """
         :Getter: Returns the folders in the file set (cached)
-        :Getter Type: :class:`dict`
+        :Getter Type: :class:`FileMap <exporgo.files.FileMap>`
         :Setter: This property cannot be set
 
         """
@@ -277,14 +285,13 @@ class FileSet:
         """
         return [file for file in self.files.values() if file.match(identifier)]
 
-    def reindex(self) -> None:
+    def index(self) -> None:
         """
-        Re-indexes the files and folders cache
-
+        Indexes the files and folders cache
         """
         self._files = FileMap()
         self._folders = FileMap()
-        self._files.update([(file.stem, file) for file in self.directory.rglob("*") if file.is_file()])
+        self._files.update(((file.stem, file) for file in self.directory.rglob("*") if file.is_file()))
         self._folders.update([(folder.stem, folder) for folder in self.directory.rglob("*") if not folder.is_file()])
 
     @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=1, key="parent_directory")
@@ -295,7 +302,7 @@ class FileSet:
         :param parent_directory: Parent directory
         """
         self.directory = parent_directory.joinpath(self._name)
-        self.reindex()
+        self.index()
 
     def validate(self) -> None:
         """
