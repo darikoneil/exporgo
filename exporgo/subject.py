@@ -7,6 +7,7 @@ from ._color import TERMINAL_FORMATTER
 from ._io import select_directory
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from .experiment import Experiment, ExperimentFactory
+from .exceptions import MissingFilesError
 
 
 _DEFAULT_PATH = Path.cwd()
@@ -19,7 +20,9 @@ class Subject:
                  directory: str | Path = _DEFAULT_PATH,
                  species: str = "Mouse",
                  study: str = None,
-                 condition: str = None):
+                 condition: str = None,
+                 meta: dict = None,
+                 **kwargs):
         """
         Class for organizing experiments for a single subject
 
@@ -57,6 +60,9 @@ class Subject:
         self.study = study
         #: str: condition
         self.condition = condition
+        self.meta = meta if meta else {}
+        if kwargs:
+            self.meta.update(kwargs)
         #: str: instance date
         self._instance_date = get_timestamp()
         # call this only after all attrs successfully initialized
@@ -96,7 +102,6 @@ class Subject:
         """
         # temporarily close logging
         self._logger.end_log()
-
         # dump is manipulative so:
         with open(self.organization_file, "w") as file:
             dump(self, file, indent=4)
@@ -108,11 +113,11 @@ class Subject:
         return tuple(self._modifications)
 
     @property
-    def experiments(self) -> tuple["Experiment", ...]:
+    def experiments(self) -> tuple[str, ...]:
         return tuple([name for name, experiment in vars(self).items() if isinstance(experiment, Experiment)])
 
     @property
-    def organization_file(self) -> tuple:
+    def organization_file(self) -> Path:
         return self.directory.joinpath("organization_file.json")
 
     @classmethod
@@ -161,7 +166,7 @@ class Subject:
         """
         self._modifications.appendleft(info)
 
-    def reindex(self) -> None:
+    def index(self) -> None:
         """
         Updates dictionary for any all experiments
 
@@ -169,7 +174,7 @@ class Subject:
         """
         for experiment_name in self.experiments:
             experiment = getattr(self, experiment_name)
-            experiment.reindex()
+            experiment.index()
 
     def validate(self) -> None:
         """
@@ -177,9 +182,16 @@ class Subject:
 
         :rtype: Mouse
         """
+        missing = {}
         for experiment_name in self.experiments:
             experiment = getattr(self, experiment_name)
-            experiment.validate()
+            try:
+                experiment.validate()
+            except MissingFilesError as exc:
+                missing.update(exc.missing_files)
+
+        if missing:
+            raise MissingFilesError(missing)
 
     def log_status(self) -> None:
         return self._logger.check_log_status()
@@ -212,14 +224,5 @@ class Subject:
         self.record(key)
 
     def __del__(self):
-        if "_logger" in vars(self):
-            self._logger.end_log()
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """
-        Shuts down logging on exit
-
-        :rtype: None
-        """
         if "_logger" in vars(self):
             self._logger.end_log()

@@ -165,7 +165,7 @@ def convert_permitted_types_to_required(function: Callable,
                 allowed_input = required(allowed_input)
 
             if not isinstance(allowed_input, required):
-                raise NotPermittedTypeError(key, pos, permitted)
+                raise NotPermittedTypeError(key, pos, permitted, allowed_input)
 
             if use_args:
                 args = _amend_args(args, allowed_input, pos)

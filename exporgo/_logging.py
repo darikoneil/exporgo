@@ -9,10 +9,7 @@ from typing import Any, Iterable
 # noinspection PyProtectedMember
 from IPython import get_ipython
 
-from ._validators import convert_permitted_types_to_required
 
-
-@convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=0, key="directory")
 class IPythonLogger:
     """
     Wrapper class for IPython logging

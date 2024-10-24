@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Any, Optional
 
+from IPython.core.magic_arguments import argument
+
 from . import __current_version__, __package_name__
 
 """
@@ -94,11 +96,13 @@ class NotPermittedTypeError(TypeError):
     :param permitted: permitted type/s
     :type permitted: :class:`Any` or :class:`tuple`\[:class:`Any`\]
     """
-    def __init__(self, key: str, pos: int, permitted: Any | tuple[Any, ...]):
+    def __init__(self, key: str, pos: int, permitted: Any | tuple[Any, ...], arg: Any):
         self.key = key
         self.pos = pos
         self.permitted = permitted
-        super().__init__(f"Argument {self.key} at position {self.pos} must be of type {self.permitted}")
+        self.argument = arg
+        super().__init__(f"Argument {self.key} at position {self.pos} must be of type {self.permitted};"
+                         f"passed type: {type(self.argument)}")
 
 
 """
