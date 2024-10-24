@@ -1,7 +1,10 @@
-import pytest
-from unittest.mock import patch, MagicMock
 from pathlib import Path
-from exporgo.subject import Subject, MissingFilesError
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from exporgo.subject import MissingFilesError, Subject
+
 
 @patch('exporgo.subject.IPythonLogger')
 @patch('exporgo.subject.ModificationLogger')

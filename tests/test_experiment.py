@@ -1,7 +1,11 @@
-import pytest
-from unittest.mock import patch, MagicMock
 from pathlib import Path
-from exporgo.experiment import Experiment, ExperimentFactory, _import_mix_in_string
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from exporgo.experiment import (Experiment, ExperimentFactory,
+                                _import_mix_in_string)
+
 
 @patch('exporgo.experiment.import_module')
 def import_mix_in_string_imports_correct_module(mock_import_module):

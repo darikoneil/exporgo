@@ -6,9 +6,8 @@ from json_tricks import dump, load
 from ._color import TERMINAL_FORMATTER
 from ._io import select_directory
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
-from .experiment import Experiment, ExperimentFactory
 from .exceptions import MissingFilesError
-
+from .experiment import Experiment, ExperimentFactory
 
 _DEFAULT_PATH = Path.cwd()
 
