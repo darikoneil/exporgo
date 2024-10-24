@@ -1,7 +1,8 @@
-from pathlib import Path
 import sys
-import pytest
 from os import devnull
+from pathlib import Path
+
+import pytest
 
 """
 CONFIGURATION FOR TESTING

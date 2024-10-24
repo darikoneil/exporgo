@@ -1,4 +1,5 @@
 import pytest
+
 # noinspection PyProtectedMember
 from exporgo._color import TERMINAL_FORMATTER, _TerminalFormatter
 from exporgo.exceptions import SingletonError

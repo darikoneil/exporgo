@@ -257,7 +257,7 @@ def validate_filename(function: Callable, pos: int = 0, key: str = None) -> Call
 """
 
 
-def validate_version(version: str):
+def validate_version(version: str) -> None:
     """
     Validate the compatibility of the organization's exporgo version with currently installed version of the package
 

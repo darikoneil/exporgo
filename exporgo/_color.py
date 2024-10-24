@@ -1,5 +1,5 @@
 from operator import eq
-from typing import Any, List, Tuple, Union
+from typing import Any
 
 from .exceptions import ImmutableInstanceWarning, SingletonError
 
@@ -38,12 +38,6 @@ class _TerminalFormatter:
             raise SingletonError(cls)
         return cls.instance
 
-    def __setattr__(self, key: Any, value: Any):
-        """
-        Prevent setting of attributes
-        """
-        raise ImmutableInstanceWarning(self)
-
     def __str__(self):
         return "Terminal Formatter"
 
@@ -79,8 +73,14 @@ class _TerminalFormatter:
         return self.BOLD + self.RED + self.UNDERLINE
 
     @staticmethod
-    def __name__(self) -> str:
+    def __name__() -> str:
         return "Terminal Formatter"
+
+    def __setattr__(self, key: Any, value: Any):
+        """
+        Prevent setting of attributes
+        """
+        raise ImmutableInstanceWarning(self)
 
     def __repr__(self):
         return "Terminal Formatter"
@@ -97,7 +97,7 @@ class _TerminalFormatter:
         # I could probably just have this fail directly, but this is a bit more graceful.
         # It's more important that the message to the user is received than raising an exception because of style
         # matters.
-        if any([eq(style_, style) for style_ in dir(self) if "__" not in style_]):
+        if any((eq(style_, style) for style_ in dir(self) if "__" not in style_)):
             return "".join([getattr(self, style), message, self.RESET])
         else:
             return message

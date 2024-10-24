@@ -159,6 +159,7 @@ class VersionBackwardCompatibilityError(ValueError):
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
 
+
 class SingletonError(RuntimeError):
     """
     Raised when attempting to create a second instance of a singleton

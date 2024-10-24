@@ -6,7 +6,6 @@ from tkinter.filedialog import askdirectory, askopenfilename
 from typing import Optional
 
 from joblib import Parallel, delayed
-from sqlalchemy.sql.operators import truediv
 from tqdm import tqdm
 
 from ._validators import convert_permitted_types_to_required
@@ -16,6 +15,8 @@ from ._validators import convert_permitted_types_to_required
 // User Interactions
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
+
+
 def select_file(**kwargs) -> Path:
     """
     Interactive tool for file selection. All keyword arguments are
@@ -100,7 +101,6 @@ def verbose_copy(source: str | Path,
         """
         file_destination = destination_.joinpath(file.relative_to(source_))
         return copy2(file, file_destination)
-
 
     destination.mkdir(parents=True, exist_ok=True)
     folders = [folder for folder in source.rglob("*") if not folder.is_file()]
