@@ -5,7 +5,6 @@ from shutil import rmtree
 
 import pytest
 
-
 """
 CONFIGURATION FOR TESTING
 """

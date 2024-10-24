@@ -1,11 +1,12 @@
 from contextlib import suppress
+from functools import singledispatchmethod
 from itertools import chain
 from pathlib import Path
-from typing import Generator, Iterable, Iterator, Mapping, Optional, Any
 from shutil import rmtree
-from functools import singledispatchmethod
-from .exceptions import MissingFilesError
+from typing import Any, Generator, Iterable, Iterator, Mapping, Optional
+
 from ._validators import convert_permitted_types_to_required
+from .exceptions import MissingFilesError
 
 
 class FileTree:
@@ -223,7 +224,6 @@ class FileTree:
         if missing:
             raise MissingFilesError(missing)
 
-
     def values(self) -> Generator["FileSet", None, None]:
         """
         Collects the filesets of the file tree
@@ -258,7 +258,7 @@ class FileTree:
         if isinstance(value, FileSet):
             rmtree(value.directory)
 
-    def _populate(self):
+    def _populate(self) -> None:
         for file_set in (file_set for file_set in self.directory.glob("*") if file_set is not file_set.is_file()):
             self.add_path(file_set.stem) if (file_set not in self.values()) else None
 
