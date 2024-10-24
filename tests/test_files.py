@@ -1,4 +1,6 @@
 import pytest
+
+from exporgo.exceptions import MissingFilesError
 from exporgo.files import FileMap, FileSet, FileTree
 
 
@@ -95,5 +97,99 @@ class TestFileSet:
 
 
 class TestFileTree:
-    ...
 
+    def test_initialization_with_index(self, tmp_path, source):
+        file_tree = FileTree("source", tmp_path)
+        assert file_tree.name == "source"
+        assert file_tree.directory == source
+        assert file_tree.num_files == len([file for file in source.rglob("*") if file.is_file()])
+        assert file_tree.num_folders == len([folder for folder in source.rglob("*") if not folder.is_file()])
+        assert len(file_tree) == len(list(source.glob("*")))
+
+    def test_add_path(self, tmp_path, source):
+        file_tree = FileTree("source", tmp_path)
+        file_tree.add_path("data")
+        assert isinstance(file_tree.get("data"), FileSet)
+        assert file_tree.get("data").directory == tmp_path.joinpath("source").joinpath("data")
+
+    def test_build(self, tmp_path):
+        file_tree = FileTree("experiment", tmp_path)
+        assert tmp_path.joinpath("experiment").exists()
+        file_tree.add_path("data")
+        file_tree.build()
+        assert file_tree.get("data").directory.exists()
+
+    def test_clear_keep(self, tmp_path, source):
+        file_tree = FileTree("source", tmp_path)
+        file_tree.clear(delete=False)
+        assert len(file_tree) == 0
+        assert tmp_path.joinpath("source").joinpath("dummy_folder_0").exists()
+
+    def test_clear_delete(self, tmp_path, source):
+        file_tree = FileTree("source", tmp_path)
+        file_tree.clear(delete=True)
+        assert len(file_tree) == 0
+        assert not tmp_path.joinpath("source").joinpath("dummy_folder_0").exists()
+
+    def test_get_existing_key(self, tmp_path, source):
+        file_tree = FileTree("source", tmp_path)
+        assert isinstance(file_tree.get("dummy_folder_0"), FileSet)
+
+    def test_get_non_existing_key(self, tmp_path):
+        file_tree = FileTree("source", tmp_path)
+        with pytest.raises(KeyError):
+            file_tree.get("non_existent")
+
+    def test_pop_existing_key(self, tmp_path, source):
+        file_tree = FileTree("source", tmp_path)
+        file_set = file_tree.pop("dummy_folder_0")
+        assert isinstance(file_set, FileSet)
+        assert len(file_tree) == len(list(source.glob("*"))) - 1
+
+    def test_pop_non_existing_key(self, tmp_path):
+        file_tree = FileTree("source", tmp_path)
+        with pytest.raises(KeyError):
+            file_tree.pop("non_existent")
+
+    def test_file_tree_popitem(self, tmp_path, source):
+        file_tree = FileTree("source", tmp_path)
+        file_set = file_tree.popitem()
+        assert isinstance(file_set, FileSet)
+        assert len(file_tree) == len(list(source.glob("*"))) - 1
+
+    def test_index(self, tmp_path, source):
+        file_tree = FileTree("source", tmp_path, index=False)
+        file_tree.add_path("dummy_folder_0")
+        file_tree.index()
+        assert len(file_tree) == 1
+        assert file_tree.num_files == 3
+
+    def test_remap(self, tmp_path, source, destination):
+        file_tree = FileTree("source", destination, index=False)
+        file_tree.remap(tmp_path)
+        assert file_tree.directory == tmp_path.joinpath("source")
+
+    def test_validate_success(self, tmp_path, source):
+        file_tree = FileTree("source", tmp_path)
+        file_tree.validate()  # Should not raise FileNotFoundError
+
+    def test_validate_fail(self, tmp_path, source):
+        file_tree = FileTree("source", tmp_path)
+        file = next(iter(file_tree.get("dummy_folder_0").files.values()))
+        file.unlink()
+        with pytest.raises(MissingFilesError):
+            file_tree.validate()
+
+    def test_call_with_target(self, tmp_path, source):
+        file_tree = FileTree("source", tmp_path)
+        target_key, target_file_set = next(iter(file_tree.items()))
+        assert file_tree.get(target_key) == target_file_set
+
+    def test_call_without_target(self, tmp_path):
+        file_tree = FileTree("source", tmp_path)
+        assert file_tree() == file_tree.directory
+
+    def test_call_target_not_found(self, tmp_path):
+        file_tree = FileTree("source", tmp_path)
+        with pytest.raises(FileNotFoundError):
+            file_tree("non_existent_file_set")

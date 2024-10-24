@@ -1,8 +1,10 @@
 from contextlib import suppress
 from itertools import chain
 from pathlib import Path
-from typing import Generator, Iterable, Iterator, Mapping, Optional
-
+from typing import Generator, Iterable, Iterator, Mapping, Optional, Any
+from shutil import rmtree
+from functools import singledispatchmethod
+from .exceptions import MissingFilesError
 from ._validators import convert_permitted_types_to_required
 
 
@@ -13,7 +15,11 @@ class FileTree:
     """
 
     @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=2, key="base_directory")
-    def __init__(self, name: str, base_directory: Path, **kwargs):
+    def __init__(self,
+                 name: str,
+                 base_directory: Path,
+                 index: bool = True,
+                 **kwargs):
         """
         A file tree that organizes experiment data, analyzed results, and figures. For implementation concerns it is not
         an extension of the built-in dictionary type, but it replicates most of its built-in methods.:
@@ -21,6 +27,8 @@ class FileTree:
         :param name: name of experiment
 
         :param base_directory: base directory of mouse
+
+        :param index: whether to populate & index the filesets in the directory upon initialization
 
         :param kwargs: key-value pairs passed to and incorporated into the file tree. Can be file sets, paths, etc
 
@@ -46,6 +54,37 @@ class FileTree:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+        if index:
+            self.index(populate=True)
+
+    @property
+    def name(self) -> str:
+        """
+        :Getter: Returns the name of the file tree
+        :Getter Type: :class:`str`
+        :Setter: This property cannot be set
+
+        """
+        return self._name
+
+    @property
+    def num_files(self) -> int:
+        """
+        :Getter: Returns the number of files in the file tree
+        :Getter Type: :class:`int`
+        :Setter: This property cannot be set
+        """
+        return sum(len(file_set.files) for file_set in self.values())
+
+    @property
+    def num_folders(self) -> int:
+        """
+        :Getter: Returns the number of folders in the file tree
+        :Getter Type: :class:`int`
+        :Setter: This property cannot be set
+        """
+        return sum(len(file_set.folders) for file_set in self.values()) + len(self)
+
     def add_path(self, key: str) -> None:
         """
         Adds a file set to the file tree
@@ -62,12 +101,18 @@ class FileTree:
             if isinstance(value, FileSet) and not value.directory.exists():
                 value.directory.mkdir()
 
-    def clear(self) -> None:
+    def clear(self, delete: bool = False) -> None:
         """
-        Clears the Filetree of all filesets
+        Clears the Filetree of all filesets.
+
+        :param delete: Whether to delete the filesets from the file system when cleared
         """
-        with suppress(KeyError):
-            self.popitem()
+        if delete:
+            self._delete(self.keys())
+
+        with suppress(IndexError):
+            while True:
+                self.popitem()
 
     def get(self, key: str) -> "FileSet":
         """
@@ -75,9 +120,12 @@ class FileTree:
 
         :returns: The file set associated with some key
 
-        :rtype: :class:`FileSet <CalSciPy.organization.files.FileSet>`
+        :rtype: :class:`FileSet <exporgo.files.FileSet>`
         """
-        return self.__getattribute__(key)
+        try:
+            return self.__getattribute__(key)
+        except AttributeError as exc:
+            raise KeyError(f"{key} not in filetree") from exc
 
     def items(self) -> Generator[tuple[str, "FileSet"], None, None]:
         """
@@ -89,7 +137,7 @@ class FileTree:
         """
         return ((key, value) for key, value in vars(self).items() if isinstance(value, FileSet))
 
-    def iter(self) -> Iterator:
+    def iter(self) -> Iterator[str]:
         """
 
         :returns: Iterator over the filesets keys in the filetree
@@ -117,7 +165,7 @@ class FileTree:
 
         :return: Fileset removed from the filetree
 
-        :rtype: :class:`FileSet <CalSciPy.organization.files.FileSet>`
+        :rtype: :class:`FileSet <exporgo.files.FileSet>`
 
         :raise: KeyError if the fileset is not in the filetree
         """
@@ -130,16 +178,22 @@ class FileTree:
         """
         Remove and return a fileset from the filetree. LIFO order guarantee.
 
-        :raise: KeyError if the filetree is empty
+        :raise: IndexError if the filetree is empty
 
         """
         key = list(self.keys())[-1]
         return self.pop(key)
 
-    def reindex(self) -> None:
+    def index(self, populate: bool = False) -> None:
         """
         Reindex the file tree to find newly added files
+
+        :param populate: Whether to populate the file tree with new filesets
         """
+
+        if populate:
+            self._populate()
+
         for key, _ in self.items():  # items call guarantees filesets only
             self.get(key).index()
 
@@ -157,10 +211,18 @@ class FileTree:
     def validate(self) -> None:
         """
         Validates that the existing filesets still exist and contain the prescribed files
+
+        :raises MissingFilesError: If any files or folders are missing
         """
+        missing = {}
         for value in self.values():
-            value.validate()
-        # TODO: Review
+            try:
+                value.validate()
+            except MissingFilesError as exc:
+                missing.update(exc.missing_files)
+        if missing:
+            raise MissingFilesError(missing)
+
 
     def values(self) -> Generator["FileSet", None, None]:
         """
@@ -168,11 +230,37 @@ class FileTree:
 
         :return: Filesets of the FileTree
 
-        :rtype: :class:`Generator <typing.Generator>`\[:class:`FileSet <CalSciPy.organization.files.FileSet>`\,
+        :rtype: :class:`Generator <typing.Generator>`\[:class:`FileSet <exporgo.files.FileSet>`\,
             :class:`None`\, :class:`None`\]
 
         """
         return (value for _, value in self.items())    # items call guarantees filesets only
+
+    @singledispatchmethod
+    def _delete(self, key: tuple[str] | list[str] | Generator[str, None, None] | Iterator[str]) -> None:
+        """
+        Deletes a fileset from the filetree
+
+        :param key: key of fileset to delete
+        """
+        key = list(key)
+        for key_ in key:
+            self._delete(key_)
+
+    @_delete.register
+    def _(self, key: str) -> None:
+        """
+        Deletes multiple filesets from the filetree
+
+        :param key: keys of filesets to delete
+        """
+        value = self.pop(key)
+        if isinstance(value, FileSet):
+            rmtree(value.directory)
+
+    def _populate(self):
+        for file_set in (file_set for file_set in self.directory.glob("*") if file_set is not file_set.is_file()):
+            self.add_path(file_set.stem) if (file_set not in self.values()) else None
 
     def __call__(self, target: Optional[str] = None) -> Path:
         """
@@ -198,10 +286,12 @@ class FileTree:
         """
         Implementation of length magic method.
 
-        :return: Number of filesets in the filetree
+        :return: Number of file_sets in the filetree
 
+        .. warning:: This method does not return the number of files in the filetree.
+            It returns the number of filesets!
         """
-        return len(list(self.keys()))
+        return sum(1 for _ in self.keys())
 
 
 class FileSet:
@@ -292,7 +382,7 @@ class FileSet:
         self._files = FileMap()
         self._folders = FileMap()
         self._files.update(((file.stem, file) for file in self.directory.rglob("*") if file.is_file()))
-        self._folders.update([(folder.stem, folder) for folder in self.directory.rglob("*") if not folder.is_file()])
+        self._folders.update(((folder.stem, folder) for folder in self.directory.rglob("*") if not folder.is_file()))
 
     @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=1, key="parent_directory")
     def remap(self, parent_directory: str | Path) -> None:
@@ -308,11 +398,11 @@ class FileSet:
         """
         Validates all files and folders in cache still exist
 
+        :raises MissingFilesError: If any files or folders are missing
         """
-        for name, location in self.files.items():
-            if not location.exists():
-                raise FileNotFoundError(f"{name}")
-        # TODO: Review
+        missing = {name: location for name, location in self.files.items() if not location.exists()}
+        if missing:
+            raise MissingFilesError(missing)
 
     def __call__(self, target: Optional[str] = None) -> Path:
         """
@@ -334,6 +424,16 @@ class FileSet:
         else:
             raise FileNotFoundError(f"{target} not found in {self.directory}")
 
+    def __eq__(self, other: Any) -> bool:
+        """
+        Implementation of equality magic method
+
+        :param other: other object to compare to
+
+        :return: Whether the fileset is equal to another object
+        """
+        return isinstance(other, FileSet) and self.directory == other.directory
+
 
 class FileMap(dict):
     """
@@ -341,7 +441,7 @@ class FileMap(dict):
     rather than overwriting the existing key-value pair.
     """
 
-    def update(self, __m: Optional[Iterable] = None, **kwargs) -> None:
+    def update(self, __m: Optional[Iterable | Generator[Iterable, None, None]] = None, **kwargs) -> None:
         """
         Updates the dictionary
         """

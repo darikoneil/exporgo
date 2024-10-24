@@ -60,6 +60,22 @@ class InvalidExtensionWarning(UserWarning):
                          f"Expected extension {self.permitted} and coerced to {self.permitted}.")
 
 
+class MissingFilesError(FileNotFoundError):
+    """
+    Raised when multiple files are missing
+    """
+    def __init__(self, missing_files: dict[str, Path]):
+        self.missing_files = missing_files
+        super().__init__(self.generate_message())
+
+    def generate_message(self) -> str:
+        message = "The following files are missing:\n"
+        for name, file in self.missing_files.items():
+            message += f"{name}: {file}"
+            message += "\n"
+        return message
+
+
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Validation (General) Errors and Warnings

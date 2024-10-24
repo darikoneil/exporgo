@@ -86,7 +86,7 @@ class Experiment:
 
         :rtype: Experiment
         """
-        self.file_tree.reindex()
+        self.file_tree.index()
 
     def remap(self, base_directory: Path) -> None:
         """
