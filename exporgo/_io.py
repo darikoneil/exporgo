@@ -6,6 +6,7 @@ from tkinter.filedialog import askdirectory, askopenfilename
 from typing import Optional
 
 from joblib import Parallel, delayed
+from sqlalchemy.sql.operators import truediv
 from tqdm import tqdm
 
 from ._validators import convert_permitted_types_to_required
@@ -92,13 +93,13 @@ def verbose_copy(source: str | Path,
     # file paths they run out of system RAM, so not exposing the joblib backend to allow threading as an alternative.
     # The list of the file paths is wrapped in tqdm to provide verbose feedback (progress bar).
 
-    def _copy(source_: Path, destination_: Path, file: Path) -> None:
+    def _copy(source_: Path, destination_: Path, file: Path) -> Path:
         """
         Copy a file from source to destination (single file function, parallelized). Should call the system fast-copy
         regardless of the OS.
         """
         file_destination = destination_.joinpath(file.relative_to(source_))
-        copy2(file, file_destination)
+        return copy2(file, file_destination)
 
 
     destination.mkdir(parents=True, exist_ok=True)
