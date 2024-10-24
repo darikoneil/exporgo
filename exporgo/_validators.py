@@ -257,13 +257,11 @@ def validate_filename(function: Callable, pos: int = 0, key: str = None) -> Call
 """
 
 
-def validate_version(version: str) -> bool:
+def validate_version(version: str):
     """
     Validate the compatibility of the organization's exporgo version with currently installed version of the package
 
     :param version: detected version
-
-    :returns: True if the version is compatible, False otherwise
 
     :raises VersionForwardCompatibilityWarning: Raised if the detected major version is ahead of the installed
         major version
@@ -286,4 +284,3 @@ def validate_version(version: str) -> bool:
         warnings.warn(VersionBackwardCompatibilityWarning(version), stacklevel=2)
     elif int(config_patch) > int(package_patch):
         warnings.warn(UpdateVersionWarning(version), stacklevel=2)
-    return True

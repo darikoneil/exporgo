@@ -106,8 +106,7 @@ def _config_mismatch_message(version: str) -> str:
 
 class UpdateVersionWarning(UserWarning):
     """
-    Raised when the organization's version is not the current version of the package. Use only when the mismatch is
-    minimal
+    Raised when the organization's version is a more recent patch than the currently installed version of the package.
 
     :param version: detected version
     """
@@ -117,7 +116,8 @@ class UpdateVersionWarning(UserWarning):
 
 class VersionForwardCompatibilityWarning(UserWarning):
     """
-    Raised when the configuration version does not match the expected version (forward compatibility of major versions)
+    Raised when the configuration major version does not match the expected major version
+    (forward compatibility of major versions)
 
     :param version: detected version
     """
@@ -129,7 +129,8 @@ class VersionForwardCompatibilityWarning(UserWarning):
 
 class VersionBackwardCompatibilityWarning(UserWarning):
     """
-    Raised when the configuration version does not match the expected version (backward compatibility of minor versions)
+    Raised when the configuration minor version does not match the expected minor version
+    (backward compatibility of minor versions)
 
     :param version: detected version
     """
@@ -141,13 +142,14 @@ class VersionBackwardCompatibilityWarning(UserWarning):
 
 class VersionBackwardCompatibilityError(ValueError):
     """
-    Raised when the configuration version does not match the expected version
+    Raised when the configuration major version does not match the major expected version.
+    (backward compatibility of major versions)
 
     :param version: detected version
     """
     def __init__(self, version: str):
         message = _config_mismatch_message(version)
-        message += "Neurobeam does not support backwards compatibility of major versions!"
+        message += "Exporgo does not support backwards compatibility of major versions!"
         super().__init__(message)
 
 
