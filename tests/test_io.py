@@ -1,12 +1,12 @@
 # noinspection PyUnresolvedReferences
 from itertools import product
 from shutil import rmtree
+
 import pytest
 from joblib import parallel_config
 
 # noinspection PyProtectedMember
 from exporgo._io import verbose_copy
-
 
 
 def test_verbose_copy(source, destination):

@@ -79,7 +79,7 @@ development = [
     "twine"
 ]
 documentation = [
-"sphinx",
+    "sphinx",
     "sphinx-rtd-theme",
     "sphinx-autodoc-typehints",
 ]
@@ -109,7 +109,9 @@ filterwarnings = [
 [tool.coverage.run]
 branch = true
 command_line = "-m pytest"
-
+omit = [
+    "*/tests/*",
+]
 dynamic_context = "test_function"
 
 [tool.coverage.report]
@@ -125,7 +127,7 @@ exclude_also = [
     "@(abc\\.)?abstractmethod",
     "@(abc\\.)?abstractproperty",
     "@(abc\\.)?abstractclassmethod",
-    "@(abc\\.)?abstractstaticmethod",
+    "@(abc\\.)?abstractstaticmethod"
 ]
 
 [tool.coverage.json]

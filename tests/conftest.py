@@ -1,10 +1,10 @@
 import sys
+from itertools import product
 from os import devnull
 from pathlib import Path
-from itertools import product
 from shutil import rmtree
-import pytest
 
+import pytest
 
 """
 CONFIGURATION FOR TESTING
