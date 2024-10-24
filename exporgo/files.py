@@ -1,6 +1,7 @@
 from contextlib import suppress
+from itertools import chain
 from pathlib import Path
-from typing import Generator, Iterable, Iterator, Mapping, Optional, Union
+from typing import Generator, Iterable, Iterator, Mapping, Optional
 
 from ._validators import convert_permitted_types_to_required
 
@@ -58,19 +59,15 @@ class FileTree:
         Builds the file-tree by initializing any file sets that do not yet exist
         """
         for value in self.values():
-            if isinstance(value, FileSet):
-                if not value.directory.exists():
-                    value.directory.mkdir()
+            if isinstance(value, FileSet) and not value.directory.exists():
+                value.directory.mkdir()
 
     def clear(self) -> None:
         """
         Clears the Filetree of all filesets
         """
-        try:
-            while True:
-                self.popitem()
-        except KeyError:
-            pass  # try except pass is okay here; run pop until it raises a key error indicating it's finished
+        with suppress(KeyError):
+            self.popitem()
 
     def get(self, key: str) -> "FileSet":
         """
@@ -124,7 +121,7 @@ class FileTree:
 
         :raise: KeyError if the fileset is not in the filetree
         """
-        if key in self.keys():  # Make sure we don't pop anything important
+        if key in self.keys():  # noqa: SIM118
             return vars(self).pop(key)
         else:
             raise KeyError(f"{key} not in filetree")
@@ -187,11 +184,10 @@ class FileTree:
 
         """
         if target:
-            with suppress(FileNotFoundError):
-                files = [fileset(target) for fileset in self.values()]
-            if len(files == 0):
+            files = [fileset(target) for fileset in self.values()]
+            if not files:
                 raise FileNotFoundError
-            if len(files > 1):
+            if len(files) > 1:
                 raise KeyError
             return files[0]
         else:
@@ -324,20 +320,12 @@ class FileSet:
 
         :raises FileNotFoundError: If the target file or folder is not found
         """
-        if target:
-            try:
-                target_file = self.files.get(target)
-                assert target_file is not None
-                return target_file
-            except (KeyError, AssertionError):
-                try:
-                    target_folder = self.folders.get(target)
-                    assert target_folder is not None
-                    return target_folder
-                except (KeyError, AssertionError):
-                    raise FileNotFoundError("Could not find target")
         if not target:
             return self.directory
+        elif (location := (self.files.get(target) or self.folders.get(target))) is not None:
+            return location
+        else:
+            raise FileNotFoundError(f"{target} not found in {self.directory}")
 
 
 class FileMap(dict):
@@ -346,29 +334,35 @@ class FileMap(dict):
     rather than overwriting the existing key-value pair.
     """
 
-    def update(self, __m: Union[Mapping, Iterable], **kwargs) -> None:  # noqa: U100, ANN001, F821
+    def update(self, __m: Optional[Iterable] = None, **kwargs) -> None:
         """
         Updates the dictionary
-
         """
-        # kwargs is not used except as protection. refactoring might be something to consider
         if isinstance(__m, Mapping):
-            for key, value in __m.items():
-                self.__setitem__(key, value)
+            # even though all mappings are iterable, not all iterables have the items method
+            items = __m.items()
         elif isinstance(__m, Iterable):
-            for key, value in __m:
-                self.__setitem__(key, value)
+            items = __m
         else:
-            pass
+            items = kwargs.items()
 
-        # TODO: Review
+        if __m is not None:
+            items = chain(items, kwargs.items())
 
-    def __setitem__(self, key: str, value: Path):
-        if key in self:
-            base_key = key
-            key_index = 0
-            while key in self:
-                key_index += 1
-                key = "".join([base_key, str(key_index)])
+        for key, value in items:
+            self.__setitem__(key, value)
+
+    @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=2, key="value")
+    def __setitem__(self, key: str, value: str | Path):
+        """
+        Implementation of setitem magic method. Appends an integer to duplicate keys before storing as a new key-value
+        pair. Appends a zero-padded integer to the key to avoid overwriting existing key-value pairs. Maximum number of
+        duplicates is 999.
+
+        :param key: key of the dictionary
+        """
+        idx = 0
+        while (key := f"{key}_{idx:03}") in self:
+            idx += 1
+
         super().__setitem__(key, value)
-        # TODO: Review
