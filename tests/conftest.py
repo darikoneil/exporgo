@@ -1,12 +1,10 @@
-from os import environ
 from pathlib import Path
-
-import numpy as np
+import sys
 import pytest
+from os import devnull
 
 """
 CONFIGURATION FOR TESTING
-
 """
 
 # MANUALLY MAKE TEMP DIRECTORY SINCE PYTEST'S TMP_PATH IS SOLELY FUNCTION SCOPE
@@ -17,3 +15,17 @@ if not _TEMPORARY_DIRECTORY.exists():
 @pytest.fixture(scope="session")
 def temp_path():
     return _TEMPORARY_DIRECTORY
+
+
+# Simple class that blocks printing
+class BlockPrinting:
+    """
+    Simple context manager that blocks printing
+    """
+    def __enter__(self):
+        self._stdout = sys.stdout
+        sys.stdout = open(devnull, "w")
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._stdout
