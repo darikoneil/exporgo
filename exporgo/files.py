@@ -8,7 +8,6 @@ from typing import Any, Generator, Iterable, Iterator, Mapping, Optional
 from ._validators import convert_permitted_types_to_required
 from .exceptions import MissingFilesError
 
-
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FileTree Organizer

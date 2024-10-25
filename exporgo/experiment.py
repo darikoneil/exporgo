@@ -3,12 +3,13 @@ from functools import singledispatchmethod
 from pathlib import Path
 from typing import Callable, Iterable, Optional
 
-from .exceptions import InvalidExperimentTypeError, DuplicateRegistrationError, ExperimentNotRegisteredError
 from ._io import select_directory, verbose_copy
 from ._logging import get_timestamp
 from ._validators import convert_permitted_types_to_required
+from .exceptions import (DuplicateRegistrationError,
+                         ExperimentNotRegisteredError,
+                         InvalidExperimentTypeError)
 from .files import FileSet, FileTree
-
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
