@@ -30,16 +30,15 @@ def select_file(**kwargs) -> Path:
     """
     root = Tk()
     file_path = Path(askopenfilename(**kwargs))
-
-    if file_path == "." or not file_path.exists():
-        raise FileNotFoundError(f"File not found: {file_path}")
-
     root.destroy()
+
+    if str(file_path) == ".":
+        raise FileNotFoundError(f"File not found: {file_path}")
 
     return file_path.resolve()
 
 
-def select_directory(**kwargs) -> Path:  # pragma: no cover
+def select_directory(**kwargs) -> Path:
     """
     Interactive tool for directory selection. All keyword arguments are
     passed to `tkinter.filedialog.askdirectory <https://docs.python.org/3/library/tk.html>`_
@@ -52,11 +51,10 @@ def select_directory(**kwargs) -> Path:  # pragma: no cover
     """
     root = Tk()
     directory_path = Path(askdirectory(**kwargs))
-
-    if directory_path == "." or not directory_path.exists():
-        raise IOError(f"Directory not found: {directory_path}")
-
     root.destroy()
+
+    if str(directory_path) == ".":
+        raise FileNotFoundError(f"Directory not found: {directory_path}")
 
     return directory_path.resolve()
 

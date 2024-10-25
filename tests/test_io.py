@@ -1,24 +1,23 @@
-# noinspection PyUnresolvedReferences
-from itertools import product
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
+from unittest.mock import patch
 import pytest
 from joblib import parallel_config
-
-# noinspection PyProtectedMember
 # noinspection PyProtectedMember
 from exporgo._io import select_directory, select_file, verbose_copy
 
 
-@patch('exporgo._io.askopenfilename', return_value=Path.cwd().joinpath("tests").joinpath("test_io.py"))
+# noinspection PyUnusedLocal
+@patch('exporgo._io.askopenfilename', return_value=__file__)
 @patch('exporgo._io.Tk')
 def test_select_file_returns_correct_path(mock_tk, mock_askopenfilename):
+    # Mock the Tk() class and the askopenfilename function
     result = select_file()
-    assert result == Path.cwd().joinpath("file.txt")
+    assert result == Path(__file__)
     mock_tk.return_value.destroy.assert_called_once()
 
-@patch('exporgo._io.askopenfilename', return_value='.')
+
+# noinspection PyUnusedLocal
+@patch('exporgo._io.askopenfilename', return_value=".")
 @patch('exporgo._io.Tk')
 def test_select_file_raises_file_not_found_error(mock_tk, mock_askopenfilename):
     with pytest.raises(FileNotFoundError):
@@ -26,17 +25,19 @@ def test_select_file_raises_file_not_found_error(mock_tk, mock_askopenfilename):
     mock_tk.return_value.destroy.assert_called_once()
 
 
-@patch('exporgo._io.askdirectory', return_value=Path.cwd().joinpath("tests"))
+# noinspection PyUnusedLocal
+@patch('exporgo._io.askdirectory', return_value=Path.cwd())
 @patch('exporgo._io.Tk')
 def test_directory_selection_returns_correct_path(mock_tk, mock_askdirectory):
     result = select_directory()
-    assert result == Path.cwd().joinpath("folder")
+    assert result == Path.cwd()
     mock_tk.return_value.destroy.assert_called_once()
 
 
+# noinspection PyUnusedLocal
 @patch('exporgo._io.askdirectory', return_value=".")
 @patch('exporgo._io.Tk')
-def test_directory_selection_raises_io_error(mock_tk, mock_askdirectory):
+def test_directory_selection_raises_file_not_found_error(mock_tk, mock_askdirectory):
     with pytest.raises(FileNotFoundError):
         select_directory()
     mock_tk.return_value.destroy.assert_called_once()
