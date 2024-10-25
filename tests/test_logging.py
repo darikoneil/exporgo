@@ -1,10 +1,8 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 # noinspection PyProtectedMember
-from exporgo._logging import IPythonLogger, ModificationLogger, get_timestamp
+from exporgo._logging import IPythonLogger, ModificationLogger
 
 
 @patch('exporgo._logging.get_ipython')
@@ -29,6 +27,7 @@ def ipython_logger_ends_logging(mock_get_ipython):
     mock_get_ipython.return_value = mock_ipython
     logger = IPythonLogger(Path('/path/to/logs'))
     logger.end_log()
+    # noinspection PyProtectedMember
     assert logger._IP is None
     mock_ipython.run_line_magic.assert_called_with('logstop', '')
 
