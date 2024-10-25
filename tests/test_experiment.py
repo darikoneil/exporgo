@@ -1,7 +1,8 @@
 import pytest
-from pathlib import Path
+from unittest.mock import patch
 from exporgo.experiment import Experiment, ExperimentRegistry, ExperimentFactory, GenericExperiment
 from exporgo.exceptions import DuplicateRegistrationError, ExperimentNotRegisteredError, InvalidExperimentTypeError
+from joblib import parallel_config
 
 
 class TestExperiment:
@@ -99,6 +100,7 @@ class TestExperimentRegistry:
 
 class TestExperimentFactory:
 
+    @ExperimentRegistry.register()
     class MockExperiment6(Experiment):
         def collect_data(self):
             pass
@@ -107,6 +109,7 @@ class TestExperimentFactory:
         def generate_class_files(self):
             pass
 
+    @ExperimentRegistry.register()
     class MockExperiment7(Experiment):
         def collect_data(self):
             pass
@@ -122,7 +125,7 @@ class TestExperimentFactory:
                                          ("MockExperiment6", "MockExperiment7"),
                                          (MockExperiment6, MockExperiment7)
                                          ))
-    def test_create_instance_string(self, tmp_path, mix_ins):
+    def test_create_experiment(self, tmp_path, mix_ins):
 
             factory = ExperimentFactory("MockExperiment", tmp_path)
             factory.add_mix_ins(mix_ins)
@@ -132,12 +135,23 @@ class TestExperimentFactory:
 
 class TestGenericExperiment:
 
-    def GenericExperiment_initialization(self):
-        exp = GenericExperiment("GenericExperiment", Path("/tmp"))
+    def test_initialization(self, tmp_path):
+        exp = GenericExperiment("GenericExperiment", tmp_path)
         assert exp.name == "GenericExperiment"
-        assert exp.base_directory == Path("/tmp")
+        assert exp.base_directory == tmp_path
+        assert exp.file_tree.get("results").directory == tmp_path.joinpath("results")
+        assert exp.file_tree.get("figures").directory == tmp_path.joinpath("figures")
 
-    def GenericExperiment_collect_data(self):
-        exp = GenericExperiment("GenericExperiment", Path("/tmp"))
+    def test_collect_data(self, tmp_path, source):
+        with patch("exporgo.experiment.select_directory", return_value = source):
+            with parallel_config(n_jobs=1):
+                exp = GenericExperiment("destination", tmp_path)
+                exp.collect_data()
+                assert exp.file_tree.num_files == len([file for file in source.rglob("*") if file.is_file()])
+                assert (exp.file_tree.num_folders ==
+                        1 + len([folder for folder in source.rglob("*") if not folder.is_file()]))
+
+    def test_analyze_data(self, tmp_path):
+        exp = GenericExperiment("GenericExperiment", tmp_path)
         with pytest.raises(NotImplementedError):
-            exp.analyze_data()
+                exp.analyze_data()
