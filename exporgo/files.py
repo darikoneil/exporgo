@@ -279,7 +279,7 @@ class FileTree:
         """
         if not target:
             return self.directory
-        elif (files:= [fileset(target) for fileset in self.values() if fileset(target)]) is not None:
+        elif len(files:= [fileset(target) for fileset in self.values() if fileset(target)]) > 0:
             return files
         else:
             raise FileNotFoundError(f"{target} not found in {self.directory}")

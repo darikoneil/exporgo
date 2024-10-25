@@ -107,9 +107,9 @@ class Subject:
     def exporgo_file(self) -> Path:
         return self.directory.joinpath("exporgo.json")
 
-    def create_experiment(self, name: str, mix_ins: Iterable[str | Experiment]) -> None:
+    def create_experiment(self, name: str, mix_ins: str| Experiment | Iterable[str | Experiment]) -> None:
         factory = ExperimentFactory(name=name, base_directory=self.directory)
-        factory.add_mix_ins(mix_ins=mix_ins)
+        factory.add_mix_ins(mix_ins)
         setattr(self, name, factory.instance_constructor())
 
     def record(self, info: str = None) -> None:

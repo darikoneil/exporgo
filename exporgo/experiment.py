@@ -144,20 +144,21 @@ class ExperimentFactory:
         self._mix_ins = []
 
     @singledispatchmethod
-    def add_mix_ins(self, mix_ins: Iterable) -> None:
-        for mix_in in mix_ins:
-            self.add_mix_ins(mix_in)
+    def add_mix_ins(self, mix_in: Experiment) -> None:
+        self._mix_ins.append(mix_in)
 
     @add_mix_ins.register
-    def _(self, mix_in: str):
+    def _ (self, mix_in: str) -> None:
         if not ExperimentRegistry.has(mix_in):
-            raise KeyError
+            raise ExperimentNotRegisteredError(mix_in)
         mix_in = ExperimentRegistry.get(mix_in)
         self._mix_ins.append(mix_in)
 
-    @add_mix_ins.register
-    def _(self, mix_in: Experiment):
-        self._mix_ins.append(mix_in)
+    @add_mix_ins.register(list)
+    @add_mix_ins.register(tuple)
+    def _(self, mix_ins) -> None:
+        for mix_in in mix_ins:
+            self.add_mix_ins(mix_in)
 
     def object_constructor(self) -> type:
         params = dict(self.__dict__)
