@@ -26,7 +26,7 @@ class IPythonLogger:
         self._IP = None
 
         #: pathlib.Path: path to log file
-        self._log_file = directory.joinpath("log_file.log")
+        self._log_file = directory.joinpath("log.exporgo")
 
         if directory.exists() and not self._log_file.exists():
             self._create_log()
@@ -139,23 +139,6 @@ class ModificationLogger(deque):
         :param value: The value to load
         """
         super().appendleft(value)
-
-    def __json_encode__(self):
-        """
-        Encode the deque values to a JSON serializable format.
-
-        :return: A dictionary with the deque values
-        """
-        return {"values": list(self)}
-
-    def __json_decode__(self, **attrs):
-        """
-        Decode JSON attributes to load the deque.
-
-        :param attrs: JSON attributes containing the values to load
-        """
-        for value in attrs.get("values"):
-            self.load(tuple(value))
 
 
 def get_timestamp() -> str:

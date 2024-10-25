@@ -4,7 +4,7 @@ from typing import Any, Iterable, Optional
 from ._color import TERMINAL_FORMATTER
 from ._io import select_directory
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
-from .exceptions import MissingFilesError
+from .exceptions import DuplicateExperimentError, MissingFilesError
 from .experiment import Experiment, ExperimentFactory
 
 
@@ -52,6 +52,9 @@ class Subject:
         #: str: instance date
         self._instance_date = get_timestamp()
 
+        #: dict: experiments
+        self._experiments = {}
+
         #: IPython_logger: logging object
         self._logger = IPythonLogger(self.directory)
 
@@ -64,6 +67,8 @@ class Subject:
         string_to_print += TERMINAL_FORMATTER(f"{self.name}\n", "header")
         string_to_print += TERMINAL_FORMATTER("Created: ", "emphasis")
         string_to_print += f"{self._instance_date}\n"
+        string_to_print += TERMINAL_FORMATTER("Last Modified: ", "emphasis")
+        string_to_print += f"{self.modifications[0]}\n"
         string_to_print += TERMINAL_FORMATTER("Directory: ", "emphasis")
         string_to_print += f"{self.directory}\n"
         string_to_print += TERMINAL_FORMATTER("Species: ", "emphasis")
@@ -84,9 +89,8 @@ class Subject:
 
         if len(self.experiments) == 0:
             string_to_print += "\tNo experiments defined\n"
-        for idx, experiment in enumerate(self.experiments):
-            string_to_print += TERMINAL_FORMATTER(f"\t{idx + 1}. ", "BLUE")
-            string_to_print += f"{experiment}\n"
+        for experiment in self.experiments:
+            string_to_print += TERMINAL_FORMATTER(f"\t{experiment}\n", "experiment")
 
         string_to_print += TERMINAL_FORMATTER("Recent Modifications:\n", "modifications")
         for modification in self.modifications[-5:]:
@@ -101,16 +105,21 @@ class Subject:
 
     @property
     def experiments(self) -> tuple[str, ...]:
-        return tuple([name for name, experiment in vars(self).items() if isinstance(experiment, Experiment)])
+        return tuple(self._experiments.keys())
 
     @property
-    def exporgo_file(self) -> Path:
-        return self.directory.joinpath("exporgo.json")
+    def file(self) -> Path:
+        return self.directory.joinpath("organization.exporgo")
 
     def create_experiment(self, name: str, mix_ins: str | Experiment | Iterable[str | Experiment]) -> None:
         factory = ExperimentFactory(name=name, base_directory=self.directory)
         factory.add_mix_ins(mix_ins)
-        setattr(self, name, factory.instance_constructor())
+
+        if name in self.experiments:
+            raise DuplicateExperimentError(name)
+
+        self._experiments[name] = factory.instance_constructor()
+        self.record(name)
 
     def record(self, info: str = None) -> None:
         self._modifications.appendleft(info)
@@ -149,6 +158,15 @@ class Subject:
             f"{self.modifications=}, "
             f"{self._instance_date=}"
         ])
+
+    def __getattr__(self, item: str) -> Any:
+        """
+        Override magic to auto-record access
+        """
+        if item in self.experiments:
+            self._experiments.get(item)
+        else:
+            return super().__getattribute__(item)
 
     def __setattr__(self, key: Any, value: Any) -> None:
         """

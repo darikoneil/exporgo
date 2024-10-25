@@ -64,6 +64,10 @@ class _TerminalFormatter:
         :Getter: Green font style for modifications
         :Getter Type: :class:`str`
         """
+        return self.YELLOW
+
+    @property
+    def experiment(self) -> str:
         return self.GREEN
 
     @property

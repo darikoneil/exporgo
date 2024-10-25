@@ -114,6 +114,7 @@ class ExperimentRegistry:
                 cls.__registry[alias] = experiment
                 return experiment
 
+        # noinspection PyTypeChecker
         return register_experiment
 
     @classmethod
@@ -145,6 +146,7 @@ class ExperimentFactory:
     def object_constructor(self) -> type["Experiment"]:
         params = dict(self.__dict__)
         params.pop("base_directory")
+        # noinspection PyTypeChecker
         return type(self._name, tuple(self._mix_ins), params)
 
     def instance_constructor(self) -> "Experiment":

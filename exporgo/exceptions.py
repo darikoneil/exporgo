@@ -83,6 +83,16 @@ class MissingFilesError(FileNotFoundError):
 """
 
 
+class DuplicateExperimentError(ValueError):
+    """
+    Raised when an experiment is already included in the experiments for a particular subject
+
+    :param alias: experiment that is already registered
+    """
+    def __init__(self, alias: str):
+        super().__init__(f"{alias} is already registered. Consider using a different name.")
+
+
 class DuplicateRegistrationError(ValueError):
     """
     Raised when an experiment is already registered
