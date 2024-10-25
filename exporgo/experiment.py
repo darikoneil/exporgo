@@ -1,29 +1,62 @@
 from abc import abstractmethod
-from importlib import import_module
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional, Callable
 
 from ._logging import get_timestamp
 from ._validators import convert_permitted_types_to_required
 from .files import FileSet, FileTree
 
 
-def _import_mix_in_string(json_string: str) -> "Experiment":
-    """
-    Import experiment mix-in from string. Usually this is taken from the serialized object but not always.
-    For this to always work, we have to make sure that the mix-in follows PEP naming conventions and they always reside
-    in their own module
+class ExperimentRegistry:
+    #: dict: registry of experiment mix-ins
+    __registry = {}
 
-    :param json_string: string indicating mix-in to import
+    @staticmethod
+    def type_check(experiment: "Experiment", raise_exception: bool = False) -> bool | None:
+        """
+        if raise_exception:
+            _ = check_protocol(adapter, (Reader, Writer, Trigger), InvalidExperimentError)
+            return True
+        else:
+            return check_protocol(adapter, (Reader, Writer, Trigger))
+        # TODO: Refactor
+        """
 
-    :return: imported mix-in
-    """
-    module_name = [char_ if char_.islower() else "".join(["_", char_.lower()])
-                   for char_ in json_string if char_.lower()]
-    module_name = "".join(module_name)
-    module_name = "".join(module_name[1:])
-    return getattr(import_module("".join(["exporgo.", module_name])), json_string)
-    # TODO: This is a hacky way to import the mix-ins. We should find a better way to do this
+    @classmethod
+    def register(cls, alias: Optional[str] = None):  # noqa: ANN206
+        """
+        A decorator to register a constructor for a particular hardware device
+        """
+        def register_adapter(experiment):  # noqa: ANN206, ANN001, ANN201
+            nonlocal alias
+
+            alias = alias if alias is not None else experiment.__name__
+            if cls.type_check(experiment):
+                if alias in cls.__registry:
+                    raise KeyError #DuplicateRegistrationError(cls, alias)
+                else:
+                    cls.__registry[alias] = experiment
+                    return experiment
+
+        return register_adapter
+    # TODO: Refactor
+
+    @classmethod
+    def has(cls, name: str) -> bool:
+        """
+        Check if a experiment mix-in is registered
+        """
+        return name in cls.__registry
+
+    @classmethod
+    def get(cls, name: str, approximate: bool = False) -> Callable:
+        if approximate:
+            experiment = next((experiment for key, experiment in cls.__registry.items() if name in key), None)
+        else:
+            experiment = cls.__registry.get(name)
+        if experiment is None:
+            raise KeyError #MissingIdentifierError(cls, name)
+        return experiment
 
 
 class Experiment:
@@ -66,6 +99,7 @@ class Experiment:
 
         :rtype: Experiment
         """
+        """
         factory = ExperimentFactory(name=self._name, base_directory=self._base_directory)
         factory.add_mix_ins([_import_mix_in_string(mix_in) for mix_in in self._mix_ins])
         experiment = factory.instance_constructor()
@@ -75,6 +109,8 @@ class Experiment:
             else:
                 setattr(experiment, key, [_import_mix_in_string(mix_in) for mix_in in self._mix_ins])
         return experiment
+        """
+        ...
 
     def get(self, *args, **kwargs) -> FileSet:
         return self.file_tree.get(*args, **kwargs)
@@ -175,10 +211,13 @@ class ExperimentFactory:
         :type mix_ins: Iterable
         :rtype: ExperimentFactory
         """
+        """
         for mix_in in mix_ins:
             if isinstance(mix_in, str):
                 mix_in = _import_mix_in_string(mix_in)
             self._mix_ins.append(mix_in)
+        """
+        ...
 
     def object_constructor(self) -> "Experiment":
         """
