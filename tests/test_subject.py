@@ -1,4 +1,3 @@
-from turtledemo.sorting_animate import Block
 from unittest.mock import patch
 
 from exporgo.subject import Subject
