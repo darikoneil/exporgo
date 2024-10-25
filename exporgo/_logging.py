@@ -86,17 +86,6 @@ class IPythonLogger:
         with open(self._log_file, "w") as log:
             log.write("")
 
-    def __json_decode__(self, **attrs):
-        """
-        Decode JSON attributes to initialize the logger.
-
-        :param attrs: JSON attributes
-        """
-        directory = attrs.get("_log_file").parent
-        self.__init__(directory)
-        # TODO: Necessary?
-
-
 class ModificationLogger(deque):
     """
     A logger class that extends deque to log modifications with timestamps.

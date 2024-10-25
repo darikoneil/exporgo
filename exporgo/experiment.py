@@ -21,7 +21,6 @@ class ExperimentRegistry:
             return True
         else:
             return check_protocol(adapter, (Reader, Writer, Trigger))
-        # TODO: Refactor
         """
     # TODO: Refactor
 
@@ -127,27 +126,6 @@ class Experiment:
     def __name__() -> str:
         return "Experiment"
 
-    @classmethod
-    def __json_construct__(cls: object, self: object) -> None:
-        """
-        Constructs the experiment from serialized form
-
-        :rtype: Experiment
-        """
-        """
-        factory = ExperimentFactory(name=self._name, base_directory=self._base_directory)
-        factory.add_mix_ins([_import_mix_in_string(mix_in) for mix_in in self._mix_ins])
-        experiment = factory.instance_constructor()
-        for key, value in vars(self).items():
-            if key != "_mix_ins":
-                setattr(experiment, key, value)
-            else:
-                setattr(experiment, key, [_import_mix_in_string(mix_in) for mix_in in self._mix_ins])
-        return experiment
-        """
-        ...
-    # TODO: Refactor
-
     @property
     def base_directory(self) -> Path:
         return self._base_directory
@@ -191,14 +169,6 @@ class Experiment:
         self.file_tree.add_path("figures")
         self.generate_class_files()
         self.file_tree.build()
-    # TODO: Review
-
-    def __json_encode__(self) -> dict:
-        # serial_encoding = {key: (value if key != "_mix_ins" else [str(value_.__name__) for value_ in value])
-        #                   for key, value in vars(self).items()}
-        #return serial_encoding
-        ...
-    # TODO: Refactor
 
 
 @ExperimentRegistry.register()

@@ -1,9 +1,6 @@
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-from json_tricks import dump, load
-
-from ._color import TERMINAL_FORMATTER
 from ._io import select_directory
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from .exceptions import MissingFilesError
@@ -60,43 +57,8 @@ class Subject:
         self._modifications.append("Instantiated")
 
     def __str__(self) -> str:
-        attr_to_print = [("Subject: ", self.name),
-                         ("Instantiated: ", self._instance_date),
-                         ("Study: ", self.study),
-                         ("Condition: ", self.condition),
-                         ("Experiments: ", self.experiments)
-                         ]
-
-        string_to_print = "\n"
-        for attr in attr_to_print:
-            key, value = attr
-            if key == "Experiments: ":
-                string_to_print += f"\n{TERMINAL_FORMATTER.BOLD}{TERMINAL_FORMATTER.YELLOW}{key}{TERMINAL_FORMATTER.RESET}\n"
-                for experiment in value:
-                    string_to_print += f"\t{experiment}\n"
-            else:
-                string_to_print += f"\n{TERMINAL_FORMATTER.BOLD}{TERMINAL_FORMATTER.YELLOW}{key}{TERMINAL_FORMATTER.RESET}{value}"
-
-        string_to_print += f"\n\nLast modified: {TERMINAL_FORMATTER.GREEN}{self.modifications[0][0]}{TERMINAL_FORMATTER.RESET}" \
-                           f", {TERMINAL_FORMATTER.GREEN}{self.modifications[0][1]}{TERMINAL_FORMATTER.RESET}"
-
-        return string_to_print
-    # TODO: add __repr__ method & refactor
-
-    def save(self) -> None:
-        """
-        Saves the subject to the directory. The organization of the subject's data is saved in a json file,
-        which can be loaded back in to reconstruct the subject. The log file is also saved in the form of a text file
-        (.log) in the subject's directory.
-        """
-        # temporarily close logging
-        self._logger.end_log()
-        # dump is manipulative so:
-        with open(self.exporgo_file, "w") as file:
-            dump(self, file, indent=4)
-
-        self._logger.start_log()
-    # TODO: refactor
+        return "SUBJECT"
+    # TODO: Implement
 
     @property
     def modifications(self) -> tuple:
@@ -110,35 +72,10 @@ class Subject:
     def exporgo_file(self) -> Path:
         return self.directory.joinpath("exporgo.json")
 
-    @classmethod
-    def load(cls, directory: Optional[str | Path] = None) -> "Subject":
-        if not directory:
-            directory = select_directory(title="Select folder containing previously saved subject", mustexist=True)
-
-        organization_file = directory.joinpath("organization_file.json")
-
-        with open(organization_file, "r") as file:
-            mouse = load(file, preserve_order=False)
-
-        # now we have to manually update our experiment mix-ins
-        for key, value in vars(mouse).items():
-            if isinstance(value, Experiment):
-                experiment = getattr(mouse, key)
-                setattr(mouse, key, experiment.__json_construct__(experiment))
-
-        # update directory if we've moved our folder since then
-        if mouse.directory != directory:
-            mouse.directory = directory  # we don't need this check really,
-            # but it's here atm to eventually add child updates
-
-        return mouse
-        # TODO: refactor
-
-    def create_experiment(self, name: str, mix_ins: Iterable[Experiment]) -> None:
+    def create_experiment(self, name: str, mix_ins: Iterable[str | Experiment]) -> None:
         factory = ExperimentFactory(name=name, base_directory=self.directory)
         factory.add_mix_ins(mix_ins=mix_ins)
         setattr(self, name, factory.instance_constructor())
-    # TODO: refactor
 
     def record(self, info: str = None) -> None:
         self._modifications.appendleft(info)
@@ -163,20 +100,20 @@ class Subject:
     def log_status(self) -> None:
         return self._logger.check_log_status()
 
-    def __json_encode__(self):
-        serialized_mouse = {key: value for key, value in vars(self).items()}  # noqa: C416
-        # unnecessary dict comprehension but now I can have big line saying make sure I'm a copy not a view
-
-        # noinspection PyProtectedMember
-        serialized_mouse["_modifications"] = self._modifications
-        for key, value in serialized_mouse.items():
-            if isinstance(value, Experiment):
-                serialized_mouse[key] = {
-                    "__instance_type__": ["CalSciPy.organization.experiment", "Experiment"],
-                    "attributes": serialized_mouse[key].__json_encode__()
-                }
-        return serialized_mouse
-        # TODO: Review
+    def __repr__(self) -> str:
+        return "".join([
+            f"{self.__class__.__name__}"
+            f"({self.name=}, "
+            f"{self.directory=}, "
+            f"{self.species=}, "
+            f"{self.study=}, "
+            f"{self.condition=}, "
+            f"{self.meta=}): "
+            f"{self.experiments=}, ",
+            f"{self.exporgo_file=}, "
+            f"{self.modifications=}, "
+            f"{self._instance_date=}"
+            ])
 
     def __setattr__(self, key: Any, value: Any) -> None:
         """

@@ -262,7 +262,7 @@ class FileTree:
         for file_set in (file_set for file_set in self.directory.glob("*") if file_set is not file_set.is_file()):
             self.add_path(file_set.stem) if (file_set not in self.values()) else None
 
-    def __call__(self, target: Optional[str] = None) -> Path:
+    def __call__(self, target: Optional[str] = None) -> Path | list[Path]:
         """
         Call the file tree for a specific file or folder and return its Path. If no target provided,
         the file tree directory is returned. If multiple paths meet the target criterion a key error is raised.
@@ -271,16 +271,12 @@ class FileTree:
         :param target: file or folder name
 
         """
-        if target:
-            files = [fileset(target) for fileset in self.values()]
-            if not files:
-                raise FileNotFoundError
-            if len(files) > 1:
-                raise KeyError
-            return files[0]
-        else:
+        if not target:
             return self.directory
-        # TODO: Review
+        elif (files:= [fileset(target) for fileset in self.values() if fileset(target)]) is not None:
+            return files
+        else:
+            raise FileNotFoundError(f"{target} not found in {self.directory}")
 
     def __len__(self) -> int:
         """
