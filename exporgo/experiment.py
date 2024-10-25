@@ -1,10 +1,10 @@
 from abc import abstractmethod
+from functools import singledispatchmethod
 from pathlib import Path
 from typing import Callable, Iterable, Optional
-from functools import singledispatchmethod
 
-from ._logging import get_timestamp
 from ._io import select_directory, verbose_copy
+from ._logging import get_timestamp
 from ._validators import convert_permitted_types_to_required
 from .files import FileSet, FileTree
 
