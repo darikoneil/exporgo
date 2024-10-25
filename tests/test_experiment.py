@@ -1,8 +1,13 @@
-import pytest
 from unittest.mock import patch
-from exporgo.experiment import Experiment, ExperimentRegistry, ExperimentFactory, GenericExperiment
-from exporgo.exceptions import DuplicateRegistrationError, ExperimentNotRegisteredError, InvalidExperimentTypeError
+
+import pytest
 from joblib import parallel_config
+
+from exporgo.exceptions import (DuplicateRegistrationError,
+                                ExperimentNotRegisteredError,
+                                InvalidExperimentTypeError)
+from exporgo.experiment import (Experiment, ExperimentFactory,
+                                ExperimentRegistry, GenericExperiment)
 
 
 class TestExperiment:
@@ -139,8 +144,8 @@ class TestGenericExperiment:
         exp = GenericExperiment("GenericExperiment", tmp_path)
         assert exp.name == "GenericExperiment"
         assert exp.base_directory == tmp_path
-        assert exp.file_tree.get("results").directory == tmp_path.joinpath("results")
-        assert exp.file_tree.get("figures").directory == tmp_path.joinpath("figures")
+        assert exp.file_tree.get("results").directory == tmp_path.joinpath("GenericExperiment").joinpath("results")
+        assert exp.file_tree.get("figures").directory == tmp_path.joinpath("GenericExperiment").joinpath("figures")
 
     def test_collect_data(self, tmp_path, source):
         with patch("exporgo.experiment.select_directory", return_value = source):
@@ -149,7 +154,7 @@ class TestGenericExperiment:
                 exp.collect_data()
                 assert exp.file_tree.num_files == len([file for file in source.rglob("*") if file.is_file()])
                 assert (exp.file_tree.num_folders ==
-                        1 + len([folder for folder in source.rglob("*") if not folder.is_file()]))
+                        3 + len([folder for folder in source.rglob("*") if not folder.is_file()]))
 
     def test_analyze_data(self, tmp_path):
         exp = GenericExperiment("GenericExperiment", tmp_path)
