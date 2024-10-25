@@ -78,9 +78,41 @@ class MissingFilesError(FileNotFoundError):
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Validation (General) Errors and Warnings
+// Validation Errors and Warnings
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
+
+class DuplicateRegistrationError(ValueError):
+    """
+    Raised when an experiment is already registered
+
+    :param alias: experiment that is already registered
+    """
+    def __init__(self, alias: str):
+        super().__init__(f"{alias} is already registered. Consider using a different name or "
+                         f"registering the class with an alias.")
+
+
+class ExperimentNotRegisteredError(KeyError):
+    """
+    Raised when an experiment is not registered
+
+    :param experiment: experiment that is not registered
+    """
+    def __init__(self, experiment: Any):
+        self.experiment = experiment
+        super().__init__(f"{self.experiment} is not registered.")
+
+
+class InvalidExperimentTypeError(TypeError):
+    """
+    Raised when an experiment is not a subclass of :class:`Experiment`
+
+    :param experiment: experiment that is not a subclass of :class:`Experiment
+    """
+    def __init__(self, experiment: Any):
+        self.experiment = experiment
+        super().__init__(f"{self.experiment} is not a subclass of Experiment")
 
 
 class NotPermittedTypeError(TypeError):

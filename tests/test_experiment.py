@@ -36,7 +36,7 @@ def experiment_validate_calls_file_tree_validate(mock_file_tree):
 @patch('exporgo.experiment.FileTree')
 def experiment_generate_file_tree_adds_paths(mock_file_tree):
     experiment = Experiment(name="TestExperiment", base_directory=Path("/base/dir"))
-    experiment.generate_file_tree()
+    experiment._generate_file_tree()
     experiment.file_tree.add_path.assert_any_call("results")
     experiment.file_tree.add_path.assert_any_call("figures")
     experiment.file_tree.build.assert_called_once()

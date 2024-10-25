@@ -59,6 +59,14 @@ class _TerminalFormatter:
         return self.YELLOW
 
     @property
+    def modifications(self) -> str:
+        """
+        :Getter: Green font style for modifications
+        :Getter Type: :class:`str`
+        """
+        return self.GREEN
+
+    @property
     def header(self) -> str:
         """
         :Getter: Style for headers, titles and other things of utmost importance consisting of

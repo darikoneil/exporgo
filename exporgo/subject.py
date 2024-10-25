@@ -1,6 +1,9 @@
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
+from polars.selectors import string
+
+from ._color import TERMINAL_FORMATTER
 from ._io import select_directory
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from .exceptions import MissingFilesError
@@ -26,10 +29,11 @@ class Subject:
 
         #: Path: directory to save mouse within; if directory doesn't contain subject name, we ought to add it
         # if directory doesn't exist, create it
-        self.directory = Path(directory) if directory else select_directory(title="Select folder to contain "
-                                                                            "subject's organized data")
-        if name not in self.directory.name:
-            self.directory = self.directory.joinpath(name)
+        directory = Path(directory) if directory \
+            else select_directory(title="Select folder to contain subject's organized data")
+        if name not in directory.name:
+            directory = directory.joinpath(name)
+        self.directory = directory
         if not self.directory.exists():
             Path.mkdir(self.directory)
 
@@ -57,8 +61,41 @@ class Subject:
         self._modifications.append("Instantiated")
 
     def __str__(self) -> str:
-        return "SUBJECT"
-    # TODO: Implement
+        string_to_print = ""
+
+        string_to_print += TERMINAL_FORMATTER(f"{self.name}\n", "header")
+        string_to_print += TERMINAL_FORMATTER(f"Created: ", "emphasis")
+        string_to_print += f"{self._instance_date}\n"
+        string_to_print += TERMINAL_FORMATTER(f"Directory: ", "emphasis")
+        string_to_print += f"{self.directory}\n"
+        string_to_print += TERMINAL_FORMATTER(f"Species: ", "emphasis")
+        string_to_print += f"{self.species}\n"
+        string_to_print += TERMINAL_FORMATTER(f"Study: ", "emphasis")
+        string_to_print += f"{self.study}\n"
+        string_to_print += TERMINAL_FORMATTER(f"Condition: ", "emphasis")
+        string_to_print += f"{self.condition}\n"
+
+        string_to_print += TERMINAL_FORMATTER(f"Meta:\n", "emphasis")
+        if not self.meta:
+            string_to_print += f"\tNo meta data defined\n"
+        else:
+            for key, value in self.meta.items():
+                string_to_print += TERMINAL_FORMATTER(f"\t{key}: ", "BLUE")
+                string_to_print += f"{value}\n"
+        string_to_print += TERMINAL_FORMATTER(f"Experiments:\n", "emphasis")
+
+        if len(self.experiments) == 0:
+            string_to_print += f"\tNo experiments defined\n"
+        for idx, experiment in enumerate(self.experiments):
+            string_to_print += TERMINAL_FORMATTER(f"\t{idx + 1}. ", "BLUE")
+            string_to_print += f"{experiment}\n"
+
+        string_to_print += TERMINAL_FORMATTER(f"Recent Modifications:\n", "modifications")
+        for modification in self.modifications[-5:]:
+            string_to_print += TERMINAL_FORMATTER(f"\t{modification[0]}: ", "BLUE")
+            string_to_print += f"{modification[1]}\n"
+
+        return string_to_print
 
     @property
     def modifications(self) -> tuple:
