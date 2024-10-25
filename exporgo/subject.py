@@ -144,6 +144,9 @@ class Subject:
     def log_status(self) -> None:
         return self._logger.check_log_status()
 
+    def get(self, key: str) -> Any:
+        return getattr(self, key)
+
     def __repr__(self) -> str:
         return "".join([
             f"{self.__class__.__name__}"
@@ -164,7 +167,7 @@ class Subject:
         Override magic to auto-record access
         """
         if item in self.experiments:
-            self._experiments.get(item)
+            return self._experiments.get(item)
         else:
             return super().__getattribute__(item)
 
