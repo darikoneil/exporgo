@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Iterable, Optional
+import yaml
 
 from ._color import TERMINAL_FORMATTER
 from ._io import select_directory
@@ -146,6 +147,25 @@ class Subject:
 
     def get(self, key: str) -> Any:
         return getattr(self, key)
+
+    def save(self) -> None:
+        with open(self.file, "w") as file:
+            yaml.safe_dump(self._to_dict(), file, default_flow_style=False, sort_keys=False)
+
+    def _to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "instance_date": self.instance_date,
+            "last_modified": self.modifications[0],
+            "directory": self.directory,
+            "species": self.species,
+            "study": self.study,
+            "condition": self.condition,
+            "meta": self.meta,
+            "experiments": {experiment: experiment for experiment in self.experiments},
+            "exporgo_file": self.file,
+            "modifications": self.modifications,
+        }
 
     def __repr__(self) -> str:
         return "".join([
