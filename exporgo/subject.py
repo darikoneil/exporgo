@@ -62,33 +62,33 @@ class Subject:
         string_to_print = ""
 
         string_to_print += TERMINAL_FORMATTER(f"{self.name}\n", "header")
-        string_to_print += TERMINAL_FORMATTER(f"Created: ", "emphasis")
+        string_to_print += TERMINAL_FORMATTER("Created: ", "emphasis")
         string_to_print += f"{self._instance_date}\n"
-        string_to_print += TERMINAL_FORMATTER(f"Directory: ", "emphasis")
+        string_to_print += TERMINAL_FORMATTER("Directory: ", "emphasis")
         string_to_print += f"{self.directory}\n"
-        string_to_print += TERMINAL_FORMATTER(f"Species: ", "emphasis")
+        string_to_print += TERMINAL_FORMATTER("Species: ", "emphasis")
         string_to_print += f"{self.species}\n"
-        string_to_print += TERMINAL_FORMATTER(f"Study: ", "emphasis")
+        string_to_print += TERMINAL_FORMATTER("Study: ", "emphasis")
         string_to_print += f"{self.study}\n"
-        string_to_print += TERMINAL_FORMATTER(f"Condition: ", "emphasis")
+        string_to_print += TERMINAL_FORMATTER("Condition: ", "emphasis")
         string_to_print += f"{self.condition}\n"
 
-        string_to_print += TERMINAL_FORMATTER(f"Meta:\n", "emphasis")
+        string_to_print += TERMINAL_FORMATTER("Meta:\n", "emphasis")
         if not self.meta:
-            string_to_print += f"\tNo meta data defined\n"
+            string_to_print += "\tNo meta data defined\n"
         else:
             for key, value in self.meta.items():
                 string_to_print += TERMINAL_FORMATTER(f"\t{key}: ", "BLUE")
                 string_to_print += f"{value}\n"
-        string_to_print += TERMINAL_FORMATTER(f"Experiments:\n", "emphasis")
+        string_to_print += TERMINAL_FORMATTER("Experiments:\n", "emphasis")
 
         if len(self.experiments) == 0:
-            string_to_print += f"\tNo experiments defined\n"
+            string_to_print += "\tNo experiments defined\n"
         for idx, experiment in enumerate(self.experiments):
             string_to_print += TERMINAL_FORMATTER(f"\t{idx + 1}. ", "BLUE")
             string_to_print += f"{experiment}\n"
 
-        string_to_print += TERMINAL_FORMATTER(f"Recent Modifications:\n", "modifications")
+        string_to_print += TERMINAL_FORMATTER("Recent Modifications:\n", "modifications")
         for modification in self.modifications[-5:]:
             string_to_print += TERMINAL_FORMATTER(f"\t{modification[0]}: ", "BLUE")
             string_to_print += f"{modification[1]}\n"
@@ -107,7 +107,7 @@ class Subject:
     def exporgo_file(self) -> Path:
         return self.directory.joinpath("exporgo.json")
 
-    def create_experiment(self, name: str, mix_ins: str| Experiment | Iterable[str | Experiment]) -> None:
+    def create_experiment(self, name: str, mix_ins: str | Experiment | Iterable[str | Experiment]) -> None:
         factory = ExperimentFactory(name=name, base_directory=self.directory)
         factory.add_mix_ins(mix_ins)
         setattr(self, name, factory.instance_constructor())
@@ -148,7 +148,7 @@ class Subject:
             f"{self.exporgo_file=}, "
             f"{self.modifications=}, "
             f"{self._instance_date=}"
-            ])
+        ])
 
     def __setattr__(self, key: Any, value: Any) -> None:
         """

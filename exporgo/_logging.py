@@ -86,6 +86,7 @@ class IPythonLogger:
         with open(self._log_file, "w") as log:
             log.write("")
 
+
 class ModificationLogger(deque):
     """
     A logger class that extends deque to log modifications with timestamps.

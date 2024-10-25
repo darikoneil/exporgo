@@ -39,10 +39,6 @@ class Experiment:
 
         self._generate_file_tree()
 
-    @staticmethod
-    def __name__() -> str:
-        return "Experiment"
-
     @property
     def base_directory(self) -> Path:
         return self._base_directory
@@ -55,6 +51,10 @@ class Experiment:
     def name(self) -> str:
         return self._name
 
+    @staticmethod
+    def __name__() -> str:
+        return "Experiment"
+
     def get(self, *args, **kwargs) -> "FileSet":
         return self.file_tree.get(*args, **kwargs)
 
@@ -62,7 +62,7 @@ class Experiment:
         self.file_tree.index()
 
     @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=1, key="base_directory")
-    def remap(self, base_directory: str| Path) -> None:
+    def remap(self, base_directory: str | Path) -> None:
         self._base_directory = base_directory
         self.file_tree.remap(base_directory)
 
@@ -99,9 +99,9 @@ class ExperimentRegistry:
             raise InvalidExperimentTypeError(experiment)
 
     @classmethod
-    def register(cls, alias: Optional[str] = None):
+    def register(cls, alias: Optional[str] = None) -> type["Experiment"]:  #: noqa: ANN206
 
-        def register_experiment(experiment):
+        def register_experiment(experiment):  # noqa: ANN206, ANN001, ANN201
             nonlocal alias
 
             cls.type_check(experiment)
@@ -115,7 +115,6 @@ class ExperimentRegistry:
                 return experiment
 
         return register_experiment
-
 
     @classmethod
     def has(cls, name: str) -> bool:
@@ -143,6 +142,15 @@ class ExperimentFactory:
         #: Iterable[str | "Experiment"]: iterable of mix-ins in string or object form
         self._mix_ins = []
 
+    def object_constructor(self) -> type["Experiment"]:
+        params = dict(self.__dict__)
+        params.pop("base_directory")
+        return type(self._name, tuple(self._mix_ins), params)
+
+    def instance_constructor(self) -> "Experiment":
+        experiment_object = self.object_constructor()
+        return experiment_object(name=self._name, base_directory=self.base_directory, mix_ins=self._mix_ins)
+
     @singledispatchmethod
     def add_mix_ins(self, mix_in: Experiment) -> None:
         self._mix_ins.append(mix_in)
@@ -156,18 +164,9 @@ class ExperimentFactory:
 
     @add_mix_ins.register(list)
     @add_mix_ins.register(tuple)
-    def _(self, mix_ins) -> None:
+    def _(self, mix_ins: tuple | list) -> None:
         for mix_in in mix_ins:
             self.add_mix_ins(mix_in)
-
-    def object_constructor(self) -> type:
-        params = dict(self.__dict__)
-        params.pop("base_directory")
-        return type(self._name, tuple(self._mix_ins), params)
-
-    def instance_constructor(self) -> "Experiment":
-        experiment_object = self.object_constructor()
-        return experiment_object(name=self._name, base_directory=self.base_directory, mix_ins=self._mix_ins)
 
 
 """
