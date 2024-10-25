@@ -1,8 +1,6 @@
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-from polars.selectors import string
-
 from ._color import TERMINAL_FORMATTER
 from ._io import select_directory
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
