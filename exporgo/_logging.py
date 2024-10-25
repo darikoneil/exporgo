@@ -118,7 +118,6 @@ class ModificationLogger(deque):
         :param __iterable: An iterable of items to append
         """
         for iter_ in __iterable:
-            iter_ = (iter_, get_timestamp())
             self.append(iter_)
 
     # noinspection SpellCheckingInspection
@@ -129,7 +128,6 @@ class ModificationLogger(deque):
         :param __iterable: An iterable of items to append
         """
         for iter_ in __iterable:
-            iter_ = (iter_, get_timestamp())
             self.appendleft(iter_)
 
     def load(self, value: Any) -> None:

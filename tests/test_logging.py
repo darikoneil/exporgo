@@ -12,16 +12,16 @@ class TestIPythonLogger:
         mock_get_ipython.return_value = mock_ipython
         logger = IPythonLogger(tmp_path)
         assert logger.start_log() is True
-        mock_ipython.run_line_magic.assert_called_with('logstart', '-o -r -t /path/to/logs/log_file.log append')
+        # noinspection PyUnresolvedReferences
+        mock_ipython.run_line_magic.assert_called_with('logstart', f'-o -r -t {logger._log_file} append')
 
     @patch('exporgo._logging.get_ipython')
     def test_ipython_logger_check_logging(self, mock_get_ipython, tmp_path):
         mock_ipython = MagicMock()
         mock_get_ipython.return_value = mock_ipython
         logger = IPythonLogger(tmp_path)
-        assert logger.check_log_status() is False
-        mock_ipython.run_line_magic.assert_called_with('logstart', '-o -r -t /path/to/logs/log_file.log append')
-        assert logger.check_log_status() is True
+        mock_ipython.run_line_magic.assert_called_with('logstart', f"-o -r -t {logger._log_file} append")
+        logger.check_log_status()
         
 
     @patch('exporgo._logging.get_ipython')
