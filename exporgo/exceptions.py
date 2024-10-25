@@ -1,8 +1,6 @@
 from pathlib import Path
 from typing import Any, Optional
 
-from IPython.core.magic_arguments import argument
-
 from . import __current_version__, __package_name__
 
 """

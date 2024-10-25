@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Iterable, Optional
+
 from json_tricks import dump, load
 
 from ._color import TERMINAL_FORMATTER
@@ -91,11 +92,11 @@ class Subject:
         # temporarily close logging
         self._logger.end_log()
         # dump is manipulative so:
-        with open(self.organization_file, "w") as file:
+        with open(self.exporgo_file, "w") as file:
             dump(self, file, indent=4)
 
         self._logger.start_log()
-        # TODO: refactor
+    # TODO: refactor
 
     @property
     def modifications(self) -> tuple:
@@ -106,8 +107,8 @@ class Subject:
         return tuple([name for name, experiment in vars(self).items() if isinstance(experiment, Experiment)])
 
     @property
-    def organization_file(self) -> Path:
-        return self.directory.joinpath("organization_file.json")
+    def exporgo_file(self) -> Path:
+        return self.directory.joinpath("exporgo.json")
 
     @classmethod
     def load(cls, directory: Optional[str | Path] = None) -> "Subject":
@@ -137,7 +138,7 @@ class Subject:
         factory = ExperimentFactory(name=name, base_directory=self.directory)
         factory.add_mix_ins(mix_ins=mix_ins)
         setattr(self, name, factory.instance_constructor())
-        # TODO: refactor
+    # TODO: refactor
 
     def record(self, info: str = None) -> None:
         self._modifications.appendleft(info)

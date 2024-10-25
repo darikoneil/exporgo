@@ -3,22 +3,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from exporgo.experiment import (Experiment, ExperimentFactory,
-                                _import_mix_in_string)
+from exporgo.experiment import Experiment, ExperimentFactory
 
-
-@patch('exporgo.experiment.import_module')
-def import_mix_in_string_imports_correct_module(mock_import_module):
-    mock_import_module.return_value = MagicMock()
-    result = _import_mix_in_string("TestMixIn")
-    mock_import_module.assert_called_with("exporgo.test_mix_in")
-    assert result == mock_import_module.return_value.TestMixIn
-
-@patch('exporgo.experiment.import_module')
-def import_mix_in_string_handles_invalid_string(mock_import_module):
-    mock_import_module.side_effect = ImportError
-    with pytest.raises(ImportError):
-        _import_mix_in_string("InvalidMixIn")
 
 @patch('exporgo.experiment.FileTree')
 @patch('exporgo.experiment.get_timestamp', return_value="2023-01-01")
