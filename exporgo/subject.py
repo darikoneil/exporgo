@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Iterable, Optional
+
 import yaml
 
 from ._color import TERMINAL_FORMATTER
@@ -100,6 +101,10 @@ class Subject:
 
         return string_to_print
 
+    def save(self) -> None:
+        with open(self.file, "w") as file:
+            yaml.safe_dump(self._to_dict(), file, default_flow_style=False, sort_keys=False)
+
     @property
     def modifications(self) -> tuple:
         return tuple(self._modifications)
@@ -147,10 +152,6 @@ class Subject:
 
     def get(self, key: str) -> Any:
         return getattr(self, key)
-
-    def save(self) -> None:
-        with open(self.file, "w") as file:
-            yaml.safe_dump(self._to_dict(), file, default_flow_style=False, sort_keys=False)
 
     def _to_dict(self) -> dict:
         return {
