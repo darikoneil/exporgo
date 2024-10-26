@@ -24,7 +24,6 @@ class TestIPythonLogger:
         logger.check_log_status()
         assert logger.running() is True
         mock_ipython.run_line_magic.assert_called_with('logstate', '')
-        assert logger.running() is False
 
     @patch('exporgo._logging.get_ipython')
     def test_ipython_logger_pauses_logging(self, mock_get_ipython, tmp_path):
