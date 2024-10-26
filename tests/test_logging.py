@@ -11,7 +11,7 @@ class TestIPythonLogger:
         mock_ipython = MagicMock()
         mock_get_ipython.return_value = mock_ipython
         logger = IPythonLogger(tmp_path)
-        assert logger.start_log() is True
+        assert logger.start() is True
         # noinspection PyUnresolvedReferences
         mock_ipython.run_line_magic.assert_called_with('logstart', f'-o -r -t {logger._log_file} append')
 
@@ -21,7 +21,7 @@ class TestIPythonLogger:
         mock_get_ipython.return_value = mock_ipython
         logger = IPythonLogger(tmp_path)
         mock_ipython.run_line_magic.assert_called_with('logstart', f"-o -r -t {logger._log_file} append")
-        logger.check_log_status()
+        logger.status()
         assert logger.running() is True
         mock_ipython.run_line_magic.assert_called_with('logstate', '')
 
@@ -30,7 +30,7 @@ class TestIPythonLogger:
         mock_ipython = MagicMock()
         mock_get_ipython.return_value = mock_ipython
         logger = IPythonLogger(tmp_path)
-        assert logger.pause_log() is True
+        assert logger.pause() is True
         mock_ipython.run_line_magic.assert_called_with('logstop', '')
 
     @patch('exporgo._logging.get_ipython')
@@ -38,7 +38,7 @@ class TestIPythonLogger:
         mock_ipython = MagicMock()
         mock_get_ipython.return_value = mock_ipython
         logger = IPythonLogger(tmp_path)
-        logger.end_log()
+        logger.end()
         # noinspection PyProtectedMember
         assert logger._IP is None
         assert logger.running() is False

@@ -39,9 +39,8 @@ dependencies = [
     "ipykernel",
     "ipython",
     "joblib",
-    "json-tricks",
-    "numpy",
-    "polars[numpy, excel, database, async]",
+    "pyyaml",
+    "pydantic",
     "tqdm",
 ]
 
@@ -83,7 +82,11 @@ documentation = [
     "sphinx-rtd-theme",
     "sphinx-autodoc-typehints",
 ]
-
+all = [
+    "exporgo[testing]",
+    "exporgo[development]",
+    "exporgo[documentation]",
+]
 [tool.setuptools]
 packages = [
     "exporgo",

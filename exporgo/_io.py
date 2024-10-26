@@ -45,7 +45,7 @@ def select_directory(**kwargs) -> Path:
 
     :param kwargs: keyword arguments passed to tkinter.filedialog.askdirectory
 
-    :raises: IOError if directory not found
+    :raises: FileNotFoundError if directory not found
 
     :return: absolute path to directory
     """

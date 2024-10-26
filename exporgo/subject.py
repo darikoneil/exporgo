@@ -3,8 +3,9 @@ from typing import Any, Iterable, Optional
 
 import yaml
 
+from . import FileTree
 from ._color import TERMINAL_FORMATTER
-from ._io import select_directory
+from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from .exceptions import DuplicateExperimentError, MissingFilesError
 from .experiment import Experiment, ExperimentFactory
@@ -37,6 +38,11 @@ class Subject:
         if not self.directory.exists():
             Path.mkdir(self.directory)
 
+        # determine if auto-starting logging. This is a hidden feature and is taken from kwargs
+        start_log = kwargs.pop("start_log", True)
+        #: IPython_logger: logging object
+        self.logger = IPythonLogger(self.directory, start_log)
+
         #: str: species
         self.species = species
 
@@ -52,13 +58,10 @@ class Subject:
             self.meta.update(kwargs)
 
         #: str: instance date
-        self._instance_date = get_timestamp()
+        self._created = get_timestamp()
 
         #: dict: experiments
         self._experiments = {}
-
-        #: IPython_logger: logging object
-        self.logger = IPythonLogger(self.directory)
 
         # call this only after all attrs successfully initialized
         self._modifications.append("Instantiated")
@@ -102,16 +105,19 @@ class Subject:
         return string_to_print
 
     def save(self) -> None:
-        self.logger.pause_log()
+        self.logger.end()
 
         with open(self.file, "w") as file:
-            yaml.safe_dump(self._to_dict(), file, default_flow_style=False, sort_keys=False)
+            yaml.safe_dump(self.__to_dict__(),
+                           file,
+                           default_flow_style=False,
+                           sort_keys=False)
 
-        self.logger.start_log()
+        self.logger.start()
 
     @property
     def created(self) -> str:
-        return self._instance_date
+        return self._created
 
     @property
     def experiments(self) -> tuple[str, ...]:
@@ -126,21 +132,17 @@ class Subject:
         return self.modifications[0][1]
 
     @property
-    def logging(self) -> bool:
-        return self.logger.running()
-
-    @property
     def modifications(self) -> tuple:
         return tuple(self._modifications)
 
-    def create_experiment(self, name: str, mix_ins: str | Experiment | Iterable[str | Experiment]) -> None:
+    def create_experiment(self, name: str, mix_ins: str | Experiment | Iterable[str | Experiment], **kwargs) -> None:
         factory = ExperimentFactory(name=name, base_directory=self.directory)
         factory.add_mix_ins(mix_ins)
 
         if name in self.experiments:
             raise DuplicateExperimentError(name)
 
-        self._experiments[name] = factory.instance_constructor()
+        self._experiments[name] = factory.instance_constructor(**kwargs)
         self.record(name)
 
     def record(self, info: str = None) -> None:
@@ -166,18 +168,51 @@ class Subject:
     def get(self, key: str) -> Any:
         return getattr(self, key)
 
-    def _to_dict(self) -> dict[str, Any]:
+    @classmethod
+    def load(cls, file: Optional[str | Path] = None):
+        file = file if file else select_file(title="Select organization file")
+        if not file.is_file():
+            file = file.joinpath("organization.exporgo")
+        with open(file, "r") as file:
+            _dict = yaml.safe_load(file)
+        return cls.__from_dict__(_dict)
+
+    @classmethod
+    def __from_dict__(cls, _dict: dict):
+        subject = cls(
+            name=_dict.get("name"),
+            directory=_dict.get("directory"),
+            species=_dict.get("species"),
+            study=_dict.get("study"),
+            condition=_dict.get("condition"),
+            meta=_dict.get("meta"),
+            start_log=False
+        )
+
+        for experiment_name, experiment_dict in _dict.get("experiments").items():
+            subject.create_experiment(experiment_name, experiment_dict.pop("mix_ins"), index=False)
+            experiment = subject.get(experiment_name)
+            experiment.file_tree = FileTree.__from_dict__(experiment_dict.pop("file_tree"))
+            experiment.__dict__.update(experiment_dict)
+
+        subject._created = _dict.get("created")
+        subject._modifications = ModificationLogger(_dict.get("modifications"))
+        subject.logger.start()
+
+        return subject
+
+    def __to_dict__(self) -> dict[str, Any]:
         return {
             "name": self.name,
-            "instance_date": self.created,
+            "created": self.created,
             "last_modified": self.last_modified,
-            "directory": self.directory,
-            "file": self.file,
+            "directory": str(self.directory),
+            "file": str(self.file),
             "species": self.species,
             "study": self.study,
             "condition": self.condition,
             "meta": self.meta,
-            "experiments": {experiment: experiment for experiment in self.experiments},
+            "experiments": {name: experiment.__to_dict__() for name, experiment in self._experiments.items()},
             "modifications": self.modifications,
         }
 
@@ -193,7 +228,7 @@ class Subject:
             f"{self.experiments=}, ",
             f"{self.exporgo_file=}, "
             f"{self.modifications=}, "
-            f"{self._instance_date=}"
+            f"{self._created=}"
         ])
 
     def __getattr__(self, item: str) -> Any:
@@ -214,4 +249,6 @@ class Subject:
 
     def __del__(self):
         if "logger" in vars(self):
-            self.logger.end_log()
+            self.logger.end()
+            self.logger._IP = None
+

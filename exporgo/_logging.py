@@ -15,11 +15,13 @@ class IPythonLogger:
     Wrapper class for IPython logging
     """
 
-    def __init__(self, directory: Path):
+    def __init__(self, directory: Path, start: bool = True):
         """
         Wrapper class for IPython logging
 
         :param directory: Path to the directory where the log file will be stored
+
+        :param start: If True, the logging will start immediately
         """
         #: bool: running status
         self._running = False
@@ -33,7 +35,8 @@ class IPythonLogger:
         if directory.exists() and not self._log_file.exists():
             self._create_log()
 
-        self.start_log()
+        if start:
+            self.start()
 
     def running(self) -> bool:
         """
@@ -43,14 +46,14 @@ class IPythonLogger:
         """
         return self._running
 
-    def check_log_status(self) -> None:
+    def status(self) -> None:
         """
         Checks log status
         """
 
         self._IP.run_line_magic('logstate', '')
 
-    def pause_log(self) -> bool:
+    def pause(self) -> bool:
         """
         Pause the logging
 
@@ -66,14 +69,14 @@ class IPythonLogger:
         self._running = False
         return True
 
-    def end_log(self) -> None:
+    def end(self) -> None:
         """
         Ends the logging
         """
-        self.pause_log()
+        self.pause()
         self._IP = None
 
-    def start_log(self) -> bool:
+    def start(self) -> bool:
         """
         Starts the logging
 

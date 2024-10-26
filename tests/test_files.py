@@ -108,14 +108,14 @@ class TestFileTree:
 
     def test_add_path(self, tmp_path, source):
         file_tree = FileTree("source", tmp_path)
-        file_tree.add_path("data")
+        file_tree.add_file_set("data")
         assert isinstance(file_tree.get("data"), FileSet)
         assert file_tree.get("data").directory == tmp_path.joinpath("source").joinpath("data")
 
     def test_build(self, tmp_path):
         file_tree = FileTree("experiment", tmp_path)
         assert tmp_path.joinpath("experiment").exists()
-        file_tree.add_path("data")
+        file_tree.add_file_set("data")
         file_tree.build()
         assert file_tree.get("data").directory.exists()
 
@@ -159,7 +159,7 @@ class TestFileTree:
 
     def test_index(self, tmp_path, source):
         file_tree = FileTree("source", tmp_path, index=False)
-        file_tree.add_path("dummy_folder_0")
+        file_tree.add_file_set("dummy_folder_0")
         file_tree.index()
         assert len(file_tree) == 1
         assert file_tree.num_files == 3

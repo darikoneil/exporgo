@@ -92,13 +92,15 @@ class FileTree:
         """
         return sum(len(file_set.folders) for file_set in self.values()) + len(self)
 
-    def add_path(self, key: str) -> None:
+    def add_file_set(self, key: str, index: bool = True) -> None:
         """
         Adds a file set to the file tree
 
         :param key: key for this file set. Should be "folder" not a full path or literal
+
+        :param index: Whether to index the file set upon creation
         """
-        setattr(self, key, FileSet(key, self.directory))
+        setattr(self, key, FileSet(key, self.directory, index))
 
     def build(self) -> None:
         """
@@ -133,6 +135,27 @@ class FileTree:
             return self.__getattribute__(key)
         except AttributeError as exc:
             raise KeyError(f"{key} not in filetree") from exc
+
+    def find_file_type(self, ext: str) -> list[Path] | None:
+        """
+        Returns all files with a specified extension
+
+        :param ext: Specified file extension
+
+        :type ext: :class:`list`\[:class:`Path <pathlib.Path>`\] or ```None```
+        """
+        return [file for file_set in self.values() for file in file_set.find_file_type(ext)]
+
+    def find_matching_files(self, identifier: str) -> list[Path] | None:
+        """
+        Returns all files that match some identifier
+
+        :param identifier: String identified to match
+
+        :rtype: :class:`list`\[:class:`Path <pathlib.Path>`\] or ```None```
+
+        """
+        return [file for file_set in self.values() for file in file_set.find_matching_files(identifier)]
 
     def items(self) -> Generator[tuple[str, "FileSet"], None, None]:
         """
@@ -266,7 +289,24 @@ class FileTree:
 
     def _populate(self) -> None:
         for file_set in (file_set for file_set in self.directory.glob("*") if file_set is not file_set.is_file()):
-            self.add_path(file_set.stem) if (file_set not in self.values()) else None
+            self.add_file_set(file_set.stem) if (file_set not in self.values()) else None
+
+    @classmethod
+    def __from_dict__(cls, _dict: dict) -> "FileTree":
+        file_tree = cls(_dict.pop("name"), _dict.pop("directory"), index=False)
+        for value in _dict.get("file_sets").values():
+            name = value.get("name")
+            value["directory"] = Path(value.get("directory")).parent
+            setattr(file_tree, name, FileSet.__from_dict__(value))
+        return file_tree
+
+
+    def __to_dict__(self) -> dict:
+        return {
+            "name": self._name,
+            "directory": str(self.directory),
+            "file_sets": {key: file_set.__to_dict__() for key, file_set in self.items()}
+        }
 
     def __call__(self, target: Optional[str] = None) -> Path | list[Path]:
         """
@@ -412,6 +452,21 @@ class FileSet:
         missing = {name: location for name, location in self.files.items() if not location.exists()}
         if missing:
             raise MissingFilesError(missing)
+
+    @classmethod
+    def __from_dict__(cls, data: dict) -> "FileSet":
+        file_set = cls(data.pop("name"), data.pop("directory"), index=False)
+        file_set._files = FileMap(data.pop("files"))
+        file_set._folders = FileMap(data.pop("folders"))
+        return file_set
+
+    def __to_dict__(self) -> dict:
+        return {
+            "name": self._name,
+            "directory": str(self.directory),
+            "files": {name: str(location) for name, location in self.files.items()},
+            "folders": {name: str(location) for name, location in self.folders.items()}
+        }
 
     def __call__(self, target: Optional[str] = None) -> Path:
         """

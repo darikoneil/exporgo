@@ -32,16 +32,20 @@ class Experiment:
         self._mix_ins = kwargs.get("mix_ins", [])
 
         #: "FileTree": file tree experimental folders and files
-        self.file_tree = FileTree(self._name, base_directory)
+        self.file_tree = FileTree(self._name, base_directory, index=kwargs.get("index", True))
 
         #: str: instance date
-        self._instance_date = get_timestamp()
+        self._created = get_timestamp()
 
         self._generate_file_tree()
 
     @property
     def base_directory(self) -> Path:
         return self._base_directory
+
+    @property
+    def created(self) -> str:
+        return self._created
 
     @property
     def mix_ins(self) -> Iterable:
@@ -82,10 +86,19 @@ class Experiment:
         ...
 
     def _generate_file_tree(self) -> None:
-        self.file_tree.add_path("results")
-        self.file_tree.add_path("figures")
+        self.file_tree.add_file_set("results")
+        self.file_tree.add_file_set("figures")
         self.generate_class_files()
         self.file_tree.build()
+
+    def __to_dict__(self):
+        return {
+            "name": self._name,
+            "base_directory": str(self._base_directory),
+            "mix_ins": [mix_in.__name__ for mix_in in self._mix_ins],
+            "file_tree": self.file_tree.__to_dict__(),
+            "instance_date": self._created
+        }
 
 
 class ExperimentRegistry:
@@ -149,9 +162,9 @@ class ExperimentFactory:
         # noinspection PyTypeChecker
         return type(self._name, tuple(self._mix_ins), params)
 
-    def instance_constructor(self) -> "Experiment":
+    def instance_constructor(self, **kwargs) -> "Experiment":
         experiment_object = self.object_constructor()
-        return experiment_object(name=self._name, base_directory=self.base_directory, mix_ins=self._mix_ins)
+        return experiment_object(name=self._name, base_directory=self.base_directory, mix_ins=self._mix_ins, **kwargs)
 
     @singledispatchmethod
     def add_mix_ins(self, mix_in: Experiment) -> None:
@@ -185,7 +198,7 @@ class GenericExperiment(Experiment):
 
     def collect_data(self) -> None:
         data_directory = select_directory(title="Select the directory containing the data")
-        _ = verbose_copy(data_directory, self.file_tree.get("data")(None), feedback="data")
+        verbose_copy(data_directory, self.file_tree.get("data")(None), feedback="data")
         self.file_tree.get("data").index()
         super().collect_data()
 
@@ -193,5 +206,5 @@ class GenericExperiment(Experiment):
         raise NotImplementedError("Generic experiments do not have an implementation for the analyze_data method")
 
     def generate_class_files(self) -> None:
-        self.file_tree.add_path("data")
+        self.file_tree.add_file_set("data")
         super().generate_class_files()
