@@ -22,7 +22,9 @@ class TestIPythonLogger:
         logger = IPythonLogger(tmp_path)
         mock_ipython.run_line_magic.assert_called_with('logstart', f"-o -r -t {logger._log_file} append")
         logger.check_log_status()
-        
+        assert logger.running() is True
+        mock_ipython.run_line_magic.assert_called_with('logstate', '')
+        assert logger.running() is False
 
     @patch('exporgo._logging.get_ipython')
     def test_ipython_logger_pauses_logging(self, mock_get_ipython, tmp_path):
@@ -40,6 +42,7 @@ class TestIPythonLogger:
         logger.end_log()
         # noinspection PyProtectedMember
         assert logger._IP is None
+        assert logger.running() is False
         mock_ipython.run_line_magic.assert_called_with('logstop', '')
 
 class TestModificationLogger:

@@ -21,6 +21,8 @@ class IPythonLogger:
 
         :param directory: Path to the directory where the log file will be stored
         """
+        #: bool: running status
+        self._running = False
 
         #: object: IPython magic
         self._IP = None
@@ -32,6 +34,14 @@ class IPythonLogger:
             self._create_log()
 
         self.start_log()
+
+    def running(self) -> bool:
+        """
+        Returns the running status
+
+        :return: True if running, False otherwise
+        """
+        return self._running
 
     def check_log_status(self) -> None:
         """
@@ -53,6 +63,7 @@ class IPythonLogger:
             except UserWarning as e:
                 print(e)
                 return False
+        self._running = False
         return True
 
     def end_log(self) -> None:
@@ -77,6 +88,7 @@ class IPythonLogger:
             except UserWarning as e:
                 print(e)
                 return False
+        self._running = True
         return True
 
     def _create_log(self) -> None:

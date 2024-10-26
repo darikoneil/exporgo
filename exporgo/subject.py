@@ -58,7 +58,7 @@ class Subject:
         self._experiments = {}
 
         #: IPython_logger: logging object
-        self._logger = IPythonLogger(self.directory)
+        self.logger = IPythonLogger(self.directory)
 
         # call this only after all attrs successfully initialized
         self._modifications.append("Instantiated")
@@ -68,9 +68,9 @@ class Subject:
 
         string_to_print += TERMINAL_FORMATTER(f"{self.name}\n", "header")
         string_to_print += TERMINAL_FORMATTER("Created: ", "emphasis")
-        string_to_print += f"{self._instance_date}\n"
+        string_to_print += f"{self.created}\n"
         string_to_print += TERMINAL_FORMATTER("Last Modified: ", "emphasis")
-        string_to_print += f"{self.modifications[0]}\n"
+        string_to_print += f"{self.last_modified}\n"
         string_to_print += TERMINAL_FORMATTER("Directory: ", "emphasis")
         string_to_print += f"{self.directory}\n"
         string_to_print += TERMINAL_FORMATTER("Species: ", "emphasis")
@@ -95,19 +95,23 @@ class Subject:
             string_to_print += TERMINAL_FORMATTER(f"\t{experiment}\n", "experiment")
 
         string_to_print += TERMINAL_FORMATTER("Recent Modifications:\n", "modifications")
-        for modification in self.modifications[-5:]:
+        for modification in self.modifications[:5]:
             string_to_print += TERMINAL_FORMATTER(f"\t{modification[0]}: ", "BLUE")
             string_to_print += f"{modification[1]}\n"
 
         return string_to_print
 
     def save(self) -> None:
+        self.logger.pause_log()
+
         with open(self.file, "w") as file:
             yaml.safe_dump(self._to_dict(), file, default_flow_style=False, sort_keys=False)
 
+        self.logger.start_log()
+
     @property
-    def modifications(self) -> tuple:
-        return tuple(self._modifications)
+    def created(self) -> str:
+        return self._instance_date
 
     @property
     def experiments(self) -> tuple[str, ...]:
@@ -116,6 +120,18 @@ class Subject:
     @property
     def file(self) -> Path:
         return self.directory.joinpath("organization.exporgo")
+
+    @property
+    def last_modified(self) -> str:
+        return self.modifications[0][1]
+
+    @property
+    def logging(self) -> bool:
+        return self.logger.running()
+
+    @property
+    def modifications(self) -> tuple:
+        return tuple(self._modifications)
 
     def create_experiment(self, name: str, mix_ins: str | Experiment | Iterable[str | Experiment]) -> None:
         factory = ExperimentFactory(name=name, base_directory=self.directory)
@@ -147,24 +163,21 @@ class Subject:
         if missing:
             raise MissingFilesError(missing)
 
-    def log_status(self) -> None:
-        return self._logger.check_log_status()
-
     def get(self, key: str) -> Any:
         return getattr(self, key)
 
-    def _to_dict(self) -> dict:
+    def _to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
-            "instance_date": self.instance_date,
-            "last_modified": self.modifications[0],
+            "instance_date": self.created,
+            "last_modified": self.last_modified,
             "directory": self.directory,
+            "file": self.file,
             "species": self.species,
             "study": self.study,
             "condition": self.condition,
             "meta": self.meta,
             "experiments": {experiment: experiment for experiment in self.experiments},
-            "exporgo_file": self.file,
             "modifications": self.modifications,
         }
 
@@ -200,5 +213,5 @@ class Subject:
         self.record(key)
 
     def __del__(self):
-        if "_logger" in vars(self):
-            self._logger.end_log()
+        if "logger" in vars(self):
+            self.logger.end_log()
