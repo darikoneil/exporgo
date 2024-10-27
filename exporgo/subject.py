@@ -319,9 +319,23 @@ class Subject:
             raise MissingFilesError(missing)
 
     def get(self, key: str) -> Any:
+        """
+        Gets an attribute or experiment by name.
+
+        :param key: The name of the attribute or experiment.
+
+        :returns: The attribute or experiment.
+        """
         return getattr(self, key)
 
     def __to_dict__(self) -> dict[str, Any]:
+        """
+        Converts the Subject object to a dictionary.
+
+        :returns: The dictionary representation of the subject.
+
+        :rtype: dict[str, Any]
+        """
         return {
             "name": self.name,
             "created": self.created,
@@ -337,6 +351,11 @@ class Subject:
         }
 
     def __repr__(self) -> str:
+        """
+        Returns a string representation of the Subject object for debugging.
+
+        :returns: A string representation of the subject.
+        """
         return "".join([
             f"{self.__class__.__name__}"
             f"({self.name=}, "
@@ -351,9 +370,23 @@ class Subject:
         ])
 
     def __call__(self, name: str) -> Any:
+        """
+        Allows the Subject object to be called like a function to get an attribute or experiment.
+
+        :param name: The name of the attribute or experiment
+
+        :returns: The attribute or experiment.
+        """
         return getattr(self, name)
 
     def __getattr__(self, item: str) -> Any:
+        """
+        Gets an attribute or experiment by name.
+
+        :param item: The name of the attribute or experiment.
+
+        :returns: The attribute or experiment.
+        """
         if item in self.experiments:
             return self._experiments.get(item)
         else:
@@ -361,12 +394,19 @@ class Subject:
 
     def __setattr__(self, key: Any, value: Any) -> None:
         """
-        Override magic to auto-record modifications
+        Sets an attribute and records the modification.
+
+        :param key: The name of the attribute.
+
+        :param value: The value of the attribute.
         """
         super().__setattr__(key, value)
         self.record(key)
 
     def __del__(self):
+        """
+        Destructor to end the logger when the Subject object is deleted.
+        """
         if "logger" in vars(self):
             self.logger.end()
             self.logger._IP = None
