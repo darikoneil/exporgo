@@ -3,12 +3,14 @@ from typing import Any, Iterable, Optional
 
 import yaml
 
+from . import __current_version__
 from . import FileTree
 from ._color import TERMINAL_FORMATTER
 from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from .exceptions import DuplicateExperimentError, MissingFilesError
 from .experiment import Experiment, ExperimentFactory
+from ._validators import validate_version
 
 
 class Subject:
@@ -162,6 +164,9 @@ class Subject:
 
     @classmethod
     def __from_dict__(cls, _dict: dict) -> "Subject":
+
+        validate_version(_dict.pop("version"))
+
         subject = cls(
             name=_dict.get("name"),
             directory=_dict.get("directory"),
@@ -229,6 +234,7 @@ class Subject:
             "meta": self.meta,
             "experiments": {name: experiment.__to_dict__() for name, experiment in self._experiments.items()},
             "modifications": self.modifications,
+            "version": __current_version__,
         }
 
     def __repr__(self) -> str:
