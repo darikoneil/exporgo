@@ -95,6 +95,11 @@ class Subject:
         self._modifications.append("Instantiated")
 
     def __str__(self) -> str:
+        """
+        Returns a string representation of the Subject object.
+
+        :returns: A formatted string representing the subject.
+        """
         string_to_print = ""
 
         string_to_print += TERMINAL_FORMATTER(f"{self.name}\n", "header")
@@ -147,6 +152,9 @@ class Subject:
         return string_to_print
 
     def save(self) -> None:
+        """
+        Saves the subject's organization data to a YAML file in the subject's directory ("organization.exporgo").
+        """
         self.logger.end()
 
         with open(self.file, "w") as file:
@@ -159,26 +167,61 @@ class Subject:
 
     @property
     def created(self) -> str:
+        """
+        :Getter: Returns the creation timestamp of the subject.
+        :GetterType: :class:`str`
+        :Setter: Not implemented.
+        """
         return self._created
 
     @property
     def experiments(self) -> tuple[str, ...]:
+        """
+        :Getter: returns the names of the experiments associated with the subject.
+        :GetterType: :class:`tuple` [:class:`str`\, ...]
+        :Setter: Not implemented.
+        """
         return tuple(self._experiments.keys())
 
     @property
     def file(self) -> Path:
+        """
+        :Getter: Returns the path to the subject's organization file.
+        :GetterType: :class:`Path <pathlib.Path>`
+        :Setter: Not implemented.
+        """
         return self.directory.joinpath("organization.exporgo")
 
     @property
     def last_modified(self) -> str:
+        """
+        :Getter: Returns the last modification timestamp of the subject.
+        :GetterType: :class:`str`
+        :Setter: Not implemented.
+        """
         return self.modifications[0][1]
 
     @property
-    def modifications(self) -> tuple:
+    def modifications(self) -> tuple[tuple[str, str], ...]:
+        """
+        :Getter: Returns a tuple of the subject's modifications.
+        :GetterType: :class:`tuple` [:class:`tuple` [:class:`str`\, :class:`str`\], ...]
+        :Setter: Not implemented.
+        """
         return tuple(self._modifications)
 
     @classmethod
     def load(cls, file: Optional[str | Path] = None) -> "Subject":
+        """
+        Loads a subject from its organization file. If not provided, a file can be selected using a file dialog.
+        Upon loading, the subject's logger is started and indexed files for each experiment are validated.
+
+        :param file: The path to the subject's organization file.
+        :type file: :class:`Optional <typing.Optional>`\[:class:`str`\ | :class:`Path <pathlib.Path>`\]
+
+        :returns: The loaded subject.
+        :rtype: :class:`Subject <exporgo.subject.Subject>`
+        """
         file = file if file else select_file(title="Select organization file")
         if not file.is_file():
             file = file.joinpath("organization.exporgo")
@@ -188,6 +231,14 @@ class Subject:
 
     @classmethod
     def __from_dict__(cls, _dict: dict) -> "Subject":
+        """
+        Creates a Subject instance from a dictionary.
+
+        :param _dict: The dictionary containing subject data.
+
+        :returns: The created subject.
+        :rtype: :class:`Subject <exporgo.subject.Subject>`
+        """
 
         validate_version(_dict.pop("version"))
 
@@ -213,6 +264,18 @@ class Subject:
         return subject
 
     def create_experiment(self, name: str, mix_ins: str | Experiment | Iterable[str | Experiment], **kwargs) -> None:
+        """
+        Creates a new experiment for the subject.
+
+        :param name: The name of the experiment.
+
+        :param mix_ins: The mix-ins for the experiment.
+        :type mix_ins: :class`str` | :class:`Experiment <exporgo.experiment.Experiment>` |
+            :class:`Iterable <typing.Iterable>`\[:class:`str` | :class:`Experiment <exporgo.experiment.Experiment>`\]
+
+        :param kwargs: Additional keyword arguments.
+        """
+
         factory = ExperimentFactory(name=name, base_directory=self.directory)
         factory.add_mix_ins(mix_ins)
 
@@ -223,14 +286,28 @@ class Subject:
         self.record(name)
 
     def record(self, info: str = None) -> None:
+        """
+        Records a modification to the subject.
+
+        :param info: Information about the modification, defaults to None.
+        :type info: :class:`Optional <typing.Optional>`\[:class:`str`\]
+        """
         self._modifications.appendleft(info)
 
     def index(self) -> None:
+        """
+         Indexes all experiments associated with the subject.
+         """
         for experiment_name in self.experiments:
             experiment = getattr(self, experiment_name)
             experiment.index()
 
     def validate(self) -> None:
+        """
+        Validates all experiments associated with the subject.
+
+        :raises MissingFilesError: If any files are missing in the experiments.
+        """
         missing = {}
         for experiment in self._experiments.values():
             try:
