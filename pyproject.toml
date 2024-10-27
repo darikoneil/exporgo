@@ -40,7 +40,6 @@ dependencies = [
     "ipython",
     "joblib",
     "pyyaml",
-    "pydantic",
     "tqdm",
 ]
 

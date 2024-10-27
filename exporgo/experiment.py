@@ -29,13 +29,16 @@ class Experiment:
         self._base_directory = base_directory
 
         #: Iterable[str | "Experiment"]: iterable of mix-ins in string or object form
-        self._mix_ins = kwargs.get("mix_ins", [])
+        self._mix_ins = kwargs.pop("mix_ins", [])
 
         #: "FileTree": file tree experimental folders and files
-        self.file_tree = FileTree(self._name, base_directory, index=kwargs.get("index", True))
+        self.file_tree = FileTree(self._name, base_directory, index=kwargs.pop("index", True))
 
         #: str: instance date
         self._created = get_timestamp()
+
+        #: dict: meta data
+        self.meta = kwargs
 
         self._generate_file_tree()
 

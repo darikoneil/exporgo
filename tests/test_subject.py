@@ -1,5 +1,11 @@
 from unittest.mock import patch
 
+import pytest
+from joblib import parallel_config
+
+# noinspection PyUnresolvedReferences,PyProtectedMember
+from exporgo._io import verbose_copy
+from exporgo.exceptions import MissingFilesError
 from exporgo.subject import Subject
 from tests.conftest import BlockPrinting
 
@@ -7,7 +13,7 @@ from tests.conftest import BlockPrinting
 class TestSubject:
 
     def test_subject_initialization_with_valid_data(self, tmp_path):
-        with patch("exporgo.subject.IPythonLogger.start_log") as mock_ipythonlogger:
+        with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="source",
                               directory=tmp_path,
                               species="Mouse",
@@ -26,14 +32,14 @@ class TestSubject:
 
     def test_subject_initialization_without_directory(self, tmp_path):
         with patch("exporgo.subject.select_directory") as mock_select_directory:
-            with patch("exporgo.subject.IPythonLogger.start_log") as mock_ipythonlogger:
+            with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
                 mock_select_directory.return_value = tmp_path
                 subject = Subject(name="TestSubject")
                 assert subject.directory == tmp_path.joinpath("TestSubject")
                 assert mock_ipythonlogger.start_log.called_once()
 
     def test_subject_print(self, tmp_path):
-        with patch("exporgo.subject.IPythonLogger.start_log") as mock_ipythonlogger:
+        with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="TestSubject",
                               directory=tmp_path,
                               species="Mouse",
@@ -41,12 +47,13 @@ class TestSubject:
                               condition="Control",
                               meta = {"test": "details"},
                               extra = "extra details")
+            subject.create_experiment("MockExperiment", "GenericExperiment")
             with BlockPrinting():
                 print(subject)
             assert mock_ipythonlogger.start_log.called_once()
 
     def test_subject_indirect_get_experiment(self, tmp_path):
-        with patch("exporgo.subject.IPythonLogger.start_log") as mock_ipythonlogger:
+        with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="TestSubject",
                               directory=tmp_path,
                               species="Mouse",
@@ -60,7 +67,7 @@ class TestSubject:
             assert mock_ipythonlogger.start_log.called_once()
 
     def test_subject_create_experiment(self, tmp_path):
-        with patch("exporgo.subject.IPythonLogger.start_log") as mock_ipythonlogger:
+        with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="TestSubject",
                               directory=tmp_path,
                               species="Mouse",
@@ -70,4 +77,61 @@ class TestSubject:
                               extra = "extra details")
             subject.create_experiment("MockExperiment", "GenericExperiment")
             assert "MockExperiment" in subject._experiments
+            assert mock_ipythonlogger.start_log.called_once()
+
+    def test_subject_save_load(self, tmp_path, source):
+        # noinspection PyUnusedLocal
+        with patch("exporgo.subject.IPythonLogger") as mock_ipythonlogger:
+            subject = Subject(name="TestSubject",
+                              directory=tmp_path,
+                              species="Mouse",
+                              study="Study1",
+                              condition="Control",
+                              meta = {"test": "details"},
+                              extra = "extra details")
+            subject.create_experiment("MockExperiment", "GenericExperiment")
+            with parallel_config(n_jobs=1):
+                verbose_copy(source, subject.get("MockExperiment").get("data").directory)
+            subject.get("MockExperiment").index()
+            subject.save()
+            subject.logger.end()
+            subject_copy = Subject.load(tmp_path.joinpath("TestSubject"))
+            assert subject_copy.name == "TestSubject"
+            assert subject_copy.species == "Mouse"
+            assert subject_copy.study == "Study1"
+            assert subject_copy.condition == "Control"
+            assert subject_copy.meta == {"test": "details", "extra": "extra details"}
+            assert "MockExperiment" in subject_copy.experiments
+            assert subject_copy.get("MockExperiment").file_tree.num_files == 9
+
+    def test_subject_validate(self, tmp_path):
+        with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
+            subject = Subject(name="TestSubject",
+                              directory=tmp_path,
+                              species="Mouse",
+                              study="Study1",
+                              condition="Control",
+                              meta = {"test": "details"},
+                              extra = "extra details")
+            subject.create_experiment("MockExperiment", "GenericExperiment")
+            subject.validate()
+            assert mock_ipythonlogger.start_log.called_once()
+
+    def test_subject_validate_fail(self, tmp_path, source):
+        with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
+            subject = Subject(name="TestSubject",
+                              directory=tmp_path,
+                              species="Mouse",
+                              study="Study1",
+                              condition="Control",
+                              meta = {"test": "details"},
+                              )
+            subject.create_experiment("MockExperiment", "GenericExperiment")
+            with parallel_config(n_jobs=1):
+                verbose_copy(source, subject.get("MockExperiment").get("data").directory)
+            subject.get("MockExperiment").index()
+            list(subject.get("MockExperiment").get("data").files.values())[0].unlink()
+
+            with pytest.raises(MissingFilesError):
+                subject.validate()
             assert mock_ipythonlogger.start_log.called_once()

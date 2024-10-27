@@ -85,17 +85,33 @@ class Subject:
 
         string_to_print += TERMINAL_FORMATTER("Meta:\n", "emphasis")
         if not self.meta:
-            string_to_print += "\tNo meta data defined\n"
+            string_to_print += "\tNo Metadata Defined\n"
         else:
             for key, value in self.meta.items():
                 string_to_print += TERMINAL_FORMATTER(f"\t{key}: ", "BLUE")
                 string_to_print += f"{value}\n"
-        string_to_print += TERMINAL_FORMATTER("Experiments:\n", "emphasis")
 
+        string_to_print += TERMINAL_FORMATTER("Experiments:\n", "emphasis")
         if len(self.experiments) == 0:
             string_to_print += "\tNo experiments defined\n"
-        for experiment in self.experiments:
-            string_to_print += TERMINAL_FORMATTER(f"\t{experiment}\n", "experiment")
+        for name, experiment in self._experiments.items():
+            string_to_print += TERMINAL_FORMATTER(f"\t{name}: \n", "BLUE")
+            string_to_print += TERMINAL_FORMATTER("\t\tCreated: ", "GREEN")
+            string_to_print += f"{experiment.created}\n"
+            string_to_print += TERMINAL_FORMATTER("\t\tProperties: ", "GREEN")
+            string_to_print += "".join([mix_in.__name__ + ", " for mix_in in experiment.mix_ins])[:-2]
+            string_to_print += "\n"
+            string_to_print += TERMINAL_FORMATTER("\t\tMeta: \n", "GREEN")
+            if not experiment.meta:
+                string_to_print += "\t\t\tNo Metadata Defined\n"
+            else:
+                for key, value in experiment.meta.items():
+                    string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key}: ", "ORANGE")
+                    string_to_print += f"{value}\n"
+            string_to_print += TERMINAL_FORMATTER("\t\tFile Tree: \n", "GREEN")
+            for key, file_set in experiment.file_tree.items():
+                string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key.capitalize()}: ", "ORANGE")
+                string_to_print += f"{len(file_set.files)} Files\n"
 
         string_to_print += TERMINAL_FORMATTER("Recent Modifications:\n", "modifications")
         for modification in self.modifications[:5]:
@@ -135,41 +151,8 @@ class Subject:
     def modifications(self) -> tuple:
         return tuple(self._modifications)
 
-    def create_experiment(self, name: str, mix_ins: str | Experiment | Iterable[str | Experiment], **kwargs) -> None:
-        factory = ExperimentFactory(name=name, base_directory=self.directory)
-        factory.add_mix_ins(mix_ins)
-
-        if name in self.experiments:
-            raise DuplicateExperimentError(name)
-
-        self._experiments[name] = factory.instance_constructor(**kwargs)
-        self.record(name)
-
-    def record(self, info: str = None) -> None:
-        self._modifications.appendleft(info)
-
-    def index(self) -> None:
-        for experiment_name in self.experiments:
-            experiment = getattr(self, experiment_name)
-            experiment.index()
-
-    def validate(self) -> None:
-        missing = {}
-        for experiment_name in self.experiments:
-            experiment = getattr(self, experiment_name)
-            try:
-                experiment.validate()
-            except MissingFilesError as exc:
-                missing.update(exc.missing_files)
-
-        if missing:
-            raise MissingFilesError(missing)
-
-    def get(self, key: str) -> Any:
-        return getattr(self, key)
-
     @classmethod
-    def load(cls, file: Optional[str | Path] = None):
+    def load(cls, file: Optional[str | Path] = None) -> "Subject":
         file = file if file else select_file(title="Select organization file")
         if not file.is_file():
             file = file.joinpath("organization.exporgo")
@@ -178,7 +161,7 @@ class Subject:
         return cls.__from_dict__(_dict)
 
     @classmethod
-    def __from_dict__(cls, _dict: dict):
+    def __from_dict__(cls, _dict: dict) -> "Subject":
         subject = cls(
             name=_dict.get("name"),
             directory=_dict.get("directory"),
@@ -200,6 +183,38 @@ class Subject:
         subject.logger.start()
 
         return subject
+
+    def create_experiment(self, name: str, mix_ins: str | Experiment | Iterable[str | Experiment], **kwargs) -> None:
+        factory = ExperimentFactory(name=name, base_directory=self.directory)
+        factory.add_mix_ins(mix_ins)
+
+        if name in self.experiments:
+            raise DuplicateExperimentError(name)
+
+        self._experiments[name] = factory.instance_constructor(**kwargs)
+        self.record(name)
+
+    def record(self, info: str = None) -> None:
+        self._modifications.appendleft(info)
+
+    def index(self) -> None:
+        for experiment_name in self.experiments:
+            experiment = getattr(self, experiment_name)
+            experiment.index()
+
+    def validate(self) -> None:
+        missing = {}
+        for experiment in self._experiments.values():
+            try:
+                experiment.validate()
+            except MissingFilesError as exc:
+                missing.update(exc.missing_files)
+
+        if missing:
+            raise MissingFilesError(missing)
+
+    def get(self, key: str) -> Any:
+        return getattr(self, key)
 
     def __to_dict__(self) -> dict[str, Any]:
         return {
@@ -232,9 +247,6 @@ class Subject:
         ])
 
     def __getattr__(self, item: str) -> Any:
-        """
-        Override magic to auto-record access
-        """
         if item in self.experiments:
             return self._experiments.get(item)
         else:
@@ -251,4 +263,3 @@ class Subject:
         if "logger" in vars(self):
             self.logger.end()
             self.logger._IP = None
-

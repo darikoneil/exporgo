@@ -92,6 +92,15 @@ class FileTree:
         """
         return sum(len(file_set.folders) for file_set in self.values()) + len(self)
 
+    @classmethod
+    def __from_dict__(cls, _dict: dict) -> "FileTree":
+        file_tree = cls(_dict.pop("name"), _dict.pop("directory"), index=False)
+        for value in _dict.get("file_sets").values():
+            name = value.get("name")
+            value["directory"] = Path(value.get("directory")).parent
+            setattr(file_tree, name, FileSet.__from_dict__(value))
+        return file_tree
+
     def add_file_set(self, key: str, index: bool = True) -> None:
         """
         Adds a file set to the file tree
@@ -291,16 +300,6 @@ class FileTree:
         for file_set in (file_set for file_set in self.directory.glob("*") if file_set is not file_set.is_file()):
             self.add_file_set(file_set.stem) if (file_set not in self.values()) else None
 
-    @classmethod
-    def __from_dict__(cls, _dict: dict) -> "FileTree":
-        file_tree = cls(_dict.pop("name"), _dict.pop("directory"), index=False)
-        for value in _dict.get("file_sets").values():
-            name = value.get("name")
-            value["directory"] = Path(value.get("directory")).parent
-            setattr(file_tree, name, FileSet.__from_dict__(value))
-        return file_tree
-
-
     def __to_dict__(self) -> dict:
         return {
             "name": self._name,
@@ -401,6 +400,13 @@ class FileSet:
         """
         return self._folders
 
+    @classmethod
+    def __from_dict__(cls, data: dict) -> "FileSet":
+        file_set = cls(data.pop("name"), data.pop("directory"), index=False)
+        file_set._files = FileMap(data.pop("files"))
+        file_set._folders = FileMap(data.pop("folders"))
+        return file_set
+
     def find_file_type(self, ext: str) -> list[Path] | None:
         """
         Returns all files with a specified extension
@@ -430,6 +436,7 @@ class FileSet:
         """
         self._files = FileMap()
         self._folders = FileMap()
+        # noinspection PyUnresolvedReferences
         self._files.update(((file.stem, file) for file in self.directory.rglob("*") if file.is_file()))
         self._folders.update(((folder.stem, folder) for folder in self.directory.rglob("*") if not folder.is_file()))
 
@@ -452,13 +459,6 @@ class FileSet:
         missing = {name: location for name, location in self.files.items() if not location.exists()}
         if missing:
             raise MissingFilesError(missing)
-
-    @classmethod
-    def __from_dict__(cls, data: dict) -> "FileSet":
-        file_set = cls(data.pop("name"), data.pop("directory"), index=False)
-        file_set._files = FileMap(data.pop("files"))
-        file_set._folders = FileMap(data.pop("folders"))
-        return file_set
 
     def __to_dict__(self) -> dict:
         return {
