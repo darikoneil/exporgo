@@ -251,6 +251,9 @@ class Subject:
             f"{self._created=}"
         ])
 
+    def __call__(self, name: str) -> Any:
+        return getattr(self, name)
+
     def __getattr__(self, item: str) -> Any:
         if item in self.experiments:
             return self._experiments.get(item)
