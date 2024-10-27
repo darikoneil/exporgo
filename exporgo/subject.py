@@ -13,24 +13,60 @@ from .experiment import Experiment, ExperimentFactory
 
 
 class Subject:
+    """
+    An organizational class to manage experiments and their associated data.
+
+    :param name: The name or identifier of the subject.
+
+    :param directory: The directory where the subject's data is stored. If not provided, a directory can be selected
+        using a file dialog.
+    :type directory: :class:`Optional <typing.Optional>`\[:class:`str`\ | :class:`Path <pathlib.Path>`\]
+
+    :param study: The study the subject is associated with.
+    :type study: :class:`Optional <typing.Optional>`\[:class:`str`\]
+
+    :param condition: The experiment condition assigned to the subject.
+    :type condition: :class:`Optional <typing.Optional>`\[:class:`str`\]
+
+    :param meta: Metadata associated with the subject.
+    :type meta: :class:`Optional <typing.Optional>`\[:class:`dict`\]
+
+    :param kwargs: Additional keyword arguments to be stored in the subject's metadata dictionary.
+    :type kwargs: Any
+
+    :var name: The name or identifier of the subject.
+    :vartype name: str
+
+    :var directory: The directory where the subject's data is stored.
+    :vartype directory: :class:`Path <pathlib.Path>`
+
+    :var study: The study the subject is associated with.
+    :vartype study: str
+
+    :var condition: The experiment condition assigned to the subject.
+    :vartype condition: str
+
+    :var meta: Metadata associated with the subject.
+    :vartype meta: dict
+
+    :var logger: A logger class to record interactions with the subject to a text file within the subject's directory
+        ("log.exporgo").
+    :vartype logger: :class:`IPythonLogger <exporgo._logging.IPythonLogger>`
+    """
 
     def __init__(self,
                  name: str,
                  directory: Optional[str | Path] = None,
-                 species: Optional[str] = None,
                  study: Optional[str] = None,
                  condition: Optional[str] = None,
                  meta: Optional[dict] = None,
                  **kwargs):
 
-        #: "ModificationLogger": modifications to this object
+        # first to capture all modifications at creation
         self._modifications = ModificationLogger()
 
-        #: str: subject name
         self.name = name
 
-        #: Path: directory to save mouse within; if directory doesn't contain subject name, we ought to add it
-        # if directory doesn't exist, create it
         directory = Path(directory) if directory \
             else select_directory(title="Select folder to contain subject's organized data")
         if name not in directory.name:
@@ -41,27 +77,18 @@ class Subject:
 
         # determine if auto-starting logging. This is a hidden feature and is taken from kwargs
         start_log = kwargs.pop("start_log", True)
-        #: IPython_logger: logging object
         self.logger = IPythonLogger(self.directory, start_log)
 
-        #: str: species
-        self.species = species
-
-        #: str: name of study
         self.study = study
 
-        #: str: condition
         self.condition = condition
 
-        #: dict: meta data
         self.meta = meta if meta else {}
         if kwargs:
             self.meta.update(kwargs)
 
-        #: str: instance date
         self._created = get_timestamp()
 
-        #: dict: experiments
         self._experiments = {}
 
         # call this only after all attrs successfully initialized
@@ -77,8 +104,6 @@ class Subject:
         string_to_print += f"{self.last_modified}\n"
         string_to_print += TERMINAL_FORMATTER("Directory: ", "emphasis")
         string_to_print += f"{self.directory}\n"
-        string_to_print += TERMINAL_FORMATTER("Species: ", "emphasis")
-        string_to_print += f"{self.species}\n"
         string_to_print += TERMINAL_FORMATTER("Study: ", "emphasis")
         string_to_print += f"{self.study}\n"
         string_to_print += TERMINAL_FORMATTER("Condition: ", "emphasis")
@@ -169,7 +194,6 @@ class Subject:
         subject = cls(
             name=_dict.get("name"),
             directory=_dict.get("directory"),
-            species=_dict.get("species"),
             study=_dict.get("study"),
             condition=_dict.get("condition"),
             meta=_dict.get("meta"),
@@ -227,7 +251,6 @@ class Subject:
             "last_modified": self.last_modified,
             "directory": str(self.directory),
             "file": str(self.file),
-            "species": self.species,
             "study": self.study,
             "condition": self.condition,
             "meta": self.meta,
@@ -241,7 +264,6 @@ class Subject:
             f"{self.__class__.__name__}"
             f"({self.name=}, "
             f"{self.directory=}, "
-            f"{self.species=}, "
             f"{self.study=}, "
             f"{self.condition=}, "
             f"{self.meta=}): "

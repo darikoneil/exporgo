@@ -16,7 +16,6 @@ class TestSubject:
         with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="source",
                               directory=tmp_path,
-                              species="Mouse",
                               study="Study1",
                               condition="Control",
                               meta = {"test": "details"},
@@ -42,7 +41,6 @@ class TestSubject:
         with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="TestSubject",
                               directory=tmp_path,
-                              species="Mouse",
                               study="Study1",
                               condition="Control",
                               meta = {"test": "details"},
@@ -56,7 +54,6 @@ class TestSubject:
         with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="TestSubject",
                               directory=tmp_path,
-                              species="Mouse",
                               study="Study1",
                               condition="Control",
                               meta = {"test": "details"},
@@ -70,7 +67,6 @@ class TestSubject:
         with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="TestSubject",
                               directory=tmp_path,
-                              species="Mouse",
                               study="Study1",
                               condition="Control",
                               meta = {"test": "details"},
@@ -84,7 +80,6 @@ class TestSubject:
         with patch("exporgo.subject.IPythonLogger") as mock_ipythonlogger:
             subject = Subject(name="TestSubject",
                               directory=tmp_path,
-                              species="Mouse",
                               study="Study1",
                               condition="Control",
                               meta = {"test": "details"},
@@ -108,7 +103,6 @@ class TestSubject:
         with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="TestSubject",
                               directory=tmp_path,
-                              species="Mouse",
                               study="Study1",
                               condition="Control",
                               meta = {"test": "details"},
@@ -121,7 +115,6 @@ class TestSubject:
         with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="TestSubject",
                               directory=tmp_path,
-                              species="Mouse",
                               study="Study1",
                               condition="Control",
                               meta = {"test": "details"},
