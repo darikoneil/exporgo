@@ -3,14 +3,13 @@ from typing import Any, Iterable, Optional
 
 import yaml
 
-from . import __current_version__
-from . import FileTree
+from . import FileTree, __current_version__
 from ._color import TERMINAL_FORMATTER
 from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
+from ._validators import validate_version
 from .exceptions import DuplicateExperimentError, MissingFilesError
 from .experiment import Experiment, ExperimentFactory
-from ._validators import validate_version
 
 
 class Subject:
