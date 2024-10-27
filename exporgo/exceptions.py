@@ -119,7 +119,7 @@ class InvalidExperimentTypeError(TypeError):
     """
     Raised when an experiment is not a subclass of :class:`Experiment`
 
-    :param experiment: experiment that is not a subclass of :class:`Experiment
+    :param experiment: experiment that is not a subclass of :class:`Experiment`
     """
     def __init__(self, experiment: Any):
         self.experiment = experiment
