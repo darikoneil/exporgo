@@ -25,6 +25,7 @@ class Scheduler:
         with open(self.file, "w", encoding="UTF-16") as file:
             file.write(self.task)
 
+    # noinspection PyMethodMayBeStatic
     def _create_task(self):
         xml = ""
         return xml
