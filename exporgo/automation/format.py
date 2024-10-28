@@ -10,7 +10,7 @@ class RegistrationInfo(BaseModel):
     security: str = Field(None, title="Security descriptor of the task",
                           serialization_alias="SecurityDescriptor")
     source: str = Field(None, title="Source of the task", serialization_alias="Source")
-    uri: str = Field("Exporgo Task", title="URI of the task", serialization_alias="URI")
+    uri: str = Field(None, title="URI of the task", serialization_alias="URI")
     version: str = Field(None, title="Version of the task", serialization_alias="Version")
 
 
