@@ -1,6 +1,6 @@
 import os
 import sys
-from datetime import date
+#from datetime import date
 
 import toml
 
@@ -12,7 +12,7 @@ pyproject_file = os.path.join(os.path.dirname(os.path.dirname(os. getcwd())), "p
 package_details = toml.load(pyproject_file).get("project")
 
 # get date for copyright
-today = date.today().year
+#today = date.today().year
 
 project = package_details.get("name")
 #copyright = "".join([today, f" {package_details.authors}"])
