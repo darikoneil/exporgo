@@ -12,6 +12,9 @@ from .exceptions import DuplicateExperimentError, MissingFilesError
 from .experiment import Experiment, ExperimentFactory
 
 
+# TODO: Add a second file that registers the subject and experiments with the scheduler and flags collection/analysis
+
+
 class Subject:
     """
     An organizational class to manage experiments and their associated data.

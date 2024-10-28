@@ -18,6 +18,11 @@ from .files import FileSet, FileTree
 """
 
 
+#: TODO: Consider changing from mix-in classes to protocol pattern where collect_data and analyze_data are a chain.
+
+#: TODO: Add flags to the Experiment class to indicate if the experiment has been collected or analyzed.
+
+
 class Experiment:
 
     @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=2, key="base_directory")
