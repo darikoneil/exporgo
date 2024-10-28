@@ -25,9 +25,6 @@ class Subject:
     :param study: The study the subject is associated with.
     :type study: :class:`Optional <typing.Optional>`\[:class:`str`\]
 
-    :param condition: The experiment condition assigned to the subject.
-    :type condition: :class:`Optional <typing.Optional>`\[:class:`str`\]
-
     :param meta: Metadata associated with the subject.
     :type meta: :class:`Optional <typing.Optional>`\[:class:`dict`\]
 
@@ -43,9 +40,6 @@ class Subject:
     :var study: The study the subject is associated with.
     :vartype study: str
 
-    :var condition: The experiment condition assigned to the subject.
-    :vartype condition: str
-
     :var meta: Metadata associated with the subject.
     :vartype meta: dict
 
@@ -58,7 +52,6 @@ class Subject:
                  name: str,
                  directory: Optional[str | Path] = None,
                  study: Optional[str] = None,
-                 condition: Optional[str] = None,
                  meta: Optional[dict] = None,
                  **kwargs):
 
@@ -80,8 +73,6 @@ class Subject:
         self.logger = IPythonLogger(self.directory, start_log)
 
         self.study = study
-
-        self.condition = condition
 
         self.meta = meta if meta else {}
         if kwargs:
@@ -111,8 +102,6 @@ class Subject:
         string_to_print += f"{self.directory}\n"
         string_to_print += TERMINAL_FORMATTER("Study: ", "emphasis")
         string_to_print += f"{self.study}\n"
-        string_to_print += TERMINAL_FORMATTER("Condition: ", "emphasis")
-        string_to_print += f"{self.condition}\n"
 
         string_to_print += TERMINAL_FORMATTER("Meta:\n", "emphasis")
         if not self.meta:

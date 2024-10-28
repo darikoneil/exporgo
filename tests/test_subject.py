@@ -17,14 +17,12 @@ class TestSubject:
             subject = Subject(name="source",
                               directory=tmp_path,
                               study="Study1",
-                              condition="Control",
                               meta = {"test": "details"},
                               extra = "extra details")
             assert subject.name == "source"
             assert subject.directory == tmp_path.joinpath("source")
             assert subject.species == "Mouse"
             assert subject.study == "Study1"
-            assert subject.condition == "Control"
             assert subject.meta == {"test": "details", "extra": "extra details"}
             subject.index()
             assert mock_ipythonlogger.start_log.called_once()
@@ -42,7 +40,6 @@ class TestSubject:
             subject = Subject(name="TestSubject",
                               directory=tmp_path,
                               study="Study1",
-                              condition="Control",
                               meta = {"test": "details"},
                               extra = "extra details")
             subject.create_experiment("MockExperiment", "GenericExperiment")
@@ -55,7 +52,6 @@ class TestSubject:
             subject = Subject(name="TestSubject",
                               directory=tmp_path,
                               study="Study1",
-                              condition="Control",
                               meta = {"test": "details"},
                               extra = "extra details")
             subject._experiments["MockExperiment"] = "MockExperiment_"
@@ -68,7 +64,6 @@ class TestSubject:
             subject = Subject(name="TestSubject",
                               directory=tmp_path,
                               study="Study1",
-                              condition="Control",
                               meta = {"test": "details"},
                               extra = "extra details")
             subject.create_experiment("MockExperiment", "GenericExperiment")
@@ -81,7 +76,6 @@ class TestSubject:
             subject = Subject(name="TestSubject",
                               directory=tmp_path,
                               study="Study1",
-                              condition="Control",
                               meta = {"test": "details"},
                               extra = "extra details")
             subject.create_experiment("MockExperiment", "GenericExperiment")
@@ -94,7 +88,6 @@ class TestSubject:
             assert subject_copy.name == "TestSubject"
             assert subject_copy.species == "Mouse"
             assert subject_copy.study == "Study1"
-            assert subject_copy.condition == "Control"
             assert subject_copy.meta == {"test": "details", "extra": "extra details"}
             assert "MockExperiment" in subject_copy.experiments
             assert subject_copy.get("MockExperiment").file_tree.num_files == 9
@@ -104,7 +97,6 @@ class TestSubject:
             subject = Subject(name="TestSubject",
                               directory=tmp_path,
                               study="Study1",
-                              condition="Control",
                               meta = {"test": "details"},
                               extra = "extra details")
             subject.create_experiment("MockExperiment", "GenericExperiment")
@@ -116,7 +108,6 @@ class TestSubject:
             subject = Subject(name="TestSubject",
                               directory=tmp_path,
                               study="Study1",
-                              condition="Control",
                               meta = {"test": "details"},
                               )
             subject.create_experiment("MockExperiment", "GenericExperiment")
