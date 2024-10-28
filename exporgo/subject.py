@@ -11,7 +11,6 @@ from ._validators import validate_version
 from .exceptions import DuplicateExperimentError, MissingFilesError
 from .experiment import Experiment, ExperimentFactory
 
-
 # TODO: Add a second file that registers the subject and experiments with the scheduler and flags collection/analysis
 
 
@@ -238,7 +237,6 @@ class Subject:
             name=_dict.get("name"),
             directory=_dict.get("directory"),
             study=_dict.get("study"),
-            condition=_dict.get("condition"),
             meta=_dict.get("meta"),
             start_log=False
         )
@@ -335,7 +333,6 @@ class Subject:
             "directory": str(self.directory),
             "file": str(self.file),
             "study": self.study,
-            "condition": self.condition,
             "meta": self.meta,
             "experiments": {name: experiment.__to_dict__() for name, experiment in self._experiments.items()},
             "modifications": self.modifications,
@@ -353,9 +350,8 @@ class Subject:
             f"({self.name=}, "
             f"{self.directory=}, "
             f"{self.study=}, "
-            f"{self.condition=}, "
             f"{self.meta=}): "
-            f"{self.experiments=}, ",
+            f"{self.experiments=}, "
             f"{self.exporgo_file=}, "
             f"{self.modifications=}, "
             f"{self._created=}"

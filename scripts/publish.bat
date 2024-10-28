@@ -1,7 +1,11 @@
 @echo off
 
+if "%1"=="nobuild" (goto publish)
+
 :: build
 call build.bat
 
 :: upload to pypi
-python -m twine upload --repository pypi dist/* --config-file .pypirc
+:publish
+cd ..
+python -m twine upload --repository pypi dist/* -u __token__ -p %EXPORGO_TOKEN%

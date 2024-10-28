@@ -21,7 +21,6 @@ class TestSubject:
                               extra = "extra details")
             assert subject.name == "source"
             assert subject.directory == tmp_path.joinpath("source")
-            assert subject.species == "Mouse"
             assert subject.study == "Study1"
             assert subject.meta == {"test": "details", "extra": "extra details"}
             subject.index()
@@ -86,7 +85,6 @@ class TestSubject:
             subject.logger.end()
             subject_copy = Subject.load(tmp_path.joinpath("TestSubject"))
             assert subject_copy.name == "TestSubject"
-            assert subject_copy.species == "Mouse"
             assert subject_copy.study == "Study1"
             assert subject_copy.meta == {"test": "details", "extra": "extra details"}
             assert "MockExperiment" in subject_copy.experiments
