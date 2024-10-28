@@ -1,9 +1,11 @@
-from abc import abstractmethod
 from functools import singledispatchmethod
 from pathlib import Path
+from pydantic import BaseModel, Field
 from typing import Callable, Iterable, Optional
+import json
 
 from ._io import select_directory, verbose_copy
+
 from ._logging import get_timestamp
 from ._validators import convert_permitted_types_to_required
 from .exceptions import (DuplicateRegistrationError,
@@ -13,14 +15,23 @@ from .files import FileSet, FileTree
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Implementation for Constructing Mix-in Experimental Classes
+// Implementation for Constructing Mix-in Experiment Functionality
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
-
 
 #: TODO: Consider changing from mix-in classes to protocol pattern where collect_data and analyze_data are a chain.
 
 #: TODO: Add flags to the Experiment class to indicate if the experiment has been collected or analyzed.
+
+
+class ExperimentSchema(BaseModel):
+    """
+    Schema for defining an experiment
+    """
+    name: str = Field("Experiment Type", title="Schema name")
+    collection_descriptor: str = Field("data", title="Descriptor for the contents of the experiment")
+    file_sets: str | list[str] = Field([], title="List of file sets for organizing experiment")
+    analyzer: str | Path | Callable = Field(title="Analyzer for the experiment")
 
 
 class Experiment:
@@ -33,7 +44,7 @@ class Experiment:
         #: Path: base directory of mouse
         self._base_directory = base_directory
 
-        #: Iterable[str | "Experiment"]: iterable of mix-ins in string or object form
+        #: Iterable[str]: iterable of strings that form keys for the experiment registry
         self._mix_ins = kwargs.pop("mix_ins", [])
 
         #: "FileTree": file tree experimental folders and files
@@ -42,10 +53,12 @@ class Experiment:
         #: str: instance date
         self._created = get_timestamp()
 
+        self._collection_progress = 0
+
+        self._analysis_progress = 0
+
         #: dict: meta data
         self.meta = kwargs
-
-        self._generate_file_tree()
 
     @property
     def base_directory(self) -> Path:
@@ -80,24 +93,6 @@ class Experiment:
 
     def validate(self) -> None:
         self.file_tree.validate()
-
-    @abstractmethod
-    def collect_data(self) -> None:
-        ...
-
-    @abstractmethod
-    def analyze_data(self) -> None:
-        ...
-
-    @abstractmethod
-    def generate_class_files(self) -> None:
-        ...
-
-    def _generate_file_tree(self) -> None:
-        self.file_tree.add_file_set("results")
-        self.file_tree.add_file_set("figures")
-        self.generate_class_files()
-        self.file_tree.build()
 
     def __to_dict__(self):
         return {
@@ -190,29 +185,3 @@ class ExperimentFactory:
     def _(self, mix_ins: tuple | list) -> None:
         for mix_in in mix_ins:
             self.add_mix_ins(mix_in)
-
-
-"""
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Implementation for a Generic Experiment
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-"""
-
-
-@ExperimentRegistry.register()
-class GenericExperiment(Experiment):
-    def __init__(self, name: str, base_directory: Path, **kwargs):
-        super().__init__(name, base_directory, **kwargs)
-
-    def collect_data(self) -> None:
-        data_directory = select_directory(title="Select the directory containing the data")
-        verbose_copy(data_directory, self.file_tree.get("data")(None), feedback="data")
-        self.file_tree.get("data").index()
-        super().collect_data()
-
-    def analyze_data(self) -> None:
-        raise NotImplementedError("Generic experiments do not have an implementation for the analyze_data method")
-
-    def generate_class_files(self) -> None:
-        self.file_tree.add_file_set("data")
-        super().generate_class_files()
