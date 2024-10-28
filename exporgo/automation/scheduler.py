@@ -1,6 +1,7 @@
 from pathlib import Path
 import subprocess
 
+
 class Scheduler:
     def __init__(self, config):
         self.config = config
