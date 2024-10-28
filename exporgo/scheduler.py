@@ -171,5 +171,5 @@ class Task:
     ...
 
 
-class TaskScheduler:
+class Scheduler:
     ...
