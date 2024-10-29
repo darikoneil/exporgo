@@ -1,7 +1,6 @@
-from pydantic import BaseModel, Field
-from pathlib import Path
-from pydantic import ConfigDict
-from enum import Enum,auto
+from enum import Enum, auto
+
+from pydantic import BaseModel, ConfigDict, Field
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -11,11 +10,13 @@ from enum import Enum,auto
 
 
 MODEL_CONFIG = ConfigDict(extra="forbid",
-                               revalidate_instances="always",
-                               use_enum_values=True,
-                               validate_assignment=True,
-                               validate_default=False
-                               )
+                          revalidate_instances="always",
+                          use_enum_values=True,
+                          validate_assignment=True,
+                          validate_default=False
+                          )
+
+
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Priority enumerations
@@ -24,7 +25,6 @@ MODEL_CONFIG = ConfigDict(extra="forbid",
 
 
 class Priority(Enum):
-    model_config = MODEL_CONFIG
     CRITICAL = 0
     HIGH = 1
     ABOVE_NORMAL = 2
@@ -32,6 +32,8 @@ class Priority(Enum):
     BELOW_NORMAL = 4
     LOW = 5
     IDLE = 6
+
+    model_config = MODEL_CONFIG
 
 
 """
@@ -48,7 +50,7 @@ class _AutoStrEnum(str, Enum):
     From https://stackoverflow.com/questions/58608361/string-based-enum-in-python
     """
     @staticmethod
-    def _generate_next_value_(name: str, start: int, count: int, last_values: list) -> str:
+    def _generate_next_value_(name: str, start: int, count: int, last_values: list) -> str:  # noqa: U100
         return name
         # Or if you prefer, return lower-case member (it's StrEnum default behavior since Python 3.11):
         # return name.lower()
@@ -79,4 +81,4 @@ class FileFormats(_AutoStrEnum):
 
 class ExporgoSettings(BaseModel):
     model_config = MODEL_CONFIG
-    file_format:  FileFormats = Field(FileFormats.JSON, title="File format for storing experiment configurations")
+    file_format: FileFormats = Field(FileFormats.JSON, title="File format for storing experiment configurations")

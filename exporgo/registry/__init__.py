@@ -1,6 +1,6 @@
-from .experiment import ExperimentRegistry, ExperimentConfig, AnalysisConfig, CollectionConfig
+from .experiment import (AnalysisConfig, CollectionConfig, ExperimentConfig,
+                         ExperimentRegistry)
 from .options import FileFormats, Priority
-
 
 __all__ = [
     "AnalysisConfig",

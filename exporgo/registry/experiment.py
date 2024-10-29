@@ -1,19 +1,19 @@
+import json
 from functools import singledispatchmethod
 from pathlib import Path
-from pydantic import BaseModel, Field
+from textwrap import indent
+from types import GeneratorType
+from typing import Callable, Sequence
+
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
-from typing import Callable, Sequence
-from types import GeneratorType
-import json
-from textwrap import indent
+from pydantic import BaseModel, Field
 
-from .options import MODEL_CONFIG, Priority
 from .._color import TERMINAL_FORMATTER
 from ..exceptions import (DuplicateRegistrationError,
-                         ExperimentNotRegisteredError)
-
+                          ExperimentNotRegisteredError)
+from .options import MODEL_CONFIG, Priority
 
 __all__ = [
     "AnalysisConfig",
@@ -88,9 +88,11 @@ class ExperimentRegistry:
                 # noinspection PyTypeChecker
                 file.write("{\n")
                 for name, experiment in cls.__registry.items():
-                    file.write(indent(json.dumps(experiment.name) + f": {experiment.model_dump_json(exclude_defaults=True, indent=4)}\n", " " * 4))
+                    file.write(indent(
+                        json.dumps(name)
+                        + f": {experiment.model_dump_json(exclude_defaults=True, indent=4)}\n",
+                        " " * 4))
                 file.write("}\n")
-                #json.dump({name: experiment.model_dump_json(exclude_defaults=True) for name, experiment in cls.__registry.items()}, file, indent=4)
         except FileNotFoundError:
             cls.__path.touch(exist_ok=False)
             cls._save_registry()
@@ -177,6 +179,6 @@ class ExperimentRegistry:
         return cls()
 
     @classmethod
-    def __exit__(cls, exc_type, exc_val, exc_tb):
+    def __exit__(cls, exc_type, exc_val, exc_tb): # noqa: ANN206
         if cls.__new_registration:
             cls._save_registry()

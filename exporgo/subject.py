@@ -3,17 +3,22 @@ from typing import Any, Iterable, Optional
 
 import yaml
 
-from .files import FileTree
 from . import __current_version__
 from ._color import TERMINAL_FORMATTER
 from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from ._validators import validate_version
 from .exceptions import DuplicateExperimentError, MissingFilesError
-from .experiment import Experiment, ExperimentFactory
-
+from .experiment import Experiment
+from .files import FileTree
 
 # TODO: Add a second file that registers the subject and experiments with the scheduler and flags collection/analysis
+
+# TODO: Add pattern-matching for file format enum
+
+# TODO: Re-add experiment factory for experiment creation
+
+# TODO: Re-implement tests effected by the experiment implementation change
 
 
 class Subject:
