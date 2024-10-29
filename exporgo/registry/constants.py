@@ -1,0 +1,16 @@
+from pydantic import ConfigDict
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Pydantic Model Configuration
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+MODEL_CONFIG = ConfigDict(extra="forbid",
+                               revalidate_instances="always",
+                               use_enum_values=True,
+                               validate_assignment=True,
+                               validate_default=False
+                               )

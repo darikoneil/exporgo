@@ -1,15 +1,27 @@
 from functools import singledispatchmethod
 from pathlib import Path
-from pydantic import BaseModel, Field
-import portalocker
+from pydantic import BaseModel, Field, ConfigDict
+from portalocker import Lock
+from portalocker.constants import LOCK_EX
+from portalocker.exceptions import BaseLockException
 from typing import Callable, Sequence
 from types import GeneratorType
 import json
 
+
+from .constants import MODEL_CONFIG
 from .options import Priority
 from .._color import TERMINAL_FORMATTER
 from ..exceptions import (DuplicateRegistrationError,
                          ExperimentNotRegisteredError)
+
+
+__all__ = [
+    "AnalysisConfig",
+    "CollectionConfig",
+    "ExperimentConfig",
+    "ExperimentRegistry"
+]
 
 
 """
@@ -20,11 +32,13 @@ from ..exceptions import (DuplicateRegistrationError,
 
 
 class CollectionConfig(BaseModel):
+    model_config = MODEL_CONFIG
     name: str = Field(None, title="Recipe name")
     file_sets: str | list[str] | tuple[str] = Field(None, title="List of file sets for organizing experiment")
 
 
 class AnalysisConfig(BaseModel):
+    model_config = MODEL_CONFIG
     name: str = Field(None, title="Recipe name")
     call: str | Path | Callable = Field(None, title="Analyzer for the experiment")
     file_sets: str | list[str] | tuple[str] = Field(None, title="List of file sets for organizing experiment")
@@ -35,6 +49,7 @@ class ExperimentConfig(BaseModel):
     """
     Recipe for defining an experiment
     """
+    model_config = MODEL_CONFIG
     name: str = Field(None, title="Recipe name")
     collector: CollectionConfig | Sequence[CollectionConfig] = Field(None, title="Experiment Collection")
     # sequence does not permit str / bytes, so this works to indicate the list or tuple
@@ -61,7 +76,8 @@ class ExperimentRegistry:
     Registry for storing experiment configurations
     """
     __registry = {}
-    __path = Path(__file__).parent.joinpath("registry").joinpath("experiments.json")
+    __path = Path(__file__).parent.joinpath("experiments.exporgo")
+    __new_registration = False
 
     @classmethod
     def _save_registry(cls) -> None:
@@ -69,7 +85,8 @@ class ExperimentRegistry:
         Save the registry to a JSON file
         """
         try:
-            with portalocker.Lock(cls.__path, "a", timeout=10) as file:
+            with Lock(cls.__path, "a", flags=LOCK_EX) as file:
+                file.truncate(0)
                 # noinspection PyTypeChecker
                 json.dump({name: experiment.model_dump_json(exclude_defaults=True)
                            for name, experiment in cls.__registry.items()},
@@ -77,8 +94,11 @@ class ExperimentRegistry:
                           indent=4,
                           sort_keys=False
                           )
-        except IOError as exc:
-            print(TERMINAL_FORMATTER(f"\nError saving registry: {exc}\n", "announcement"))
+        except FileNotFoundError:
+            cls.__path.touch(exist_ok=False)
+            cls._save_registry()
+        except (IOError, BaseLockException) as exc:
+            print(TERMINAL_FORMATTER(f"\nError saving registry: {exc}\n\n", "announcement"))
 
     @classmethod
     def has(cls, name: str) -> bool:
@@ -119,6 +139,12 @@ class ExperimentRegistry:
         cls.__registry[experiment.name] = experiment
 
     # noinspection PyNestedDecorators
+    @register.register
+    @classmethod
+    def _(cls, experiment: dict) -> None:
+        cls.register(ExperimentConfig.model_validate(experiment))
+
+    # noinspection PyNestedDecorators
     @register.register(list)
     @register.register(tuple)
     @register.register(GeneratorType)
@@ -139,22 +165,17 @@ class ExperimentRegistry:
         Load the registry from a JSON file
         """
         try:
-            with portalocker.Lock(cls.__path, "r", timeout=10) as file:
-                cls.register((ExperimentConfig.parse_raw(config) for name, config in json.load(file).items()))
+            with Lock(cls.__path, "r", timeout=10) as file:
+                cls.register((ExperimentConfig.model_validate_json(config) for name, config in json.load(file).items()))
         except (IOError, json.JSONDecodeError) as exc:
             print(TERMINAL_FORMATTER(f"\nError loading registry: {exc}\n\n", "announcement"))
 
-    @staticmethod
-    def _validate(config: dict) ->"ExperimentConfig":
-        """
-        Validate an experiment configuration
-        """
-        return ExperimentConfig(**config)
-
     @classmethod
-    def __enter__(cls):
+    def __enter__(cls) -> "ExperimentRegistry":
         cls._load_registry()
+        return cls()
 
     @classmethod
     def __exit__(cls, exc_type, exc_val, exc_tb):
-        ...
+        if cls.__new_registration:
+            cls._save_registry()
