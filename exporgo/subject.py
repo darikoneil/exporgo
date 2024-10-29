@@ -3,13 +3,15 @@ from typing import Any, Iterable, Optional
 
 import yaml
 
-from . import FileTree, __current_version__
+from .files import FileTree
+from . import __current_version__
 from ._color import TERMINAL_FORMATTER
 from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from ._validators import validate_version
 from .exceptions import DuplicateExperimentError, MissingFilesError
 from .experiment import Experiment, ExperimentFactory
+
 
 # TODO: Add a second file that registers the subject and experiments with the scheduler and flags collection/analysis
 
@@ -266,13 +268,13 @@ class Subject:
         :param kwargs: Additional keyword arguments.
         """
 
-        factory = ExperimentFactory(name=name, base_directory=self.directory)
-        factory.add_mix_ins(mix_ins)
+        #factory = ExperimentFactory(name=name, base_directory=self.directory)
+        #factory.add_mix_ins(mix_ins)
 
         if name in self.experiments:
             raise DuplicateExperimentError(name)
 
-        self._experiments[name] = factory.instance_constructor(**kwargs)
+        #self._experiments[name] = factory.instance_constructor(**kwargs)
         self.record(name)
 
     def record(self, info: str = None) -> None:

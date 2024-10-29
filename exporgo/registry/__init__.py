@@ -1,9 +1,9 @@
-from experiment import ExperimentRegistry, ExperimentConfig, AnalyzerConfig, CollectionConfig
+from experiment import ExperimentRegistry, ExperimentConfig, AnalysisConfig, CollectionConfig
 
 
 __all__ = [
     "ExperimentRegistry",
     "ExperimentConfig",
-    "AnalyzerConfig",
+    "AnalysisConfig",
     "CollectionConfig",
 ]

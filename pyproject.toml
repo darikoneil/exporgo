@@ -41,7 +41,6 @@ dependencies = [
     "joblib",
     "portalocker",
     "pydantic",
-    "pyyaml",
     "tqdm",
 ]
 
@@ -50,6 +49,13 @@ documentation = "https://github.com/darikoneil/exporgo"
 repository = "https://github.com/darikoneil/exporgo"
 
 [project.optional-dependencies]
+toml = [
+    "toml",
+    "toml-w"
+]
+yaml = [
+    "pyyaml"
+]
 testing = [
     "pytest",
     "pytest-sugar",
@@ -82,8 +88,16 @@ documentation = [
     "sphinx",
     "sphinx-rtd-theme",
     "sphinx-autodoc-typehints",
+    #"nbsphinx",
+    #"sphinx-copybutton",
+    #"sphinx-gallery",
+    "autoclasstoc",
+    "autodoc_pydantic",
+
 ]
 all = [
+    "exporgo[toml]",
+    "exporgo[yaml]",
     "exporgo[testing]",
     "exporgo[development]",
     "exporgo[documentation]",

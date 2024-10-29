@@ -22,11 +22,14 @@ project = package_details.get("name")
 release = package_details.get("version")
 
 extensions = [
+    'sphinx.ext.todo',
     'sphinx.ext.autodoc',
     'sphinx.ext.autosectionlabel',
     'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
+    "autoclasstoc",
+    'sphinxcontrib.autodoc_pydantic',
     'sphinx_autodoc_typehints']
 
 typehints_defaults = 'comma'
@@ -47,7 +50,5 @@ source_suffix = ".rst"
 html_theme = 'sphinx_rtd_theme'
 
 pygments_style = "sphinx"
-
-latex_engine = "pdflatex"
 
 todo_include_todos = True

@@ -23,3 +23,7 @@ class Experiment:
 
         #: dict: meta data
         self.meta = kwargs
+
+
+class ExperimentFactory:
+    ...

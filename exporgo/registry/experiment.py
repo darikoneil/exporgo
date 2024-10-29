@@ -6,7 +6,7 @@ from typing import Callable, Sequence
 from types import GeneratorType
 import json
 
-from ..priorities import Priority
+from .options import Priority
 from .._color import TERMINAL_FORMATTER
 from ..exceptions import (DuplicateRegistrationError,
                          ExperimentNotRegisteredError)
@@ -39,7 +39,7 @@ class ExperimentConfig(BaseModel):
     collector: CollectionConfig | Sequence[CollectionConfig] = Field(None, title="Experiment Collection")
     # sequence does not permit str / bytes, so this works to indicate the list or tuple
     analyzer: AnalysisConfig | Sequence[CollectionConfig] = Field(None, title="Experiment Analysis")
-    priority: Priority = Field(Priority.NORMAL, title="Priority of the experiment")
+    priority: Priority = Field(Priority.NORMAL, title="Global priority of the experiment")
 
     @singledispatchmethod
     def merge(self, experiments: "ExperimentConfig") -> "ExperimentConfig":
