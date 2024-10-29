@@ -9,8 +9,7 @@ from types import GeneratorType
 import json
 from textwrap import indent
 
-from .constants import MODEL_CONFIG
-from .options import Priority
+from .options import MODEL_CONFIG, Priority
 from .._color import TERMINAL_FORMATTER
 from ..exceptions import (DuplicateRegistrationError,
                          ExperimentNotRegisteredError)

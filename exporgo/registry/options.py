@@ -1,5 +1,37 @@
 from pydantic import BaseModel, Field
+from pathlib import Path
+from pydantic import ConfigDict
 from enum import Enum,auto
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Pydantic Model Configuration
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+MODEL_CONFIG = ConfigDict(extra="forbid",
+                               revalidate_instances="always",
+                               use_enum_values=True,
+                               validate_assignment=True,
+                               validate_default=False
+                               )
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Priority enumerations
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+class Priority(Enum):
+    model_config = MODEL_CONFIG
+    CRITICAL = 0
+    HIGH = 1
+    ABOVE_NORMAL = 2
+    NORMAL = 3
+    BELOW_NORMAL = 4
+    LOW = 5
+    IDLE = 6
 
 
 """
@@ -32,16 +64,6 @@ class _AutoStrEnum(str, Enum):
 """
 
 
-class Priority(Enum):
-    CRITICAL = 0
-    HIGH = 1
-    ABOVE_NORMAL = 2
-    NORMAL = 3
-    BELOW_NORMAL = 4
-    LOW = 5
-    IDLE = 6
-
-
 class FileFormats(_AutoStrEnum):
     JSON = auto()
     YAML = auto()
@@ -56,4 +78,5 @@ class FileFormats(_AutoStrEnum):
 
 
 class ExporgoSettings(BaseModel):
+    model_config = MODEL_CONFIG
     file_format:  FileFormats = Field(FileFormats.JSON, title="File format for storing experiment configurations")

@@ -1,5 +1,5 @@
 from .experiment import ExperimentRegistry, ExperimentConfig, AnalysisConfig, CollectionConfig
-from .options import Priority, FileFormats
+from .options import FileFormats, Priority
 
 
 __all__ = [
@@ -9,4 +9,5 @@ __all__ = [
     "ExperimentConfig",
     "FileFormats",
     "Priority",
+
 ]
