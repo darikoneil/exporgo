@@ -1,13 +1,13 @@
 from functools import singledispatchmethod
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
 from typing import Callable, Sequence
 from types import GeneratorType
 import json
-
+from textwrap import indent
 
 from .constants import MODEL_CONFIG
 from .options import Priority
@@ -76,7 +76,7 @@ class ExperimentRegistry:
     Registry for storing experiment configurations
     """
     __registry = {}
-    __path = Path(__file__).parent.joinpath("experiments.exporgo")
+    __path = Path(__file__).parent.joinpath("experiments.json")
     __new_registration = False
 
     @classmethod
@@ -85,15 +85,13 @@ class ExperimentRegistry:
         Save the registry to a JSON file
         """
         try:
-            with Lock(cls.__path, "a", flags=LOCK_EX) as file:
-                file.truncate(0)
+            with Lock(cls.__path, "w", flags=LOCK_EX) as file:
                 # noinspection PyTypeChecker
-                json.dump({name: experiment.model_dump_json(exclude_defaults=True)
-                           for name, experiment in cls.__registry.items()},
-                          file,
-                          indent=4,
-                          sort_keys=False
-                          )
+                file.write("{\n")
+                for name, experiment in cls.__registry.items():
+                    file.write(indent(json.dumps(experiment.name) + f": {experiment.model_dump_json(exclude_defaults=True, indent=4)}\n", " " * 4))
+                file.write("}\n")
+                #json.dump({name: experiment.model_dump_json(exclude_defaults=True) for name, experiment in cls.__registry.items()}, file, indent=4)
         except FileNotFoundError:
             cls.__path.touch(exist_ok=False)
             cls._save_registry()
@@ -137,6 +135,7 @@ class ExperimentRegistry:
         if experiment.name in cls.__registry:
             raise DuplicateRegistrationError(experiment.name)
         cls.__registry[experiment.name] = experiment
+        cls.__new_registration = True
 
     # noinspection PyNestedDecorators
     @register.register
@@ -166,7 +165,10 @@ class ExperimentRegistry:
         """
         try:
             with Lock(cls.__path, "r", timeout=10) as file:
-                cls.register((ExperimentConfig.model_validate_json(config) for name, config in json.load(file).items()))
+                cls.register((ExperimentConfig.model_validate(config) for _, config in json.load(file).items()))
+        except FileNotFoundError:
+            cls.__path.touch(exist_ok=False)
+            cls._save_registry()
         except (IOError, json.JSONDecodeError) as exc:
             print(TERMINAL_FORMATTER(f"\nError loading registry: {exc}\n\n", "announcement"))
 

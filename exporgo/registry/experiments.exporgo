@@ -1,3 +1,0 @@
-{
-    "Generic Experiment": "{\"name\":\"Generic Experiment\",\"collector\":{\"name\":\"Generic Collection\",\"file_sets\":[\"figures\",\"results\"]},\"analyzer\":{\"name\":\"Generic Analysis\",\"call\":\"C:\\\\Users\\\\Yuste\\\\PycharmProjects\\\\exporgo\\\\helloworld.py\",\"file_sets\":[\"figures\",\"results\"]}}"
-}
