@@ -39,10 +39,9 @@ dependencies = [
     "ipykernel",
     "ipython",
     "joblib",
-    "portalocker[redis]",
+    "portalocker",
     "pydantic",
     "pyyaml",
-    "redis",
     "tqdm",
 ]
 

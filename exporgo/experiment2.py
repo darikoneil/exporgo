@@ -1,11 +1,10 @@
 from functools import singledispatchmethod
 from pathlib import Path
 from pydantic import BaseModel, Field
+import portalocker
 from typing import Callable, Iterable, Optional
 import json
 from ._io import select_directory, verbose_copy
-import portalocker
-from redis import Redis
 
 from ._color import TERMINAL_FORMATTER
 from ._logging import get_timestamp
@@ -30,7 +29,7 @@ class ExperimentConfig(BaseModel):
     name: str = Field("Experiment Type", title="Recipe name")
     collection_descriptor: str = Field("data", title="Descriptor for the contents of the experiment")
     file_sets: str | list[str] = Field([], title="List of file sets for organizing experiment")
-    analyzer: str | Path | Callable = Field(title="Analyzer for the experiment")
+    analyzer: str | Path | Callable = Field(lambda *args, **kwargs: None, title="Analyzer for the experiment")
 
 
 class ExperimentRegistry:
@@ -38,8 +37,7 @@ class ExperimentRegistry:
     Registry for storing experiment configurations
     """
     __registry = {}
-    __client = Redis(host="localhost", port="6969", db=0)
-    __path = Path(__file__).parent.joinpath("experiments.json")
+    __path = Path(__file__).parent.joinpath("registry").joinpath("experiments.json")
 
     @classmethod
     def _save_registry(cls) -> None:
@@ -47,11 +45,9 @@ class ExperimentRegistry:
         Save the registry to a JSON file
         """
         try:
-            with portalocker.Lock(cls.__path, "w") as file:
-
-            with open(cls.__path, "w") as file:
+            with portalocker.Lock(cls.__path, "a", timeout=10) as file:
                 # noinspection PyTypeChecker
-                json.dump({name: experiment.__name__ for name, experiment in cls.__registry.items()}, file, indent=4)
+                json.dump({name: experiment.json() for name, experiment in cls.__registry.items()}, file, indent=4)
         except IOError as exc:
             print(TERMINAL_FORMATTER(f"\nError saving registry: {exc}\n", "announcement"))
 
@@ -63,7 +59,7 @@ class ExperimentRegistry:
         return name in cls.__registry
 
     @classmethod
-    def get(cls, name: str) -> ExperimentConfig:
+    def get(cls, name: str) -> "ExperimentConfig":
         """
         Get an experiment configuration
         """
@@ -72,7 +68,20 @@ class ExperimentRegistry:
         return cls.__registry[name]
 
     @classmethod
-    def register(cls, experiment: ExperimentConfig) -> None:
+    def pop(cls, name: str) -> "ExperimentConfig":
+        """
+        Remove an experiment configuration
+        """
+        if not cls.has(name):
+            raise ExperimentNotRegisteredError(name)
+        config = cls.__registry.pop(name)
+        cls._save_registry()
+        return config
+
+    # noinspection PyNestedDecorators
+    @singledispatchmethod
+    @classmethod
+    def register(cls, experiment: "ExperimentConfig") -> None:
         """
         Register an experiment configuration
         """
@@ -80,31 +89,46 @@ class ExperimentRegistry:
             raise DuplicateRegistrationError(experiment.name)
         cls.__registry[experiment.name] = experiment
 
+    # noinspection PyNestedDecorators
+    @register.register(list)
+    @register.register(tuple)
+    @classmethod
+    def _(cls, experiment: list | tuple) -> None:
+        for config in experiment:
+            cls.register(config)
+
+    # noinspection PyNestedDecorators
+    @register.register
+    @classmethod
+    def _(cls, name: str, **kwargs) -> None:
+        cls.register(ExperimentConfig(name=name, **kwargs))
+
     @classmethod
     def _load_registry(cls) -> None:
         """
         Load the registry from a JSON file
         """
         try:
-            with open(cls.__path, "r") as file:
-                fcntl.flock(file, fcntl.LOCK_EX)
-                #cls.__registry = {name: getattr(__import__("exporgo.experiment", fromlist=[name]), name) for name in json.load(file)}
-                fcntl.flock(file, fcntl.LOCK_UN)
+            with portalocker.Lock(cls.__path, "r", timeout=10) as file:
+                cls.register({name: ExperimentConfig(**config) for name, config in json.load(file).items()})
         except (IOError, json.JSONDecodeError) as exc:
             print(TERMINAL_FORMATTER(f"\nError loading registry: {exc}\n", "announcement"))
 
+    @staticmethod
+    def _validate(config: dict) ->"ExperimentConfig":
+        """
+        Validate an experiment configuration
+        """
+        return ExperimentConfig(**config)
+
     @classmethod
     def __enter__(cls):
-        with portalocker.RedisLock(cls.__client, cls.__path, timeout=10):
-
-
-            self._load_registry()
-        self._load_registry()
-        return self
+        cls._load_registry()
 
     @classmethod
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self._save_registry()
+    def __exit__(cls, exc_type, exc_val, exc_tb):
+        ...
+
 
 class ExperimentFactory:
     ...
