@@ -1,8 +1,11 @@
 from functools import singledispatchmethod
 from pathlib import Path
+
+from polars import exclude
 from pydantic import BaseModel, Field
 import portalocker
-from typing import Callable, Iterable, Optional
+from typing import Callable, Iterable, Optional, Generator
+from types import GeneratorType
 import json
 from ._io import select_directory, verbose_copy
 
@@ -47,7 +50,12 @@ class ExperimentRegistry:
         try:
             with portalocker.Lock(cls.__path, "a", timeout=10) as file:
                 # noinspection PyTypeChecker
-                json.dump({name: experiment.json() for name, experiment in cls.__registry.items()}, file, indent=4)
+                json.dump({name: experiment.model_dump_json(exclude_defaults=True)
+                           for name, experiment in cls.__registry.items()},
+                          file,
+                          indent=4,
+                          sort_keys=False
+                          )
         except IOError as exc:
             print(TERMINAL_FORMATTER(f"\nError saving registry: {exc}\n", "announcement"))
 
@@ -92,6 +100,7 @@ class ExperimentRegistry:
     # noinspection PyNestedDecorators
     @register.register(list)
     @register.register(tuple)
+    @register.register(GeneratorType)
     @classmethod
     def _(cls, experiment: list | tuple) -> None:
         for config in experiment:
@@ -110,9 +119,9 @@ class ExperimentRegistry:
         """
         try:
             with portalocker.Lock(cls.__path, "r", timeout=10) as file:
-                cls.register({name: ExperimentConfig(**config) for name, config in json.load(file).items()})
+                cls.register((ExperimentConfig.parse_raw(config) for name, config in json.load(file).items()))
         except (IOError, json.JSONDecodeError) as exc:
-            print(TERMINAL_FORMATTER(f"\nError loading registry: {exc}\n", "announcement"))
+            print(TERMINAL_FORMATTER(f"\nError loading registry: {exc}\n\n", "announcement"))
 
     @staticmethod
     def _validate(config: dict) ->"ExperimentConfig":
