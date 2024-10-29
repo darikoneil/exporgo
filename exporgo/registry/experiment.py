@@ -1,21 +1,15 @@
 from functools import singledispatchmethod
 from pathlib import Path
-from polars import exclude
-from polars import exclude
 from pydantic import BaseModel, Field
 import portalocker
-from typing import Callable, Iterable, Optional, Generator
+from typing import Callable, Sequence
 from types import GeneratorType
 import json
-from .._io import select_directory, verbose_copy
 
+from ..priorities import Priority
 from .._color import TERMINAL_FORMATTER
-from .._logging import get_timestamp
-from .._validators import convert_permitted_types_to_required
 from ..exceptions import (DuplicateRegistrationError,
-                         ExperimentNotRegisteredError,
-                         InvalidExperimentTypeError)
-from ..files import FileSet, FileTree
+                         ExperimentNotRegisteredError)
 
 
 """
@@ -26,21 +20,33 @@ from ..files import FileSet, FileTree
 
 
 class CollectionConfig(BaseModel):
-    ...
+    name: str = Field(None, title="Recipe name")
+    file_sets: str | list[str] | tuple[str] = Field(None, title="List of file sets for organizing experiment")
 
 
-class AnalyzerConfig(BaseModel):
-    ...
+class AnalysisConfig(BaseModel):
+    name: str = Field(None, title="Recipe name")
+    call: str | Path | Callable = Field(None, title="Analyzer for the experiment")
+    file_sets: str | list[str] | tuple[str] = Field(None, title="List of file sets for organizing experiment")
+    priority: Priority = Field(Priority.NORMAL, title="Priority of the analysis")
 
 
 class ExperimentConfig(BaseModel):
     """
     Recipe for defining an experiment
     """
-    name: str = Field("Experiment Type", title="Recipe name")
-    collection_descriptor: str = Field("data", title="Descriptor for the contents of the experiment")
-    file_sets: str | list[str] = Field([], title="List of file sets for organizing experiment")
-    analyzer: str | Path | Callable = Field(lambda *args, **kwargs: None, title="Analyzer for the experiment")
+    name: str = Field(None, title="Recipe name")
+    collector: CollectionConfig | Sequence[CollectionConfig] = Field(None, title="Experiment Collection")
+    # sequence does not permit str / bytes, so this works to indicate the list or tuple
+    analyzer: AnalysisConfig | Sequence[CollectionConfig] = Field(None, title="Experiment Analysis")
+    priority: Priority = Field(Priority.NORMAL, title="Priority of the experiment")
+
+    @singledispatchmethod
+    def merge(self, experiments: "ExperimentConfig") -> "ExperimentConfig":
+        """
+        Merge two experiment configurations
+        """
+        ...
 
 
 """
