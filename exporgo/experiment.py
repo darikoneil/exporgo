@@ -76,7 +76,9 @@ class Experiment:
         # TODO: Analyze
 
     def collect(self, sources: Optional[CollectionType] = None) -> None:
-        ...
+        if sources is not None and isinstance(sources, CollectionType):
+            assert len(sources) == len(self.config.analyzer_file_sets), "Number of sources must match number of analyzer file sets"
+        self._collect(sources)
 
     @singledispatchmethod
     def _collect(self, source):
@@ -84,13 +86,16 @@ class Experiment:
 
     @_collect.register(NoneType)
     def _(self, source: NoneType):
-        ...
+        for name in self.config.analyzer_file_sets:
+            destination = self.file_tree.get(name).directory
+            source = select_directory()
+            verbose_copy(source, destination, name)
 
     @_collect.register(str)
     @_collect.register(Path)
     @_collect.register(PathLike)
     def _(self, source: Folder):
-        ...
+
 
     @_collect.register(list)
     @_collect.register(tuple)
