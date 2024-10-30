@@ -3,8 +3,9 @@ from functools import singledispatchmethod
 from pathlib import Path
 from textwrap import indent
 from types import GeneratorType
-from typing import Callable, Sequence, Optional
+from typing import Callable, Sequence, Optional, Iterator
 
+from ..types import CollectionType
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
@@ -33,7 +34,8 @@ class AnalysisConfig(BaseModel):
     model_config = MODEL_CONFIG
     name: str = Field(None, title="Recipe name")
     call: str | Path | Callable = Field(None, title="Analyzer for the experiment")
-    file_sets: str | list[str] | tuple[str] = Field(None, title="List of file sets for organizing experiment")
+    file_sets: str | list[str] | tuple[str, ...] = Field(None,
+                                                    title="Collection of file sets for organizing experiment")
     priority: Priority = Field(Priority.NORMAL, title="Priority of the analysis")
 
 
@@ -43,7 +45,7 @@ class ExperimentConfig(BaseModel):
     """
     model_config = MODEL_CONFIG
     name: str = Field(None, title="Recipe name")
-    file_sets: Optional[str | list[str] | tuple[str]]  = Field(None, title="List of file sets for organizing experiment")
+    file_sets: Optional[str | list[str] | tuple[str, ...]]  = Field(None, title="List of file sets for organizing experiment")
     # sequence does not permit str / bytes, so this works to indicate the list or tuple
     analyzer: AnalysisConfig | Sequence[AnalysisConfig] = Field(None, title="Experiment Analysis")
     priority: Priority = Field(Priority.NORMAL, title="Global priority of the experiment")
@@ -70,7 +72,7 @@ class ExperimentConfig(BaseModel):
         return self._parse_file_sets(self.file_sets) if self.file_sets is not None else set()
 
     @staticmethod
-    def _parse_file_sets(file_sets: str | list[str] | tuple[str]) -> set[str]:
+    def _parse_file_sets(file_sets: str | list[str] | tuple[str, ...]) -> set[str]:
         if isinstance(file_sets, str):
             return {file_sets, }
         return set(file_sets)
@@ -167,9 +169,11 @@ class ExperimentRegistry:
     # noinspection PyNestedDecorators
     @register.register(list)
     @register.register(tuple)
+    @register.register(set)
     @register.register(GeneratorType)
+    @register.register(Iterator)
     @classmethod
-    def _(cls, experiment: list | tuple) -> None:
+    def _(cls, experiment: CollectionType) -> None:
         for config in experiment:
             cls.register(config)
 

@@ -4,12 +4,14 @@ from .registry import AnalysisConfig, ExperimentConfig, ExperimentRegistry
 from ._validators import convert_permitted_types_to_required
 from .files import FileTree, FileSet
 from ._logging import get_timestamp
-from typing import Optional
+from typing import Optional, Iterator
 from .registry.options import Priority
 from ._tools import conditional_dispatch
 from types import GeneratorType
 from ._io import verbose_copy, select_directory
-
+from .types import Folder, CollectionType
+from types import NoneType
+from os import PathLike
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,17 +21,17 @@ from ._io import verbose_copy, select_directory
 
 class Experiment:
 
-    @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=2, key="base_directory")
+    @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=2, key="base_directory")
     def __init__(self,
                  name: str,
-                 base_directory: str | Path,
+                 base_directory: Folder,
                  config: ExperimentConfig,
                  priority: Priority = None,
                  **kwargs):
         #: str: name of the experiment
         self._name = name
 
-        #: Path: base directory of subject
+        #: Folder: base directory of subject
         self._base_directory = base_directory
 
         self.config = config
@@ -37,7 +39,7 @@ class Experiment:
         self.priority = config.priority if priority is None else priority
 
         #: "FileTree": file tree experimental folders and files
-        self.file_tree = FileTree(self._name, self._base_directory, index=kwargs.pop("index", True))
+        self.file_tree = FileTree(self._base_directory, index=kwargs.pop("index", True))
         self._generate_file_sets()
 
         #: dict: meta data
@@ -52,6 +54,7 @@ class Experiment:
     @property
     def experiment_directory(self) -> Path:
         return self.base_directory.joinpath(self.name)
+
     @property
     def created(self) -> str:
         return self._created
@@ -65,42 +68,46 @@ class Experiment:
         return "Experiment"
 
     @base_directory.setter
-    def base_directory(self, base_directory: str | Path) -> None:
+    def base_directory(self, base_directory: Folder) -> None:
         self.remap(base_directory)
 
     def analyze(self) -> bool:
         ...
         # TODO: Analyze
 
-    # noinspection PyUnusedLocal
-    def collect(self, source):
-            for name, destination in self.file_tree.items():
+    def collect(self, sources: Optional[CollectionType] = None) -> None:
+        ...
 
-    def _collect(path:)
+    @singledispatchmethod
+    def _collect(self, source):
+        ...
 
-            
-
+    @_collect.register(NoneType)
+    def _(self, source: NoneType):
+        ...
 
     @_collect.register(str)
     @_collect.register(Path)
-    def _(self, path: str | Path):
-            verbose_copy(source, destination.directory, name)
+    @_collect.register(PathLike)
+    def _(self, source: Folder):
+        ...
 
     @_collect.register(list)
     @_collect.register(tuple)
+    @_collect.register(set)
     @_collect.register(GeneratorType)
-    def _(self, path: list | tuple | GeneratorType):
-        for path_ in path:
-            self.collect(path)
-    
+    @_collect.register(Iterator)
+    def _(self, sources: CollectionType):
+        ...
+
     def get(self, *args, **kwargs) -> FileSet:
         return self.file_tree.get(*args, **kwargs)
 
     def index(self) -> None:
         self.file_tree.index()
 
-    @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=1, key="base_directory")
-    def remap(self, base_directory: str | Path) -> None:
+    @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=1, key="base_directory")
+    def remap(self, base_directory: Folder) -> None:
         self._base_directory = base_directory
         self.file_tree.remap(base_directory)
 
@@ -110,9 +117,7 @@ class Experiment:
     def _generate_file_sets(self) -> None:
         for required_file_set in self.config.required_file_sets:
             self.file_tree.add(required_file_set)
-        for file_set in self.file_tree.values():
-            if not (directory := file_set.directory).exists():
-                directory.mkdir()
+        self.file_tree.build()
 
     def __call__(self, *args, **kwargs):
         return self.get(*args, **kwargs)
@@ -121,9 +126,10 @@ class Experiment:
 
 class ExperimentFactory:
 
+    @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=2, key="base_directory")
     def __init__(self,
                  name: str,
-                 base_directory: str | Path
+                 base_directory: Folder
                  ):
         self.name = name
         self.base_directory = base_directory
@@ -132,10 +138,6 @@ class ExperimentFactory:
     @conditional_dispatch
     def __call__(self, *args):
         ...
-
-    @__call__.register(lambda *args: len(args) == 2 and isinstance(args[1], ExperimentConfig))
-    def _(self, *args):
-        return Experiment(self.name, self.base_directory)
 
     def __enter__(self):
         with ExperimentRegistry() as self.registry:

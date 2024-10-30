@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Optional
 
 import yaml
 
@@ -9,16 +9,7 @@ from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from ._validators import validate_version
 from .exceptions import DuplicateExperimentError, MissingFilesError
-from .experiment import Experiment
-from .files import FileTree
-
-# TODO: Add a second file that registers the subject and experiments with the scheduler and flags collection/analysis
-
-# TODO: Add pattern-matching for file format enum
-
-# TODO: Re-add experiment factory for experiment creation
-
-# TODO: Re-implement tests effected by the experiment implementation change
+from .types import File, Folder, Modification
 
 
 class Subject:
@@ -29,7 +20,7 @@ class Subject:
 
     :param directory: The directory where the subject's data is stored. If not provided, a directory can be selected
         using a file dialog.
-    :type directory: :class:`Optional <typing.Optional>`\[:class:`str`\ | :class:`Path <pathlib.Path>`\]
+    :type directory: :class:`Optional <typing.Optional>`\[:class:`Folder <exporgo.types.Folder>`]
 
     :param study: The study the subject is associated with.
     :type study: :class:`Optional <typing.Optional>`\[:class:`str`\]
@@ -44,7 +35,7 @@ class Subject:
     :vartype name: str
 
     :var directory: The directory where the subject's data is stored.
-    :vartype directory: :class:`Path <pathlib.Path>`
+    :vartype directory: :class:`Folder <exporgo.types.Folder>`
 
     :var study: The study the subject is associated with.
     :vartype study: str
@@ -59,7 +50,7 @@ class Subject:
 
     def __init__(self,
                  name: str,
-                 directory: Optional[str | Path] = None,
+                 directory: Optional[Folder] = None,
                  study: Optional[str] = None,
                  meta: Optional[dict] = None,
                  **kwargs):
@@ -188,7 +179,7 @@ class Subject:
         :GetterType: :class:`Path <pathlib.Path>`
         :Setter: Not implemented.
         """
-        return self.directory.joinpath("organization.exporgo")
+        return self.directory.joinpath("organization.json")
 
     @property
     def last_modified(self) -> str:
@@ -200,16 +191,15 @@ class Subject:
         return self.modifications[0][1]
 
     @property
-    def modifications(self) -> tuple[tuple[str, str], ...]:
+    def modifications(self) -> tuple[Modification, ...]:
         """
         :Getter: Returns a tuple of the subject's modifications.
-        :GetterType: :class:`tuple` [:class:`tuple` [:class:`str`\, :class:`str`\], ...]
-        :Setter: Not implemented.
+        :GetterType: :class:`tuple`\[:class:`Modification <exporgo.types.Modification>`\]
         """
         return tuple(self._modifications)
 
     @classmethod
-    def load(cls, file: Optional[str | Path] = None) -> "Subject":
+    def load(cls, file: Optional[File] = None) -> "Subject":
         """
         Loads a subject from its organization file. If not provided, a file can be selected using a file dialog.
         Upon loading, the subject's logger is started and indexed files for each experiment are validated.
@@ -222,7 +212,7 @@ class Subject:
         """
         file = file if file else select_file(title="Select organization file")
         if not file.is_file():
-            file = file.joinpath("organization.exporgo")
+            file = file.joinpath("organization.json")
         with open(file, "r") as file:
             _dict = yaml.safe_load(file)
         return cls.__from_dict__(_dict)
@@ -248,11 +238,11 @@ class Subject:
             start_log=False
         )
 
-        for experiment_name, experiment_dict in _dict.get("experiments").items():
-            subject.create_experiment(experiment_name, experiment_dict.pop("mix_ins"), index=False)
-            experiment = subject.get(experiment_name)
-            experiment.file_tree = FileTree.__from_dict__(experiment_dict.pop("file_tree"))
-            experiment.__dict__.update(experiment_dict)
+        #for experiment_name, experiment_dict in _dict.get("experiments").items():
+        #    subject.create_experiment(experiment_name, experiment_dict.pop("mix_ins"), index=False)
+        #    experiment = subject.get(experiment_name)
+        #    experiment.file_tree = FileTree.__from_dict__(experiment_dict.pop("file_tree"))
+        #    experiment.__dict__.update(experiment_dict)
 
         subject._created = _dict.get("created")
         subject._modifications = ModificationLogger(_dict.get("modifications"))
@@ -262,27 +252,10 @@ class Subject:
 
     def create_experiment(self,
                           name: str,
-                          mix_ins: str | Experiment | Iterable[str | Experiment],
                           **kwargs) -> None:
-        """
-        Creates a new experiment for the subject.
-
-        :param name: The name of the experiment.
-
-        :param mix_ins: The mix-ins for the experiment.
-        :type mix_ins: :class`str` | :class:`Experiment <exporgo.experiment.Experiment>` |
-            :class:`Iterable <typing.Iterable>`\[:class:`str` | :class:`Experiment <exporgo.experiment.Experiment>`\]
-
-        :param kwargs: Additional keyword arguments.
-        """
-
-        #factory = ExperimentFactory(name=name, base_directory=self.directory)
-        #factory.add_mix_ins(mix_ins)
-
         if name in self.experiments:
             raise DuplicateExperimentError(name)
-
-        #self._experiments[name] = factory.instance_constructor(**kwargs)
+        print(f"{kwargs=}")
         self.record(name)
 
     def record(self, info: str = None) -> None:
@@ -298,8 +271,7 @@ class Subject:
         """
          Indexes all experiments associated with the subject.
          """
-        for experiment_name in self.experiments:
-            experiment = getattr(self, experiment_name)
+        for experiment in self._experiments.values():
             experiment.index()
 
     def validate(self) -> None:

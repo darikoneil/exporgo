@@ -9,6 +9,8 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 
 from ._validators import convert_permitted_types_to_required
+from .types import Folder
+
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,10 +68,10 @@ def select_directory(**kwargs) -> Path:
 """
 
 
-@convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=0, key="source")
-@convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=1, key="destination")
-def verbose_copy(source: str | Path,
-                 destination: str | Path,
+@convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=0, key="source")
+@convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=1, key="destination")
+def verbose_copy(source: Folder,
+                 destination: Folder,
                  feedback: Optional[str] = None) -> bool:
     """
     Copy a file from source to destination. If verbose is True, print feedback.

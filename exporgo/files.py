@@ -7,7 +7,7 @@ from typing import Any, Generator, Iterable, Iterator, Mapping, Optional
 
 from ._validators import convert_permitted_types_to_required
 from .exceptions import MissingFilesError
-
+from .types import File, Folder
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FileTree Organizer
@@ -21,17 +21,19 @@ class FileTree:
     an extension of the built-in dictionary type, but it replicates most of its built-in methods.
     """
 
-    @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=1, key="directory")
+    @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=1, key="directory")
     def __init__(self,
-                 directory: Path,
+                 directory: Folder,
                  index: bool = True):
         """
         A file tree that organizes experiment data, analyzed results, and figures. For implementation concerns it is not
         an extension of the built-in dictionary type, but it replicates most of its built-in methods.:
 
+        :param directory: directory of file tree
+
         :param index: whether to populate & index the filesets in the directory upon initialization
         """
-        #: :class:`Path <pathlib.Path>`: directory of file tree
+        #: :class:`Folder <exporgo.types.Folder>`: directory of file tree
         self._directory = directory
 
         if index:
@@ -46,8 +48,8 @@ class FileTree:
         return self._directory
 
     @base_directory.setter
-    @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=0, key="directory")
-    def base_directory(self, directory: str | Path) -> None:
+    @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=0, key="directory")
+    def base_directory(self, directory: Folder) -> None:
         self.remap(directory)
 
     @property
@@ -91,9 +93,9 @@ class FileTree:
         """
         Builds the file-tree by initializing any file sets that do not yet exist
         """
-        for value in self.values():
-            if isinstance(value, FileSet) and not value.directory.exists():
-                value.directory.mkdir()
+        for file_set in self.values():
+            if not (directory := file_set.directory).exists():
+                directory.mkdir()
 
     def clear(self, delete: bool = False) -> None:
         """
@@ -121,23 +123,23 @@ class FileTree:
         except AttributeError as exc:
             raise KeyError(f"{key} not in filetree") from exc
 
-    def find_file_type(self, ext: str) -> list[Path] | None:
+    def find_file_type(self, ext: str) -> list[Path]:
         """
         Returns all files with a specified extension
 
         :param ext: Specified file extension
 
-        :type ext: :class:`list`\[:class:`Path <pathlib.Path>`\] or ```None```
+        :type ext: :class:`list`\[:class:`Path <pathlib.Path>`\]
         """
         return [file for file_set in self.values() for file in file_set.find_file_type(ext)]
 
-    def find_matching_files(self, identifier: str) -> list[Path] | None:
+    def find_matching_files(self, identifier: str) -> list[Path]:
         """
         Returns all files that match some identifier
 
         :param identifier: String identified to match
 
-        :rtype: :class:`list`\[:class:`Path <pathlib.Path>`\] or ```None```
+        :rtype: :class:`list`\[:class:`Path <pathlib.Path>`\]
 
         """
         return [file for file_set in self.values() for file in file_set.find_matching_files(identifier)]
@@ -212,7 +214,7 @@ class FileTree:
         for key, _ in self.items():  # items call guarantees filesets only
             self.get(key).index()
 
-    @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=1, key="base_directory")
+    @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=1, key="base_directory")
     def remap(self, base_directory: str | Path) -> None:
         """
         Remap the fileset to a new location after moving the folder
@@ -324,10 +326,10 @@ class FileSet:
     several methods for keeping track of datasets.
     """
 
-    @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=2, key="parent_directory")
+    @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=2, key="parent_directory")
     def __init__(self,
                  name: str,
-                 parent_directory: str | Path,
+                 parent_directory: Folder,
                  index: bool = True):
         """
         Organizing class for a set of files. Contents may be only files or a collection of folders and files.
@@ -415,7 +417,7 @@ class FileSet:
         self._files.update(((file.stem, file) for file in self.directory.rglob("*") if file.is_file()))
         self._folders.update(((folder.stem, folder) for folder in self.directory.rglob("*") if not folder.is_file()))
 
-    @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=1, key="parent_directory")
+    @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=1, key="parent_directory")
     def remap(self, parent_directory: str | Path) -> None:
         """
         Remaps all files and folders in the file set following a change in the parent directory or parent file tree
@@ -498,7 +500,7 @@ class FileMap(dict):
         for key, value in items:
             self.__setitem__(key, value)
 
-    @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=2, key="value")
+    @convert_permitted_types_to_required(permitted=(File, Folder), required=Path, pos=2, key="value")
     def __setitem__(self, key: str, value: str | Path):
         """
         Implementation of setitem magic method. Appends an integer to duplicate keys before storing as a new key-value
