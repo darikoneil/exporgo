@@ -1,10 +1,9 @@
-from .experiments import (AnalysisConfig, CollectionConfig, ExperimentConfig,
+from .experiments import (AnalysisConfig, ExperimentConfig,
                          ExperimentRegistry)
 from .options import FileFormats, Priority, ExporgoSettings
 
 __all__ = [
     "AnalysisConfig",
-    "CollectionConfig",
     "ExperimentRegistry",
     "ExperimentConfig",
     "ExporgoSettings",

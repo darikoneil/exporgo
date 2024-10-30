@@ -260,7 +260,10 @@ class Subject:
 
         return subject
 
-    def create_experiment(self, name: str, mix_ins: str | Experiment | Iterable[str | Experiment], **kwargs) -> None:
+    def create_experiment(self,
+                          name: str,
+                          mix_ins: str | Experiment | Iterable[str | Experiment],
+                          **kwargs) -> None:
         """
         Creates a new experiment for the subject.
 

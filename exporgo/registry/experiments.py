@@ -3,12 +3,12 @@ from functools import singledispatchmethod
 from pathlib import Path
 from textwrap import indent
 from types import GeneratorType
-from typing import Callable, Sequence
+from typing import Callable, Sequence, Optional
 
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from .._color import TERMINAL_FORMATTER
 from ..exceptions import (DuplicateRegistrationError,
@@ -17,7 +17,6 @@ from .options import MODEL_CONFIG, Priority
 
 __all__ = [
     "AnalysisConfig",
-    "CollectionConfig",
     "ExperimentConfig",
     "ExperimentRegistry"
 ]
@@ -28,12 +27,6 @@ __all__ = [
 // Configuration Schema for Combinatorial Experiment Functionality
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
-
-
-class CollectionConfig(BaseModel):
-    model_config = MODEL_CONFIG
-    name: str = Field(None, title="Recipe name")
-    file_sets: str | list[str] | tuple[str] = Field(None, title="List of file sets for organizing experiment")
 
 
 class AnalysisConfig(BaseModel):
@@ -50,10 +43,37 @@ class ExperimentConfig(BaseModel):
     """
     model_config = MODEL_CONFIG
     name: str = Field(None, title="Recipe name")
-    collector: CollectionConfig | Sequence[CollectionConfig] = Field(None, title="Experiment Collection")
+    file_sets: Optional[str | list[str] | tuple[str]]  = Field(None, title="List of file sets for organizing experiment")
     # sequence does not permit str / bytes, so this works to indicate the list or tuple
-    analyzer: AnalysisConfig | Sequence[CollectionConfig] = Field(None, title="Experiment Analysis")
+    analyzer: AnalysisConfig | Sequence[AnalysisConfig] = Field(None, title="Experiment Analysis")
     priority: Priority = Field(Priority.NORMAL, title="Global priority of the experiment")
+
+    @property
+    def required_file_sets(self) -> set[str]:
+        """
+        Get the required file sets
+        """
+        return self.supplemental_file_sets | self.analyzer_file_sets
+
+    @property
+    def analyzer_file_sets(self) -> set[str]:
+        analyzer_file_sets = set()
+        if isinstance(self.analyzer, AnalysisConfig):
+            analyzer_file_sets.update(self._parse_file_sets(self.analyzer.file_sets))
+        else:
+            for analysis in self.analyzer:
+                analyzer_file_sets.update(self._parse_file_sets(analysis.file_sets))
+        return analyzer_file_sets
+
+    @property
+    def supplemental_file_sets(self) -> set[str]:
+        return self._parse_file_sets(self.file_sets) if self.file_sets is not None else set()
+
+    @staticmethod
+    def _parse_file_sets(file_sets: str | list[str] | tuple[str]) -> set[str]:
+        if isinstance(file_sets, str):
+            return {file_sets, }
+        return set(file_sets)
 
     @singledispatchmethod
     def merge(self, experiments: "ExperimentConfig") -> "ExperimentConfig":
