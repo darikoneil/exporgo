@@ -16,6 +16,4 @@ Folder = str | Path | PathLike
 
 CollectionType = list | tuple | set | GeneratorType | Iterator
 
-
 Modification = tuple[str, str]
-
