@@ -1,0 +1,23 @@
+{
+    "$defs": {
+        "FileFormats": {
+            "enum": [
+                "JSON",
+                "YAML",
+                "TOML"
+            ],
+            "title": "FileFormats",
+            "type": "string"
+        }
+    },
+    "additionalProperties": false,
+    "properties": {
+        "file_format": {
+            "$ref": "#/$defs/FileFormats",
+            "default": "JSON",
+            "title": "File format for storing experiment configurations"
+        }
+    },
+    "title": "ExporgoSettings",
+    "type": "object"
+}
