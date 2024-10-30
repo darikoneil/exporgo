@@ -8,6 +8,7 @@ from typing import Optional
 from .registry.options import Priority
 from ._tools import conditional_dispatch
 from types import GeneratorType
+from ._io import verbose_copy, select_directory
 
 
 """
@@ -70,15 +71,18 @@ class Experiment:
     def analyze(self) -> bool:
         ...
 
+    # noinspection PyUnusedLocal
     @singledispatchmethod
-    def collect(self, path: Optional = None) -> bool:
-        ...
+    def collect(self, path: Optional = None):
+        for name, destination in self.file_tree.items():
+            source = select_directory(title=f"Select {name} source")
+            verbose_copy(source, destination.directory, name)
 
 
     @collect.register(str)
     @collect.register(Path)
-    def _(self, path ) -> bool:
-        ...
+    def _(self, path: ) -> bool:
+
 
     def get(self, *args, **kwargs) -> FileSet:
         return self.file_tree.get(*args, **kwargs)
