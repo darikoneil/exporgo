@@ -42,7 +42,7 @@ class Experiment:
 
         #: dict: meta data
         self.meta = kwargs
-
+        
         self._created = get_timestamp()
 
     @property
@@ -70,20 +70,29 @@ class Experiment:
 
     def analyze(self) -> bool:
         ...
+        # TODO: Analyze
 
     # noinspection PyUnusedLocal
-    @singledispatchmethod
-    def collect(self, path: Optional = None):
-        for name, destination in self.file_tree.items():
-            source = select_directory(title=f"Select {name} source")
+    def collect(self, source):
+            for name, destination in self.file_tree.items():
+
+    def _collect(path:)
+
+            
+
+
+    @_collect.register(str)
+    @_collect.register(Path)
+    def _(self, path: str | Path):
             verbose_copy(source, destination.directory, name)
 
-
-    @collect.register(str)
-    @collect.register(Path)
-    def _(self, path: ) -> bool:
-
-
+    @_collect.register(list)
+    @_collect.register(tuple)
+    @_collect.register(GeneratorType)
+    def _(self, path: list | tuple | GeneratorType):
+        for path_ in path:
+            self.collect(path)
+    
     def get(self, *args, **kwargs) -> FileSet:
         return self.file_tree.get(*args, **kwargs)
 
