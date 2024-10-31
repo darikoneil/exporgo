@@ -1,3 +1,7 @@
+from pydantic import BaseModel, Field
+from ..options.options import MODEL_CONFIG
+from ..types import Priority, Status, Analysis
+from typing import Sequence
 import json
 from functools import singledispatchmethod
 from pathlib import Path
@@ -17,54 +21,20 @@ from ..exceptions import (DuplicateRegistrationError,
 from exporgo.options.options import MODEL_CONFIG
 from exporgo.types import Priority
 
-__all__ = [
-    "ExperimentConfig",
-    "ExperimentRegistry"
-]
 
-
-"""
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Configuration Schema for Combinatorial Experiment Functionality
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-"""
-
-
-
-class ExperimentConfig(BaseModel):
-    """
-    Recipe for defining an experiment
-    """
+class AnalysisConfig(BaseModel):
     model_config = MODEL_CONFIG
-    key: str = Field(None, title="Unique key for the experiment type in the registry")
-    supplemental_file_sets: Optional[str | list[str] | tuple[str, ...]]  = Field(None, title="List of file sets for organizing experiment")
-    # sequence does not permit str / bytes, so this works to indicate the list or tuple
-    priority: Priority = Field(Priority.NORMAL, title="Global priority of the experiment")
-
-    @staticmethod
-    def _parse_file_sets(file_sets: str | list[str] | tuple[str, ...]) -> set[str]:
-        if isinstance(file_sets, str):
-            return {file_sets, }
-        return set(file_sets)
-
-    @singledispatchmethod
-    def merge(self, experiments: "ExperimentConfig") -> "ExperimentConfig":
-        """
-        Merge two experiment configurations
-        """
-        ...
+    key: str = Field(None, title="Unique key for the analysis type in the registry")
+    call: Analysis = Field(None, title="Analyzer for the experiment")
+    file_sets: str | list[str] | tuple[str, ...] = Field(None,
+                                                         title="Collection of file sets for organizing experiment")
+    priority: Priority = Field(Priority.NORMAL, title="Priority of the analysis")
+    status: Status = Field(Status.SOURCE, title="Status of the analysis")
 
 
-"""
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Implementation of Registry for Experiment Configurations
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-"""
-
-
-class ExperimentRegistry:
+class AnalysisRegistry:
     """
-    Registry for storing experiment configurations
+    Registry for storing analysis configurations
     """
     __registry = {}
     __path = Path(__file__).parent.joinpath("experiments.json")
@@ -175,3 +145,12 @@ class ExperimentRegistry:
     def __exit__(cls, exc_type, exc_val, exc_tb): # noqa: ANN206
         if cls.__new_registration:
             cls._save_registry()
+
+
+class PipelineConfig(BaseModel):
+    steps: AnalysisConfig | Sequence[AnalysisConfig] = Field(None, title="Sequence of analysis steps")
+    priority: Priority = Field(Priority.NORMAL, title="Pipeline Priority")
+    status: Status = Field(Status.SOURCE, title="Pipeline Status")
+    model_config = MODEL_CONFIG
+
+
