@@ -21,7 +21,7 @@ class Analyzer:
         return self._name
 
     @property
-    def file_sets(self) -> str | CollectionType[str]:
+    def file_sets(self) -> str | CollectionType:
         return self._file_sets
 
     @property

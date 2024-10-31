@@ -18,12 +18,16 @@ from .analysis import Analyzer
 
 class Experiment:
 
+    @convert_permitted_types_to_required(permitted=(Folder, ),
+                                         required=Path,
+                                         pos=2,
+                                         key="base_directory")
     def __init__(self,
                  name: str,
                  base_directory: Folder,
-                 experiment_keys: str | CollectionType[str],
+                 experiment_keys: str | CollectionType,
                  analyzer: Analyzer,
-                 file_sets: str | CollectionType[str],
+                 file_sets: str | CollectionType,
                  priority: Priority = Priority.NORMAL,
                  **kwargs):
         #: str: name of the experiment
@@ -59,7 +63,7 @@ class Experiment:
         return self._created
 
     @property
-    def experiment_keys(self) -> str | CollectionType[str]:
+    def experiment_keys(self) -> str | CollectionType:
         return self._keys
 
     @property

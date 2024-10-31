@@ -26,7 +26,7 @@ class FileTree:
     @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=1, key="directory")
     def __init__(self,
                  directory: Folder,
-                 file_sets: str | CollectionType[str] = None,
+                 file_sets: str | CollectionType = None,
                  index: bool = True):
 
         """
@@ -97,10 +97,14 @@ class FileTree:
 
     # noinspection PyUnusedLocal
     @singledispatchmethod
-    def build(self, file_sets: NoneType) -> None:
+    def build(self, file_sets) -> None:
         """
         Builds the file-tree by initializing any file sets that do not yet exist
         """
+        ...
+
+    @build.register(NoneType)
+    def _(self, file_sets: NoneType) -> None:
         for file_set in self.values():
             if not (directory := file_set.directory).exists():
                 directory.mkdir()
@@ -109,15 +113,15 @@ class FileTree:
     @build.register(tuple)
     @build.register(set)
     @build.register(GeneratorType)
-    def _(self, file_sets: CollectionType[str]) -> None:
+    def _(self, file_sets: CollectionType) -> None:
         for file_set in file_sets:
             self.add(file_set, index=False)
-        self.build()
+        self.build(None)
 
     @build.register
     def _(self, file_sets: str) -> None:
         self.add(file_sets, index=False)
-        self.build()
+        self.build(None)
 
     def clear(self, delete: bool = False) -> None:
         """
