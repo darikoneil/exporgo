@@ -1,15 +1,16 @@
 from pathlib import Path
-from functools import singledispatchmethod, singledispatch
-from .registry import AnalysisConfig, ExperimentConfig, ExperimentRegistry
+from functools import singledispatchmethod
+from .registry import ExperimentConfig, ExperimentRegistry
 from ._validators import convert_permitted_types_to_required
 from .files import FileTree, FileSet
 from ._logging import get_timestamp
-from typing import Optional, Iterator
-from .registry.options import Priority
+from typing import Optional
+from exporgo.options.options import Priority
 from ._tools import conditional_dispatch
 from types import GeneratorType
 from ._io import verbose_copy, select_directory
 from .types import Folder, CollectionType
+from .analysis import Analyzer
 from types import NoneType
 from os import PathLike
 
@@ -19,14 +20,16 @@ from os import PathLike
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
 
+
 class Experiment:
 
-    @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=2, key="base_directory")
     def __init__(self,
                  name: str,
                  base_directory: Folder,
-                 config: ExperimentConfig,
-                 priority: Priority = None,
+                 experiment_keys: str | CollectionType[str],
+                 analyzer: Analyzer,
+                 file_sets: str | CollectionType[str],
+                 priority: Priority = Priority.NORMAL,
                  **kwargs):
         #: str: name of the experiment
         self._name = name
@@ -34,17 +37,18 @@ class Experiment:
         #: Folder: base directory of subject
         self._base_directory = base_directory
 
-        self.config = config
-
-        self.priority = config.priority if priority is None else priority
-
         #: "FileTree": file tree experimental folders and files
-        self.file_tree = FileTree(self._base_directory, index=kwargs.pop("index", True))
-        self._generate_file_sets()
+        self.file_tree = FileTree(self.experiment_directory, file_sets, index=False)
+
+        self._keys = experiment_keys
+
+        self.analyzer = analyzer
+
+        self.priority = priority
 
         #: dict: meta data
         self.meta = kwargs
-        
+
         self._created = get_timestamp()
 
     @property
@@ -58,6 +62,10 @@ class Experiment:
     @property
     def created(self) -> str:
         return self._created
+
+    @property
+    def experiment_keys(self) -> str | CollectionType[str]:
+        return self._keys
 
     @property
     def name(self) -> str:
@@ -75,35 +83,9 @@ class Experiment:
         ...
         # TODO: Analyze
 
-    def collect(self, sources: Optional[CollectionType] = None) -> None:
-        if sources is not None and isinstance(sources, CollectionType):
-            assert len(sources) == len(self.config.analyzer_file_sets), "Number of sources must match number of analyzer file sets"
-        self._collect(sources)
-
-    @singledispatchmethod
-    def _collect(self, source):
+    def collect(self) -> bool:
         ...
-
-    @_collect.register(NoneType)
-    def _(self, source: NoneType):
-        for name in self.config.analyzer_file_sets:
-            destination = self.file_tree.get(name).directory
-            source = select_directory()
-            verbose_copy(source, destination, name)
-
-    @_collect.register(str)
-    @_collect.register(Path)
-    @_collect.register(PathLike)
-    def _(self, source: Folder):
-
-
-    @_collect.register(list)
-    @_collect.register(tuple)
-    @_collect.register(set)
-    @_collect.register(GeneratorType)
-    @_collect.register(Iterator)
-    def _(self, sources: CollectionType):
-        ...
+        # TODO: Collect
 
     def get(self, *args, **kwargs) -> FileSet:
         return self.file_tree.get(*args, **kwargs)
@@ -118,11 +100,6 @@ class Experiment:
 
     def validate(self) -> None:
         self.file_tree.validate()
-
-    def _generate_file_sets(self) -> None:
-        for required_file_set in self.config.required_file_sets:
-            self.file_tree.add(required_file_set)
-        self.file_tree.build()
 
     def __call__(self, *args, **kwargs):
         return self.get(*args, **kwargs)

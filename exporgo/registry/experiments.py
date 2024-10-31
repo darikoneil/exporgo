@@ -3,18 +3,18 @@ from functools import singledispatchmethod
 from pathlib import Path
 from textwrap import indent
 from types import GeneratorType
-from typing import Callable, Sequence, Optional, Iterator
+from typing import Callable, Sequence, Optional
 
 from ..types import CollectionType
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field
 
 from .._color import TERMINAL_FORMATTER
 from ..exceptions import (DuplicateRegistrationError,
                           ExperimentNotRegisteredError)
-from .options import MODEL_CONFIG, Priority
+from exporgo.options.options import MODEL_CONFIG, Priority
 
 __all__ = [
     "AnalysisConfig",
@@ -44,21 +44,21 @@ class ExperimentConfig(BaseModel):
     Recipe for defining an experiment
     """
     model_config = MODEL_CONFIG
-    name: str = Field(None, title="Recipe name")
-    file_sets: Optional[str | list[str] | tuple[str, ...]]  = Field(None, title="List of file sets for organizing experiment")
+    key: str = Field(None, title="Unique key for the experiment type in the registry")
+    supplemental_file_sets: Optional[str | list[str] | tuple[str, ...]]  = Field(None, title="List of file sets for organizing experiment")
     # sequence does not permit str / bytes, so this works to indicate the list or tuple
     analyzer: AnalysisConfig | Sequence[AnalysisConfig] = Field(None, title="Experiment Analysis")
     priority: Priority = Field(Priority.NORMAL, title="Global priority of the experiment")
 
     @property
-    def required_file_sets(self) -> set[str]:
+    def file_sets(self) -> set[str]:
         """
         Get the required file sets
         """
-        return self.supplemental_file_sets | self.analyzer_file_sets
+        return  self._parse_file_sets(self.supplemental_file_sets) | self.analyzer_file_sets
 
     @property
-    def analyzer_file_sets(self) -> set[str]:
+    def analyzed_file_sets(self) -> set[str]:
         analyzer_file_sets = set()
         if isinstance(self.analyzer, AnalysisConfig):
             analyzer_file_sets.update(self._parse_file_sets(self.analyzer.file_sets))
@@ -67,9 +67,6 @@ class ExperimentConfig(BaseModel):
                 analyzer_file_sets.update(self._parse_file_sets(analysis.file_sets))
         return analyzer_file_sets
 
-    @property
-    def supplemental_file_sets(self) -> set[str]:
-        return self._parse_file_sets(self.file_sets) if self.file_sets is not None else set()
 
     @staticmethod
     def _parse_file_sets(file_sets: str | list[str] | tuple[str, ...]) -> set[str]:
@@ -109,9 +106,9 @@ class ExperimentRegistry:
             with Lock(cls.__path, "w", flags=LOCK_EX) as file:
                 # noinspection PyTypeChecker
                 file.write("{\n")
-                for name, experiment in cls.__registry.items():
+                for key, experiment in cls.__registry.items():
                     file.write(indent(
-                        json.dumps(name)
+                        json.dumps(key)
                         + f": {experiment.model_dump_json(exclude_defaults=True, indent=4)}\n",
                         " " * 4))
                 file.write("}\n")
@@ -122,29 +119,29 @@ class ExperimentRegistry:
             print(TERMINAL_FORMATTER(f"\nError saving registry: {exc}\n\n", "announcement"))
 
     @classmethod
-    def has(cls, name: str) -> bool:
+    def has(cls, key: str) -> bool:
         """
         Check if an experiment configuration is registered
         """
-        return name in cls.__registry
+        return key in cls.__registry
 
     @classmethod
-    def get(cls, name: str) -> "ExperimentConfig":
+    def get(cls, key: str) -> "ExperimentConfig":
         """
         Get an experiment configuration
         """
-        if not cls.has(name):
-            raise ExperimentNotRegisteredError(name)
-        return cls.__registry[name]
+        if not cls.has(key):
+            raise ExperimentNotRegisteredError(key)
+        return cls.__registry[key]
 
     @classmethod
-    def pop(cls, name: str) -> "ExperimentConfig":
+    def pop(cls, key: str) -> "ExperimentConfig":
         """
         Remove an experiment configuration
         """
-        if not cls.has(name):
-            raise ExperimentNotRegisteredError(name)
-        config = cls.__registry.pop(name)
+        if not cls.has(key):
+            raise ExperimentNotRegisteredError(key)
+        config = cls.__registry.pop(key)
         cls._save_registry()
         return config
 
@@ -155,9 +152,9 @@ class ExperimentRegistry:
         """
         Register an experiment configuration
         """
-        if experiment.name in cls.__registry:
-            raise DuplicateRegistrationError(experiment.name)
-        cls.__registry[experiment.name] = experiment
+        if experiment.key in cls.__registry:
+            raise DuplicateRegistrationError(experiment.key)
+        cls.__registry[experiment.key] = experiment
         cls.__new_registration = True
 
     # noinspection PyNestedDecorators
@@ -171,7 +168,6 @@ class ExperimentRegistry:
     @register.register(tuple)
     @register.register(set)
     @register.register(GeneratorType)
-    @register.register(Iterator)
     @classmethod
     def _(cls, experiment: CollectionType) -> None:
         for config in experiment:

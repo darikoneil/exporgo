@@ -1,6 +1,6 @@
 {
     "Generic Experiment": {
-        "name": "Generic Experiment",
+        "key": "Generic Experiment",
         "analyzer": {
             "name": "Generic Analysis",
             "call": "C:\\Users\\Yuste\\PycharmProjects\\exporgo\\helloworld.py",

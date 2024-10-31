@@ -7,7 +7,9 @@ from typing import Any, Generator, Iterable, Iterator, Mapping, Optional
 
 from ._validators import convert_permitted_types_to_required
 from .exceptions import MissingFilesError
-from .types import File, Folder
+from .types import File, Folder, CollectionType
+from types import NoneType, GeneratorType
+
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FileTree Organizer
@@ -24,7 +26,9 @@ class FileTree:
     @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=1, key="directory")
     def __init__(self,
                  directory: Folder,
+                 file_sets: str | CollectionType[str] = None,
                  index: bool = True):
+
         """
         A file tree that organizes experiment data, analyzed results, and figures. For implementation concerns it is not
         an extension of the built-in dictionary type, but it replicates most of its built-in methods.:
@@ -35,6 +39,8 @@ class FileTree:
         """
         #: :class:`Folder <exporgo.types.Folder>`: directory of file tree
         self._directory = directory
+
+        self.build(file_sets)
 
         if index:
             self.index(populate=True)
@@ -89,13 +95,29 @@ class FileTree:
         """
         setattr(self, key, FileSet(key, self.tree_directory, index))
 
-    def build(self) -> None:
+    # noinspection PyUnusedLocal
+    @singledispatchmethod
+    def build(self, file_sets: NoneType) -> None:
         """
         Builds the file-tree by initializing any file sets that do not yet exist
         """
         for file_set in self.values():
             if not (directory := file_set.directory).exists():
                 directory.mkdir()
+
+    @build.register(list)
+    @build.register(tuple)
+    @build.register(set)
+    @build.register(GeneratorType)
+    def _(self, file_sets: CollectionType[str]) -> None:
+        for file_set in file_sets:
+            self.add(file_set, index=False)
+        self.build()
+
+    @build.register
+    def _(self, file_sets: str) -> None:
+        self.add(file_sets, index=False)
+        self.build()
 
     def clear(self, delete: bool = False) -> None:
         """
@@ -211,8 +233,8 @@ class FileTree:
         if populate:
             self._populate()
 
-        for key, _ in self.items():  # items call guarantees filesets only
-            self.get(key).index()
+        for file_set in self.values():
+            file_set.index()
 
     @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=1, key="base_directory")
     def remap(self, base_directory: str | Path) -> None:

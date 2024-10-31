@@ -1,6 +1,6 @@
 from pathlib import Path
 from os import PathLike
-from typing import Iterator
+from typing import Callable
 from types import GeneratorType
 
 """
@@ -9,11 +9,12 @@ from types import GeneratorType
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
 
+Analysis = str| Path | Callable
 
 File = str | Path | PathLike
 
 Folder = str | Path | PathLike
 
-CollectionType = list | tuple | set | GeneratorType | Iterator
+CollectionType = list | tuple | set | GeneratorType
 
 Modification = tuple[str, str]
