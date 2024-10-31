@@ -3,6 +3,7 @@ from typing import Callable
 from exporgo.options.options import Priority
 from exporgo.types import CollectionType
 
+
 class Analyzer:
 
     def __init__(self,

@@ -1,18 +1,13 @@
 from pathlib import Path
-from functools import singledispatchmethod
-from .registry import ExperimentConfig, ExperimentRegistry
+from .registry import ExperimentRegistry
 from ._validators import convert_permitted_types_to_required
 from .files import FileTree, FileSet
 from ._logging import get_timestamp
-from typing import Optional
 from exporgo.options.options import Priority
 from ._tools import conditional_dispatch
-from types import GeneratorType
-from ._io import verbose_copy, select_directory
 from .types import Folder, CollectionType
 from .analysis import Analyzer
-from types import NoneType
-from os import PathLike
+
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -1,6 +1,6 @@
 from ._version import __current_version__, __package_name__
-from .registry import (AnalysisConfig, ExperimentConfig,
-                       ExperimentRegistry, FileFormats, Priority)
+from .registry import (AnalysisConfig, ExperimentConfig, ExperimentRegistry)
+from .options.options import FileFormats, Priority
 from .subject import Subject
 
 __all__ = [
