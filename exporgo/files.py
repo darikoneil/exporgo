@@ -103,6 +103,7 @@ class FileTree:
         """
         ...
 
+    # noinspection PyUnusedLocal
     @build.register(NoneType)
     def _(self, file_sets: NoneType) -> None:
         for file_set in self.values():
