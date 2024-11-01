@@ -115,6 +115,17 @@ class ExperimentNotRegisteredError(KeyError):
         super().__init__(f"{self.experiment} is not registered.")
 
 
+class AnalysisNotRegisteredError(KeyError):
+    """
+    Raised when an experiment is not registered
+
+    :param experiment: experiment that is not registered
+    """
+
+    def __init__(self, experiment: Any):
+        self.experiment = experiment
+        super().__init__(f"{self.experiment} is not registered.")
+
 class InvalidExperimentTypeError(TypeError):
     """
     Raised when an experiment is not a subclass of :class:`Experiment`

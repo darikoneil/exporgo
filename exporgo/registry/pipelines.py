@@ -1,13 +1,11 @@
-from pydantic import BaseModel, Field
-from ..options.options import MODEL_CONFIG
-from ..types import Priority, Status, Analysis
-from typing import Sequence
+
+from ..types import Status, Analysis
 import json
 from functools import singledispatchmethod
 from pathlib import Path
 from textwrap import indent
 from types import GeneratorType
-from typing import Callable, Sequence, Optional
+from typing import Sequence
 
 from ..types import CollectionType
 from portalocker import Lock
@@ -16,8 +14,7 @@ from portalocker.exceptions import BaseLockException
 from pydantic import BaseModel, Field
 
 from .._color import TERMINAL_FORMATTER
-from ..exceptions import (DuplicateRegistrationError,
-                          ExperimentNotRegisteredError)
+from ..exceptions import (DuplicateRegistrationError, AnalysisNotRegisteredError)
 from exporgo.options.options import MODEL_CONFIG
 from exporgo.types import Priority
 
@@ -57,7 +54,7 @@ class AnalysisRegistry:
     Registry for storing analysis configurations
     """
     __registry = {}
-    __path = Path(__file__).parent.joinpath("experiments.json")
+    __path = Path(__file__).parent.joinpath("analysis.json")
     __new_registration = False
 
     @classmethod
@@ -69,10 +66,10 @@ class AnalysisRegistry:
             with Lock(cls.__path, "w", flags=LOCK_EX) as file:
                 # noinspection PyTypeChecker
                 file.write("{\n")
-                for key, experiment in cls.__registry.items():
+                for key, analysis in cls.__registry.items():
                     file.write(indent(
                         json.dumps(key)
-                        + f": {experiment.model_dump_json(exclude_defaults=True, indent=4)}\n",
+                        + f": {analysis.model_dump_json(exclude_defaults=True, indent=4)}\n",
                         " " * 4))
                 file.write("}\n")
         except FileNotFoundError:
@@ -84,26 +81,26 @@ class AnalysisRegistry:
     @classmethod
     def has(cls, key: str) -> bool:
         """
-        Check if an experiment configuration is registered
+        Check if an analysis configuration is registered
         """
         return key in cls.__registry
 
     @classmethod
-    def get(cls, key: str) -> "ExperimentConfig":
+    def get(cls, key: str) -> "AnalysisConfig":
         """
-        Get an experiment configuration
+        Get an analysis configuration
         """
         if not cls.has(key):
-            raise ExperimentNotRegisteredError(key)
+            raise AnalysisNotRegisteredError(key)
         return cls.__registry[key]
 
     @classmethod
-    def pop(cls, key: str) -> "ExperimentConfig":
+    def pop(cls, key: str) -> "AnalysisConfig":
         """
         Remove an experiment configuration
         """
         if not cls.has(key):
-            raise ExperimentNotRegisteredError(key)
+            raise AnalysisNotRegisteredError(key)
         config = cls.__registry.pop(key)
         cls._save_registry()
         return config
@@ -111,20 +108,20 @@ class AnalysisRegistry:
     # noinspection PyNestedDecorators
     @singledispatchmethod
     @classmethod
-    def register(cls, experiment: "ExperimentConfig") -> None:
+    def register(cls, analysis: "AnalysisConfig") -> None:
         """
         Register an experiment configuration
         """
-        if experiment.key in cls.__registry:
-            raise DuplicateRegistrationError(experiment.key)
-        cls.__registry[experiment.key] = experiment
+        if analysis.key in cls.__registry:
+            raise DuplicateRegistrationError(analysis.key)
+        cls.__registry[analysis.key] = analysis
         cls.__new_registration = True
 
     # noinspection PyNestedDecorators
     @register.register
     @classmethod
-    def _(cls, experiment: dict) -> None:
-        cls.register(ExperimentConfig.model_validate(experiment))
+    def _(cls, analysis: dict) -> None:
+        cls.register(Analysis.model_validate(analysis))
 
     # noinspection PyNestedDecorators
     @register.register(list)
@@ -132,15 +129,15 @@ class AnalysisRegistry:
     @register.register(set)
     @register.register(GeneratorType)
     @classmethod
-    def _(cls, experiment: CollectionType) -> None:
-        for config in experiment:
+    def _(cls, analysis: CollectionType) -> None:
+        for config in analysis:
             cls.register(config)
 
     # noinspection PyNestedDecorators
     @register.register
     @classmethod
     def _(cls, name: str, **kwargs) -> None:
-        cls.register(ExperimentConfig(name=name, **kwargs))
+        cls.register(Analysis(name=name, **kwargs))
 
     @classmethod
     def _load_registry(cls) -> None:
@@ -149,7 +146,7 @@ class AnalysisRegistry:
         """
         try:
             with Lock(cls.__path, "r", timeout=10) as file:
-                cls.register((ExperimentConfig.model_validate(config) for _, config in json.load(file).items()))
+                cls.register((AnalysisConfig.model_validate(config) for _, config in json.load(file).items()))
         except FileNotFoundError:
             cls.__path.touch(exist_ok=False)
             cls._save_registry()
@@ -157,7 +154,7 @@ class AnalysisRegistry:
             print(TERMINAL_FORMATTER(f"\nError loading registry: {exc}\n\n", "announcement"))
 
     @classmethod
-    def __enter__(cls) -> "ExperimentRegistry":
+    def __enter__(cls) -> "AnalysisRegistry":
         cls._load_registry()
         return cls()
 

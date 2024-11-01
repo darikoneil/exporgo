@@ -3,7 +3,6 @@ from os import PathLike
 from typing import Callable
 from types import GeneratorType
 from enum import Enum, auto
-from typing import TypeVar
 
 
 """
