@@ -22,6 +22,13 @@ from exporgo.options.options import MODEL_CONFIG
 from exporgo.types import Priority
 
 
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Combinatorial Pipeline Configuration
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
 class AnalysisConfig(BaseModel):
     model_config = MODEL_CONFIG
     key: str = Field(None, title="Unique key for the analysis type in the registry")
@@ -30,6 +37,19 @@ class AnalysisConfig(BaseModel):
                                                          title="Collection of file sets for organizing experiment")
     priority: Priority = Field(Priority.NORMAL, title="Priority of the analysis")
     status: Status = Field(Status.SOURCE, title="Status of the analysis")
+
+class PipelineConfig(BaseModel):
+    steps: AnalysisConfig | Sequence[AnalysisConfig] = Field(None, title="Sequence of analysis steps")
+    priority: Priority = Field(Priority.NORMAL, title="Pipeline Priority")
+    status: Status = Field(Status.SOURCE, title="Pipeline Status")
+    model_config = MODEL_CONFIG
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Analysis Step Registration
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
 
 
 class AnalysisRegistry:
@@ -147,10 +167,5 @@ class AnalysisRegistry:
             cls._save_registry()
 
 
-class PipelineConfig(BaseModel):
-    steps: AnalysisConfig | Sequence[AnalysisConfig] = Field(None, title="Sequence of analysis steps")
-    priority: Priority = Field(Priority.NORMAL, title="Pipeline Priority")
-    status: Status = Field(Status.SOURCE, title="Pipeline Status")
-    model_config = MODEL_CONFIG
 
 
