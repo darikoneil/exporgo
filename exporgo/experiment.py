@@ -4,8 +4,8 @@ from ._validators import convert_permitted_types_to_required
 from .files import FileTree, FileSet
 from ._logging import get_timestamp
 from ._tools import conditional_dispatch
-from .types import Folder, CollectionType, Priority
-from .analysis import Analyzer
+from .pipeline import Pipeline
+from .types import Folder, CollectionType, Priority, Status
 
 
 """
@@ -17,16 +17,12 @@ from .analysis import Analyzer
 
 class Experiment:
 
-    @convert_permitted_types_to_required(permitted=(Folder, ),
-                                         required=Path,
-                                         pos=2,
-                                         key="base_directory")
     def __init__(self,
                  name: str,
                  base_directory: Folder,
-                 experiment_keys: str | CollectionType,
-                 analyzer: Analyzer,
-                 file_sets: str | CollectionType,
+                 keys: str | CollectionType,
+                 file_tree: FileTree,
+                 pipeline: Pipeline,
                  priority: Priority = Priority.NORMAL,
                  **kwargs):
         #: str: name of the experiment
@@ -35,18 +31,22 @@ class Experiment:
         #: Folder: base directory of subject
         self._base_directory = base_directory
 
-        #: "FileTree": file tree experimental folders and files
-        self.file_tree = FileTree(self.experiment_directory, file_sets, index=False)
+        #: str | Collection Type: experiment registry keys
+        self.keys = keys
 
-        self._keys = experiment_keys
+        #: FileTree: file tree for the experiment
+        self.file_tree = file_tree,
 
-        self.analyzer = analyzer
+        #: Pipeline: pipeline for the experiment
+        self.pipeline = pipeline
 
+        #: Priority: priority of the experiment
         self.priority = priority
 
         #: dict: meta data
         self.meta = kwargs
 
+        # timestamp of creation
         self._created = get_timestamp()
 
     @property
@@ -62,12 +62,12 @@ class Experiment:
         return self._created
 
     @property
-    def experiment_keys(self) -> str | CollectionType:
-        return self._keys
-
-    @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def status(self) -> Status:
+        return self.pipeline.status
 
     @staticmethod
     def __name__() -> str:
@@ -76,14 +76,6 @@ class Experiment:
     @base_directory.setter
     def base_directory(self, base_directory: Folder) -> None:
         self.remap(base_directory)
-
-    def analyze(self) -> bool:
-        ...
-        # TODO: Analyze
-
-    def collect(self) -> bool:
-        ...
-        # TODO: Collect
 
     def get(self, *args, **kwargs) -> FileSet:
         return self.file_tree.get(*args, **kwargs)
