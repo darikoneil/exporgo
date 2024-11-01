@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Callable
-from exporgo.options.options import Priority
-from exporgo.types import CollectionType
+from exporgo.types import CollectionType, Priority
 
 
 class Analyzer:

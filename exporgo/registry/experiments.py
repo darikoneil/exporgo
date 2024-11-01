@@ -3,7 +3,7 @@ from functools import singledispatchmethod
 from pathlib import Path
 from textwrap import indent
 from types import GeneratorType
-from typing import Callable, Sequence, Optional
+from typing import Optional
 
 from ..types import CollectionType
 from portalocker import Lock
@@ -47,13 +47,6 @@ class ExperimentConfig(BaseModel):
             return {file_sets, }
         return set(file_sets)
 
-    @singledispatchmethod
-    def merge(self, experiments: "ExperimentConfig") -> "ExperimentConfig":
-        """
-        Merge two experiment configurations
-        """
-        ...
-
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,6 +63,7 @@ class ExperimentRegistry:
     __path = Path(__file__).parent.joinpath("experiments.json")
     __new_registration = False
 
+    # noinspection DuplicatedCode
     @classmethod
     def _save_registry(cls) -> None:
         """
@@ -152,6 +146,7 @@ class ExperimentRegistry:
     def _(cls, name: str, **kwargs) -> None:
         cls.register(ExperimentConfig(name=name, **kwargs))
 
+    # noinspection DuplicatedCode
     @classmethod
     def _load_registry(cls) -> None:
         """

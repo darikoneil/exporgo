@@ -3,9 +3,8 @@ from .registry import ExperimentRegistry
 from ._validators import convert_permitted_types_to_required
 from .files import FileTree, FileSet
 from ._logging import get_timestamp
-from exporgo.options.options import Priority
 from ._tools import conditional_dispatch
-from .types import Folder, CollectionType
+from .types import Folder, CollectionType, Priority
 from .analysis import Analyzer
 
 
