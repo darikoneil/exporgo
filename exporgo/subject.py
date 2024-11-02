@@ -9,7 +9,8 @@ from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from ._validators import validate_version
 from .exceptions import DuplicateExperimentError, MissingFilesError
-from .types import File, Folder, Modification, Priority
+from .experiment import ExperimentFactory
+from .types import File, Folder, Modification, Priority, CollectionType
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,25 +39,7 @@ class Subject:
     :type priority: :class:`Priority <exporgo.types.Priority>`
 
     :param kwargs: Additional keyword arguments to be stored in the subject's metadata dictionary.
-    :type kwargs: Any
-
-    :var name: The name or identifier of the subject.
-    :vartype name: str
-
-    :var directory: The directory where the subject's data is stored.
-    :vartype directory: :class:`Folder <exporgo.types.Folder>`
-
-    :var study: The study the subject is associated with.
-    :vartype study: str
-
-    :var meta: Metadata associated with the subject.
-    :vartype meta: dict
-
-    :var priority: The priority of the subject
-
-    :var logger: A logger class to record interactions with the subject to a text file within the subject's directory
-        ("log.exporgo").
-    :vartype logger: :class:`IPythonLogger <exporgo._logging.IPythonLogger>`
+    :type kwargs: :class:`Any <typing.Any>`
     """
 
     def __init__(self,
@@ -70,30 +53,31 @@ class Subject:
         # first to capture all modifications at creation
         self._modifications = ModificationLogger()
 
-        #: str: The name or identifier of the subject.
+        #: :class:`str`\: The name or identifier of the subject.
         self.name = name
 
         directory = Path(directory) if directory \
             else select_directory(title="Select folder to contain subject's organized data")
         if name not in directory.name:
             directory = directory.joinpath(name)
-        #: :class:`Path <pathlib.Path`\: The directory where the subject's data is stored.
+        #: :class:`Path <pathlib.Path>`\: The directory where the subject's data is stored.
         self.directory = directory
         if not self.directory.exists():
             Path.mkdir(self.directory)
 
-        #: str: The study the subject is associated with.
+        #: :class:`str`\: The study the subject is associated with.
         self.study = study
 
         # determine if auto-starting logging. This is a hidden feature and is taken from kwargs
         start_log = kwargs.pop("start_log", True)
         self.logger = IPythonLogger(self.directory, start_log)
 
+        #: :class:`dict`\: Metadata associated with the subject.
         self.meta = meta if meta else {}
         if kwargs:
             self.meta.update(kwargs)
 
-        #: :class:`Priority <exporgo.types.Priority>`: The priority of the subject
+        #: :class:`Priority <exporgo.types.Priority>`\: The priority of the subject
         self._priority = priority
 
         self._created = get_timestamp()
@@ -108,6 +92,7 @@ class Subject:
         Returns a string representation of the Subject object.
 
         :returns: A formatted string representing the subject.
+
         """
         string_to_print = ""
 
@@ -160,7 +145,7 @@ class Subject:
 
     def save(self) -> None:
         """
-        Saves the subject's organization data to a YAML file in the subject's directory ("organization.exporgo").
+        Saves the subject to file.
         """
         self.logger.end()
 
@@ -175,60 +160,72 @@ class Subject:
     @property
     def created(self) -> str:
         """
-        :Getter: Returns the creation timestamp of the subject.
-        :GetterType: :class:`str`
-        :Setter: Not implemented.
+        The timestamp associated with the creation of the subject.
 
-        :meta read-only:
+        :Return type: :class:`str`
+        :meta read-only-properties:
         """
         return self._created
 
     @property
     def experiments(self) -> tuple[str, ...]:
         """
-        :Getter: returns the names of the experiments associated with the subject.
-        :GetterType: :class:`tuple` [:class:`str`\, ...]
-        :Setter: Not implemented.
+        The names of the experiments associated with the subject.
+
+
+        :Return type: :class:`tuple` [:class:`str`\, ...]
+        :meta read-only-properties:
         """
         return tuple(self._experiments.keys())
 
     @property
     def file(self) -> Path:
         """
-        :Getter: Returns the path to the subject's organization file.
-        :GetterType: :class:`Path <pathlib.Path>`
-        :Setter: Not implemented.
+        The path to the subject's organization file.
+
+        :Return type: :class:`Path <pathlib.Path>`
+
+        :meta read-only-properties:
         """
         return self.directory.joinpath("organization.json")
 
     @property
     def last_modified(self) -> str:
         """
-        :Getter: Returns the last modification timestamp of the subject.
-        :GetterType: :class:`str`
-        :Setter: Not implemented.
+        The last timestamp associated with a modification to the subject.
+
+        :Return type: :class:`str`
+        :meta read-only-properties:
         """
         return self.modifications[0][1]
 
     @property
     def modifications(self) -> tuple[Modification, ...]:
         """
-        :Getter: Returns a tuple of the subject's modifications.
-        :GetterType: :class:`tuple`\[:class:`Modification <exporgo.types.Modification>`\]
+        The modifications made to the subject.
+
+        :Return type: :class:`tuple`\[:class:`Modification <exporgo.types.Modification>`\]
+        :meta read-only-properties:
         """
         return tuple(self._modifications)
 
     @classmethod
     def load(cls, file: Optional[File] = None) -> "Subject":
         """
-        Loads a subject from its organization file. If not provided, a file can be selected using a file dialog.
-        Upon loading, the subject's logger is started and indexed files for each experiment are validated.
+        Loads a subject from its organization file.
+
+        A file can be selected using a file dialog if no file is provided. Upon loading, the subject's logger is
+        started and indexed files for each experiment are validated.
 
         :param file: The path to the subject's organization file.
-        :type file: :class:`Optional <typing.Optional>`\[:class:`str`\ | :class:`Path <pathlib.Path>`\]
+        :type file: :class:`Optional <typing.Optional>`\[:class:`File <exporgo.types.File>`]
 
         :returns: The loaded subject.
         :rtype: :class:`Subject <exporgo.subject.Subject>`
+
+        :raises FileNotFoundError: If the file does not exist.
+
+        :meta class-method:
         """
         file = file if file else select_file(title="Select organization file")
         if not file.is_file():
@@ -266,9 +263,30 @@ class Subject:
 
     def create_experiment(self,
                           name: str,
+                          keys: str | CollectionType,
+                          priority: Optional[Priority] = None,
                           **kwargs) -> None:
+        """
+        Creates an experiment associated with the subject.
+
+        :param name: The name of the experiment.
+
+        :param keys: The experiment registry keys used to construct the experiment
+        :type keys: :class:`str`\ | :class:`CollectionType`\[:class:`str`\]
+
+        :param priority: Override the priority of the experiment.
+        :type priority: :class:`Optional <typing.Optional>`\[:class:`Priority <exporgo.types.Priority>`\]
+
+        :param kwargs: Additional keyword arguments to be stored in the experiment's metadata dictionary.
+        :type kwargs: :class:`Any <typing.Any>`
+
+        """
         if name in self.experiments:
             raise DuplicateExperimentError(name)
+
+        with ExperimentFactory(name, self.directory) as factory:
+            self._experiments[name] =  factory(keys, priority, **kwargs)
+
         self.record(name)
 
     def record(self, info: str = None) -> None:
@@ -289,7 +307,7 @@ class Subject:
 
     def validate(self) -> None:
         """
-        Validates all experiments associated with the subject.
+        Validates the file tree for all experiments associated with the subject.
 
         :raises MissingFilesError: If any files are missing in the experiments.
         """

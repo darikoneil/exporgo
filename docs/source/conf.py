@@ -43,8 +43,8 @@ extensions = [
 
 autodoc_default_options = {
     'members': True,
-    'special-members': True,
-    'private-members': True,
+    'special-members': False,
+    'private-members': False,
     'inherited-members': True,
     'undoc-members': True,
     'exclude-members': '__weakref__',
@@ -77,6 +77,20 @@ todo_include_todos = True
 
 typehints_defaults = 'comma'
 
+always_document_param_types = True
+
+typehints_fully_qualified = False
+
+typehints_document_rtype = True
+
+always_use_bars_union = True
+
+simplify_optional_unions = False
+
+typehints_use_signature = False
+
+typehints_use_signature_return = False
+
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -86,7 +100,9 @@ typehints_defaults = 'comma'
 
 
 autoclasstoc_sections = [
-    'read-only',
+    'read-only-properties',
+    'read-write-properties',
+    'public-methods-without-dunders',
     ]
 
 
@@ -98,11 +114,86 @@ autoclasstoc_sections = [
 
 
 from autoclasstoc import Section
+from autoclasstoc import PublicMethodsWithoutDunders
 
 
-class ReadOnlySection(Section):
-    key = 'read-only'
+class PropertiesSection(Section):
+    key = 'read-write-properties'
+    title = "Properties:"
+
+    def predicate(self, name, attr, meta):
+        return 'read-write-properties' in meta
+
+
+class ReadOnlyPropertiesSection(Section):
+    key = 'read-only-properties'
     title = "Read-Only Properties:"
 
     def predicate(self, name, attr, meta):
-        return 'read-only' in meta
+        return 'read-only-properties' in meta
+
+
+"""
+class PublicAttributes(Section):
+    key = 'public-attrs'
+    title = "Public Attributes:"
+
+    def predicate(self, name, attr, meta):
+        return 'attribute' in meta
+    
+    
+class PublicInstanceMethods(Section):
+    key = 'public-methods'
+    title = "Public Methods:"
+
+    def predicate(self, name, attr, meta):
+        return 'method' in meta
+    
+
+class PublicClassMethods(Section):
+    key = 'public-class-methods'
+    title = "Public Class Methods:"
+
+    def predicate(self, name, attr, meta):
+        return 'classmethod' in meta
+    
+    
+class PublicStaticMethods(Section):
+    key = 'public-static-methods'
+    title = "Public Static Methods:"
+
+    def predicate(self, name, attr, meta):
+        return 'staticmethod' in meta
+    
+
+class PrivateAttributes(Section):
+    key = 'private-attrs'
+    title = "Private Attributes:"
+    
+    def predicate(self, name, attr, meta):
+        return 'private' in meta
+    
+    
+class PrivateInstanceMethods(Section):
+    key = 'private-methods'
+    title = "Private Methods:"
+    
+    def predicate(self, name, attr, meta):
+        return 'private' in meta
+    
+    
+class PrivateClassMethods(Section):
+    key = 'private-class-methods'
+    title = "Private Class Methods:"
+    
+    def predicate(self, name, attr, meta):
+        return 'private' in meta and 'classmethod' in meta
+    
+
+class PrivateStaticMethods(Section):
+    key = 'private-static-methods'
+    title = "Private Static Methods:"
+    
+    def predicate(self, name, attr, meta):
+        return 'private' in meta and 'staticmethod' in meta
+"""

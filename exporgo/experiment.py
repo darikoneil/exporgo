@@ -101,7 +101,7 @@ class ExperimentFactory:
     @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=2, key="base_directory")
     def __init__(self,
                  name: str,
-                 base_directory: Folder
+                 base_directory: Folder,
                  ):
         self.name = name
         self.base_directory = base_directory
