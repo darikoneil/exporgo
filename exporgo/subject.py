@@ -178,6 +178,8 @@ class Subject:
         :Getter: Returns the creation timestamp of the subject.
         :GetterType: :class:`str`
         :Setter: Not implemented.
+
+        :meta read-only:
         """
         return self._created
 

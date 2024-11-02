@@ -3,8 +3,12 @@ import sys
 
 import toml
 
-#from datetime import date
 
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Path Setup and Package Details
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
 
 # IMPORTS ps I can be done not so dumbly
 sys.path.insert(0, os.path.dirname(os.path.dirname(os. getcwd())))
@@ -13,13 +17,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os. getcwd())))
 pyproject_file = os.path.join(os.path.dirname(os.path.dirname(os. getcwd())), "pyproject.toml")
 package_details = toml.load(pyproject_file).get("project")
 
-# get date for copyright
-#today = date.today().year
-
 project = package_details.get("name")
-#copyright = "".join([today, f" {package_details.authors}"])
+author = "Darik A. O'Neil"
 #author = f"{package_details.authors}"  # f-string because maybe weird sphinx stuff if it gets list, not sure
 release = package_details.get("version")
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Sphinx Configuration
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+master_docs = 'index'
 
 extensions = [
     'sphinx.ext.todo',
@@ -32,10 +41,16 @@ extensions = [
     'sphinxcontrib.autodoc_pydantic',
     'sphinx_autodoc_typehints']
 
-typehints_defaults = 'comma'
+autodoc_default_options = {
+    'members': True,
+    'special-members': True,
+    'private-members': True,
+    'inherited-members': True,
+    'undoc-members': True,
+    'exclude-members': '__weakref__',
+}
 templates_path = ['_templates']
 exclude_patterns = []
-
 language = 'en'
 
 intersphinx_mapping = {
@@ -52,3 +67,42 @@ html_theme = 'sphinx_rtd_theme'
 pygments_style = "sphinx"
 
 todo_include_todos = True
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Sphinx Autodoc Typehints
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+typehints_defaults = 'comma'
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AutoClassToc Configuration
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+autoclasstoc_sections = [
+    'read-only',
+    ]
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Custom Sections (AutoClassToc)
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+from autoclasstoc import Section
+
+
+class ReadOnlySection(Section):
+    key = 'read-only'
+    title = "Read-Only Properties:"
+
+    def predicate(self, name, attr, meta):
+        return 'read-only' in meta
