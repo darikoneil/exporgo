@@ -3,12 +3,12 @@ from functools import singledispatchmethod
 from itertools import chain
 from pathlib import Path
 from shutil import rmtree
+from types import GeneratorType, NoneType
 from typing import Any, Generator, Iterable, Iterator, Mapping, Optional
 
 from ._validators import convert_permitted_types_to_required
 from .exceptions import MissingFilesError
-from .types import File, Folder, CollectionType
-from types import NoneType, GeneratorType
+from .types import CollectionType, File, Folder
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

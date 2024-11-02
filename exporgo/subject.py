@@ -9,14 +9,14 @@ from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from ._validators import validate_version
 from .exceptions import DuplicateExperimentError, MissingFilesError
-from .types import File, Folder, Modification
-
+from .types import File, Folder, Modification, Priority
 
 """
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Class for organizing the data of single subjects
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
+
 
 class Subject:
     """
@@ -34,6 +34,9 @@ class Subject:
     :param meta: Metadata associated with the subject.
     :type meta: :class:`Optional <typing.Optional>`\[:class:`dict`\]
 
+    :param priority: The priority of the subject
+    :type priority: :class:`Priority <exporgo.types.Priority>`
+
     :param kwargs: Additional keyword arguments to be stored in the subject's metadata dictionary.
     :type kwargs: Any
 
@@ -49,6 +52,8 @@ class Subject:
     :var meta: Metadata associated with the subject.
     :vartype meta: dict
 
+    :var priority: The priority of the subject
+
     :var logger: A logger class to record interactions with the subject to a text file within the subject's directory
         ("log.exporgo").
     :vartype logger: :class:`IPythonLogger <exporgo._logging.IPythonLogger>`
@@ -59,30 +64,37 @@ class Subject:
                  directory: Optional[Folder] = None,
                  study: Optional[str] = None,
                  meta: Optional[dict] = None,
+                 priority: Priority = Priority.NORMAL,
                  **kwargs):
 
         # first to capture all modifications at creation
         self._modifications = ModificationLogger()
 
+        #: str: The name or identifier of the subject.
         self.name = name
 
         directory = Path(directory) if directory \
             else select_directory(title="Select folder to contain subject's organized data")
         if name not in directory.name:
             directory = directory.joinpath(name)
+        #: :class:`Path <pathlib.Path`\: The directory where the subject's data is stored.
         self.directory = directory
         if not self.directory.exists():
             Path.mkdir(self.directory)
+
+        #: str: The study the subject is associated with.
+        self.study = study
 
         # determine if auto-starting logging. This is a hidden feature and is taken from kwargs
         start_log = kwargs.pop("start_log", True)
         self.logger = IPythonLogger(self.directory, start_log)
 
-        self.study = study
-
         self.meta = meta if meta else {}
         if kwargs:
             self.meta.update(kwargs)
+
+        #: :class:`Priority <exporgo.types.Priority>`: The priority of the subject
+        self._priority = priority
 
         self._created = get_timestamp()
 
@@ -244,12 +256,6 @@ class Subject:
             start_log=False
         )
 
-        #for experiment_name, experiment_dict in _dict.get("experiments").items():
-        #    subject.create_experiment(experiment_name, experiment_dict.pop("mix_ins"), index=False)
-        #    experiment = subject.get(experiment_name)
-        #    experiment.file_tree = FileTree.__from_dict__(experiment_dict.pop("file_tree"))
-        #    experiment.__dict__.update(experiment_dict)
-
         subject._created = _dict.get("created")
         subject._modifications = ModificationLogger(_dict.get("modifications"))
         subject.logger.start()
@@ -261,7 +267,6 @@ class Subject:
                           **kwargs) -> None:
         if name in self.experiments:
             raise DuplicateExperimentError(name)
-        print(f"{kwargs=}")
         self.record(name)
 
     def record(self, info: str = None) -> None:

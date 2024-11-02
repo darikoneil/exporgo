@@ -1,6 +1,16 @@
 exporgo package
 ===============
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   exporgo.options
+   exporgo.registry
+   exporgo.schemas
+
 Submodules
 ----------
 
@@ -10,7 +20,9 @@ Submodules
    exporgo.exceptions
    exporgo.experiment
    exporgo.files
+   exporgo.pipeline
    exporgo.subject
+   exporgo.types
 
 Module contents
 ---------------

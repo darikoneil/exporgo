@@ -5,17 +5,18 @@ from textwrap import indent
 from types import GeneratorType
 from typing import Optional
 
-from ..types import CollectionType
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
 from pydantic import BaseModel, Field
 
+from exporgo.options.options import MODEL_CONFIG
+from exporgo.types import Priority
+
 from .._color import TERMINAL_FORMATTER
 from ..exceptions import (DuplicateRegistrationError,
                           ExperimentNotRegisteredError)
-from exporgo.options.options import MODEL_CONFIG
-from exporgo.types import Priority
+from ..types import CollectionType
 
 __all__ = [
     "ExperimentConfig",

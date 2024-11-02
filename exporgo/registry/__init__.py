@@ -1,5 +1,4 @@
-from .experiments import (ExperimentConfig,
-                         ExperimentRegistry)
+from .experiments import ExperimentConfig, ExperimentRegistry
 from .pipelines import AnalysisConfig, AnalysisRegistry, PipelineConfig
 
 __all__ = [

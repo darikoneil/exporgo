@@ -1,12 +1,12 @@
 from pathlib import Path
-from .registry import ExperimentRegistry
-from ._validators import convert_permitted_types_to_required
-from .files import FileTree, FileSet
+
 from ._logging import get_timestamp
 from ._tools import conditional_dispatch
+from ._validators import convert_permitted_types_to_required
+from .files import FileSet, FileTree
 from .pipeline import Pipeline
-from .types import Folder, CollectionType, Priority, Status
-
+from .registry import ExperimentRegistry
+from .types import CollectionType, Folder, Priority, Status
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

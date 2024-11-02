@@ -1,6 +1,6 @@
-from typing import Callable, Any
 from functools import update_wrapper
 from types import MappingProxyType
+from typing import Any, Callable
 
 
 def _find_implementation(registry: dict, *args: Any, **kwargs: Any) -> Callable:

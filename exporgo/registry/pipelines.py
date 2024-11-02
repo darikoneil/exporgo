@@ -1,5 +1,4 @@
 
-from ..types import Status, Analysis
 import json
 from functools import singledispatchmethod
 from pathlib import Path
@@ -7,17 +6,15 @@ from textwrap import indent
 from types import GeneratorType
 from typing import Sequence
 
-from ..types import CollectionType
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
 from pydantic import BaseModel, Field
 
 from .._color import TERMINAL_FORMATTER
-from ..exceptions import (DuplicateRegistrationError, AnalysisNotRegisteredError)
-from exporgo.options.options import MODEL_CONFIG
-from exporgo.types import Priority
-
+from ..exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
+from ..options.options import MODEL_CONFIG
+from ..types import Analysis, Category, CollectionType, Priority, Status
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -31,7 +28,7 @@ class AnalysisConfig(BaseModel):
     key: str = Field(None, title="Unique key for the analysis type in the registry")
     call: Analysis = Field(None, title="Analyzer for the experiment")
     file_sets: str | list[str] | tuple[str, ...] = Field(None, title="Collection of file sets for organizing experiment")
-
+    category: Category = Field(Category.ANALYZE, title="Category of the analysis")
     priority: Priority = Field(Priority.NORMAL, title="Priority of the analysis")
     status: Status = Field(Status.SOURCE, title="Status of the analysis")
 
@@ -163,7 +160,3 @@ class AnalysisRegistry:
     def __exit__(cls, exc_type, exc_val, exc_tb): # noqa: ANN206
         if cls.__new_registration:
             cls._save_registry()
-
-
-
-

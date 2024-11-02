@@ -1,16 +1,17 @@
 from functools import partial
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from shutil import copy2
+from sys import modules
 from tkinter import Tk
 from tkinter.filedialog import askdirectory, askopenfilename
-from typing import Optional
+from typing import Callable, Optional
 
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
 from ._validators import convert_permitted_types_to_required
-from .types import Folder
-
+from .types import File, Folder
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -115,3 +116,19 @@ def verbose_copy(source: Folder,
     return all(Parallel(n_jobs=-1, backend="loky")(delayed(copier)(file) for file in tqdm(files,
                                                                                           total=len(files),
                                                                                           desc=message)))
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Importing
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+@convert_permitted_types_to_required(permitted=(File, ), required=Path, pos=2, key="path")
+def import_callable_from_file(name: str, module: str, path: File) -> Callable:
+    spec = spec_from_file_location(module, path)
+    module_ = module_from_spec(spec)
+    modules[module] = module_
+    spec.loader.exec_module(module_)
+    return getattr(module_, name)
