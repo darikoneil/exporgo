@@ -28,6 +28,12 @@ class _AutoStrEnum(str, Enum):
         return self.value  # type: ignore
 
 
+class Category(Enum):
+    PREPARE = 0
+    ANALYZE = 1
+    SUMMARIZE = 2
+
+
 class FileFormats(_AutoStrEnum):
     JSON = auto()
     YAML = auto()

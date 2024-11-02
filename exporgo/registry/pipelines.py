@@ -30,10 +30,11 @@ class AnalysisConfig(BaseModel):
     model_config = MODEL_CONFIG
     key: str = Field(None, title="Unique key for the analysis type in the registry")
     call: Analysis = Field(None, title="Analyzer for the experiment")
-    file_sets: str | list[str] | tuple[str, ...] = Field(None,
-                                                         title="Collection of file sets for organizing experiment")
+    file_sets: str | list[str] | tuple[str, ...] = Field(None, title="Collection of file sets for organizing experiment")
+
     priority: Priority = Field(Priority.NORMAL, title="Priority of the analysis")
     status: Status = Field(Status.SOURCE, title="Status of the analysis")
+
 
 class PipelineConfig(BaseModel):
     steps: AnalysisConfig | Sequence[AnalysisConfig] = Field(None, title="Sequence of analysis steps")
