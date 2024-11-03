@@ -3,7 +3,7 @@ from functools import singledispatchmethod
 from pathlib import Path
 from textwrap import indent
 from types import GeneratorType
-from typing import Optional, Sequence
+from typing import Sequence
 
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
