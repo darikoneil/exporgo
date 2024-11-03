@@ -1,33 +1,33 @@
 import pytest
 
 from exporgo.exceptions import MissingFilesError
-from exporgo.files import FileMap, FileSet, FileTree
+from exporgo.files import MapWithDuplicates, FileSet, FileTree
 
 
 class TestFileMap:
     def test_initialization(self):
-        file_map = FileMap()
+        file_map = MapWithDuplicates()
         assert file_map == {}
 
     def test_update_dictionary_iterative(self, source):
-        file_map = FileMap()
+        file_map = MapWithDuplicates()
         for file in source.rglob("*"):
             file_map.update({file.stem: file})
         assert len(file_map) == len(list(source.rglob("*")))
 
     def test_update_dictionary_simultaneous(self, source):
-        file_map = FileMap()
+        file_map = MapWithDuplicates()
         file_map.update({str(file): file for file in source.rglob("*")})
         assert len(file_map) == len(list(source.rglob("*")))
 
     def test_update_key_value_pairs(self, source):
-        file_map = FileMap()
+        file_map = MapWithDuplicates()
         files = [(file.stem, file) for file in source.rglob("*")]
         file_map.update(files)
         assert len(file_map) == len(list(source.rglob("*")))
 
     def test_update_kwargs(self, source):
-        file_map = FileMap()
+        file_map = MapWithDuplicates()
         file_map.update(**{str(file): file for file in source.rglob("*")})
         assert len(file_map) == len(list(source.rglob("*")))
 

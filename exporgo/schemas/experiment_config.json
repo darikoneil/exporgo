@@ -1,60 +1,5 @@
 {
     "$defs": {
-        "AnalysisConfig": {
-            "additionalProperties": false,
-            "properties": {
-                "name": {
-                    "default": null,
-                    "title": "Recipe name",
-                    "type": "string"
-                },
-                "call": {
-                    "anyOf": [
-                        {
-                            "type": "string"
-                        },
-                        {
-                            "format": "path",
-                            "type": "string"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Analyzer for the experiment"
-                },
-                "file_sets": {
-                    "anyOf": [
-                        {
-                            "type": "string"
-                        },
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "maxItems": 1,
-                            "minItems": 1,
-                            "prefixItems": [
-                                {
-                                    "type": "string"
-                                }
-                            ],
-                            "type": "array"
-                        }
-                    ],
-                    "default": null,
-                    "title": "List of file sets for organizing experiment"
-                },
-                "priority": {
-                    "$ref": "#/$defs/Priority",
-                    "default": 3,
-                    "title": "Priority of the analysis"
-                }
-            },
-            "title": "AnalysisConfig",
-            "type": "object"
-        },
         "Priority": {
             "enum": [
                 0,
@@ -63,27 +8,21 @@
                 3,
                 4,
                 5,
-                6,
-                {
-                    "extra": "forbid",
-                    "revalidate_instances": "always",
-                    "use_enum_values": true,
-                    "validate_assignment": true,
-                    "validate_default": false
-                }
+                6
             ],
-            "title": "Priority"
+            "title": "Priority",
+            "type": "integer"
         }
     },
     "additionalProperties": false,
     "description": "Recipe for defining an experiment",
     "properties": {
-        "name": {
+        "key": {
             "default": null,
-            "title": "Recipe name",
+            "title": "Unique key for the experiment type in the registry",
             "type": "string"
         },
-        "file_sets": {
+        "supplemental_file_sets": {
             "anyOf": [
                 {
                     "type": "string"
@@ -95,36 +34,11 @@
                     "type": "array"
                 },
                 {
-                    "maxItems": 1,
-                    "minItems": 1,
-                    "prefixItems": [
-                        {
-                            "type": "string"
-                        }
-                    ],
-                    "type": "array"
-                },
-                {
                     "type": "null"
                 }
             ],
             "default": null,
             "title": "List of file sets for organizing experiment"
-        },
-        "analyzer": {
-            "anyOf": [
-                {
-                    "$ref": "#/$defs/AnalysisConfig"
-                },
-                {
-                    "items": {
-                        "$ref": "#/$defs/AnalysisConfig"
-                    },
-                    "type": "array"
-                }
-            ],
-            "default": null,
-            "title": "Experiment Analysis"
         },
         "priority": {
             "$ref": "#/$defs/Priority",

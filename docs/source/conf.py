@@ -100,9 +100,9 @@ typehints_use_signature_return = False
 
 
 autoclasstoc_sections = [
+    'public-methods-without-dunders',
     'read-only-properties',
     'read-write-properties',
-    'public-methods-without-dunders',
     ]
 
 
@@ -114,7 +114,6 @@ autoclasstoc_sections = [
 
 
 from autoclasstoc import Section
-from autoclasstoc import PublicMethodsWithoutDunders
 
 
 class PropertiesSection(Section):

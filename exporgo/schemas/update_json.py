@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from ..registry import AnalysisConfig, ExperimentConfig
+from ..registry import AnalysisConfig, ExperimentConfig, PipelineConfig
 from ..options.options import ExporgoSettings
 
 
@@ -19,7 +19,3 @@ def _update_json_schema() -> None:
         with path.joinpath(f"{to_snake_case(model.__name__)}.json").open("w") as file:
             # noinspection PyTypeChecker
             json.dump(model.model_json_schema(), file, indent=4, sort_keys=False)
-
-
-if __name__ == "__main__":
-    _update_json_schema()

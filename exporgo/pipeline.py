@@ -1,8 +1,13 @@
 from pathlib import Path
-from typing import Callable
+from typing import Callable, TYPE_CHECKING, Optional
+from types import NoneType
+from functools import singledispatchmethod
 
-from .subject import Subject
-from .types import Category, CollectionType, File, Priority, Status
+
+if TYPE_CHECKING:
+    from .subject import Subject
+
+from .types import Category, CollectionType, File, Priority, Status, Folder
 
 
 class AnalysisStep:
@@ -30,10 +35,10 @@ class AnalysisStep:
         return self._file_sets
 
     @property
-    def priority(self) -> Priority:
+    def priority(self) -> "Priority":
         return self._priority
 
-    def __call__(self, subject: File | Subject):
+    def __call__(self, subject: File or "Subject"):
         self._call(subject)
 
 
@@ -42,3 +47,25 @@ class Pipeline:
         self.steps = steps
         self.priority = priority
         self.status = status
+
+    def analyze(self) -> None:
+        ...
+
+    def collect(self, sources: Optional[Folder | CollectionType]) -> None:
+        self._collect(sources)
+
+    @singledispatchmethod
+    def _collect(self, sources: Optional[Folder | CollectionType]) -> None:
+        ...
+
+    @_collect.register(CollectionType)
+    def _(self, sources: CollectionType) -> None:
+        ...
+
+    @_collect.register(Folder)
+    def _(self, sources: Folder) -> None:
+        ...
+
+    @_collect.register(type(None))
+    def _(self, sources: NoneType) -> None:
+        ...

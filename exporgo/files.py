@@ -19,43 +19,50 @@ from .types import CollectionType, File, Folder
 
 class FileTree:
     """
-    A file tree that organizes data. For implementation concerns it is not
-    an extension of the built-in dictionary type, but it replicates most of its built-in methods.
+    A file tree that organizes data. 
+
+    For implementation concerns it is not an extension of the built-in dictionary type, but it replicates most
+    of its built-in methods.
     """
 
     @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=1, key="directory")
     def __init__(self,
                  directory: Folder,
-                 file_sets: str | CollectionType = None,
-                 index: bool = True):
+                 file_sets: Optional[str | CollectionType] = None,
+                 populate: bool = True):
 
         """
         A file tree that organizes experiment data, analyzed results, and figures. For implementation concerns it is not
         an extension of the built-in dictionary type, but it replicates most of its built-in methods.:
 
         :param directory: directory of file tree
+        :type directory: :class:`Folder <exporgo.types.Folder>`
 
-        :param index: whether to populate & index the filesets in the directory upon initialization
+        :param file_sets: file sets to initialize the file tree with
+        :type file_sets: :class:`Optional <typing.Optional>`\[:class:`str` |
+            :class:`CollectionType <exporgo.types.CollectionType`\]
+
+        :param populate: whether to populate existing filesets in the directory upon initialization
         """
         #: :class:`Folder <exporgo.types.Folder>`: directory of file tree
         self._directory = directory
 
         self.build(file_sets)
 
-        if index:
-            self.index(populate=True)
+        if populate:
+            self.populate()
 
     @property
-    def base_directory(self) -> Path:
+    def parent_directory(self) -> Path:
         return self._directory.parent
 
     @property
     def tree_directory(self) -> Path:
         return self._directory
 
-    @base_directory.setter
+    @parent_directory.setter
     @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=0, key="directory")
-    def base_directory(self, directory: Folder) -> None:
+    def parent_directory(self, directory: Folder) -> None:
         self.remap(directory)
 
     @property
@@ -150,26 +157,15 @@ class FileTree:
         except AttributeError as exc:
             raise KeyError(f"{key} not in filetree") from exc
 
-    def find_file_type(self, ext: str) -> list[Path]:
-        """
-        Returns all files with a specified extension
-
-        :param ext: Specified file extension
-
-        :type ext: :class:`list`\[:class:`Path <pathlib.Path>`\]
-        """
-        return [file for file_set in self.values() for file in file_set.find_file_type(ext)]
-
-    def find_matching_files(self, identifier: str) -> list[Path]:
+    def find(self, identifier: str) -> Generator[Path, None, None]:
         """
         Returns all files that match some identifier
 
         :param identifier: String identified to match
 
-        :rtype: :class:`list`\[:class:`Path <pathlib.Path>`\]
-
+        :rtype: :class:`Generator <typing.Generator>`\[:class:`Path`\, :class:`None`\, :class:`None`\]
         """
-        return [file for file_set in self.values() for file in file_set.find_matching_files(identifier)]
+        return (file for file_set in self.values() for file in file_set.find(identifier))
 
     def items(self) -> Generator[tuple[str, "FileSet"], None, None]:
         """
@@ -228,27 +224,28 @@ class FileTree:
         key = list(self.keys())[-1]
         return self.pop(key)
 
-    def index(self, populate: bool = False) -> None:
+    def populate(self) -> None:
         """
-        Reindex the file tree to find newly added files
-
-        :param populate: Whether to populate the file tree with new filesets
+        Populates the file tree with pre-existing or missing file sets in the directory
         """
+        for file_set in (file_set for file_set in self.tree_directory.glob("*") if file_set is not file_set.is_file()):
+            self.add(file_set.stem) if (file_set not in self.values()) else None
 
-        if populate:
-            self._populate()
-
+    def index(self) -> None:
+        """
+        Indexes the files and folders in the file tree
+        """
         for file_set in self.values():
             file_set.index()
 
-    @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=1, key="base_directory")
-    def remap(self, base_directory: str | Path) -> None:
+    @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=1, key="parent_directory")
+    def remap(self, parent_directory: str | Path) -> None:
         """
         Remap the fileset to a new location after moving the folder
 
-        :param base_directory: base directory of mouse
+        :param parent_directory: base directory of mouse
         """
-        self._directory = base_directory.joinpath(self.tree_directory.name)
+        self._directory = parent_directory.joinpath(self.tree_directory.name)
         for key in self.keys():
             self.get(key).remap(self.tree_directory)
 
@@ -301,10 +298,6 @@ class FileTree:
         if isinstance(value, FileSet):
             rmtree(value.directory)
 
-    def _populate(self) -> None:
-        for file_set in (file_set for file_set in self.tree_directory.glob("*") if file_set is not file_set.is_file()):
-            self.add(file_set.stem) if (file_set not in self.values()) else None
-
     def __to_dict__(self) -> dict:
         return {
             "directory": str(self.tree_directory),
@@ -341,7 +334,7 @@ class FileTree:
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Components of FileTree
+// File Tree Contents
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
 
@@ -366,90 +359,83 @@ class FileSet:
         :param name: Name of file set
 
         :param parent_directory: Parent directory (filetree)
+        :type parent_directory: :class:`Folder <exporgo.types.Folder>`
 
         :param index: Whether to index the files and folders in the directory upon initialization
         """
-        #: str: name of file set
+        #: :class:`str1\: name of file set
         self._name = name
 
-        #: :class:`Path <pathlib.Path>`: File set directory
+        #: :class:`Path <pathlib.Path>`\: File set directory
         self.directory = parent_directory.joinpath(name)
 
-        #: :class:`FileMap <exporgo.files.FileMap>`: Files cache
-        self._files = FileMap()  # files cache
+        #: :class:`FileMap <exporgo.files.FileMap>`\: Files cache
+        self._files = DictWithDuplicates()  # files cache
 
-        #: :class:`FileMap <exporgo.files.FileMap>`: Folders cache
-        self._folders = FileMap()  # folders cache
+        #: :class:`FileMap <exporgo.files.FileMap>`\: Folders cache
+        self._folders = DictWithDuplicates()  # folders cache
 
         if index:
+
             self.index()
 
     @property
-    def files(self) -> "FileMap":
+    def files(self) -> "DictWithDuplicates":
         """
-        :Getter: Returns the files in the file set (cached)
-        :Getter Type: :class:`FileMap <exporgo.files.FileMap>`
-        :Setter: This property cannot be set
+        The files in the file set (cached)
 
+        :Return Type: :class:`DictWithDuplicates <exporgo.files.DictWithDuplicates>`
+
+        :meta read-only-properties:
         """
         return self._files
 
     @property
-    def folders(self) -> "FileMap":
+    def folders(self) -> "DictWithDuplicates":
         """
-        :Getter: Returns the folders in the file set (cached)
-        :Getter Type: :class:`FileMap <exporgo.files.FileMap>`
-        :Setter: This property cannot be set
+        Folders in the file set (cached)
 
+        :Return Type: :class:`DictWithDuplicates <exporgo.files.DictWithDuplicates>`
+
+        :meta read-only-properties:
         """
         return self._folders
 
     @classmethod
     def __from_dict__(cls, data: dict) -> "FileSet":
         file_set = cls(data.pop("name"), data.pop("directory"), index=False)
-        file_set._files = FileMap(data.pop("files"))
-        file_set._folders = FileMap(data.pop("folders"))
+        file_set._files = DictWithDuplicates(data.pop("files"))
+        file_set._folders = DictWithDuplicates(data.pop("folders"))
         return file_set
 
-    def find_file_type(self, ext: str) -> list[Path] | None:
-        """
-        Returns all files with a specified extension
-
-        :param ext: Specified file extension
-
-        :type ext: :class:`list`\[:class:`Path <pathlib.Path>`\] or ```None```
-        """
-        if "." not in ext:
-            ext = "".join([".", ext])
-        return [file for file in self.files.values() if file.suffix == ext]
-
-    def find_matching_files(self, identifier: str) -> list[Path] | None:
+    def find(self, identifier: str) -> Generator[Path, None, None]:
         """
         Returns all files that match some identifier
 
         :param identifier: String identified to match
 
-        :rtype: :class:`list`\[:class:`Path <pathlib.Path>`\] or ```None```
+        :rtype: :class:`list`\[:class:`Path <pathlib.Path>`\]
 
         """
-        return [file for file in self.files.values() if file.match(identifier)]
+        return (file for file in self.files.values() if file.match(identifier))
 
     def index(self) -> None:
         """
-        Indexes the files and folders cache
+        Indexes the files and folders in the file set
         """
-        self._files = FileMap()
-        self._folders = FileMap()
+        self._files = DictWithDuplicates()
+        self._folders = DictWithDuplicates()
         # noinspection PyUnresolvedReferences
         self._files.update(((file.stem, file) for file in self.directory.rglob("*") if file.is_file()))
         self._folders.update(((folder.stem, folder) for folder in self.directory.rglob("*") if not folder.is_file()))
 
     @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=1, key="parent_directory")
-    def remap(self, parent_directory: str | Path) -> None:
+    def remap(self, parent_directory: Folder) -> None:
         """
         Remaps all files and folders in the file set following a change in the parent directory or parent file tree
 
         :param parent_directory: Parent directory
+        :type parent_directory: :class:`Folder <exporgo.types.Folder>`
         """
         self.directory = parent_directory.joinpath(self._name)
         self.index()
@@ -478,8 +464,9 @@ class FileSet:
         the directory path is returned
 
         :param target: file or folder name
+        :type target: :class:`Optional <typing.Optional>`\[:class:`str`\]
 
-        :type target: :class:`Optional <typing.Optional>`\[:class:`str`\], default: ```None```
+        :type target: :class:`Optional <typing.Optional>`\[:class:`str`\]
 
         :return: Path of target file or folder
 
@@ -503,7 +490,7 @@ class FileSet:
         return isinstance(other, FileSet) and self.directory == other.directory
 
 
-class FileMap(dict):
+class DictWithDuplicates(dict):
     """
     Dictionary extension that appends an integer to duplicate keys before storing as a new key-value pair
     rather than overwriting the existing key-value pair.
@@ -528,13 +515,16 @@ class FileMap(dict):
             self.__setitem__(key, value)
 
     @convert_permitted_types_to_required(permitted=(File, Folder), required=Path, pos=2, key="value")
-    def __setitem__(self, key: str, value: str | Path):
+    def __setitem__(self, key: str, value: File | Folder) -> None:
         """
         Implementation of setitem magic method. Appends an integer to duplicate keys before storing as a new key-value
         pair. Appends a zero-padded integer to the key to avoid overwriting existing key-value pairs. Maximum number of
         duplicates is 999.
 
         :param key: key of the dictionary
+
+        :param value: value of the dictionary
+        :type value: :class:`File <exporgo.types.File>` | :class:`Folder <exporgo.types.Folder>`
         """
         idx = 0
         while (key := f"{key}_{idx:03}") in self:

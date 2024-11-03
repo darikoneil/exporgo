@@ -15,13 +15,13 @@ class TestExperiment:
     def test_initialization(self, tmp_path):
         exp = Experiment("TestExperiment", tmp_path)
         assert exp.name == "TestExperiment"
-        assert exp.base_directory == tmp_path
+        assert exp.parent_directory == tmp_path
         assert exp.mix_ins == []
 
     def test_remap(self, source, destination):
         exp = Experiment("TestExperiment", source)
         exp.remap(destination)
-        assert exp.base_directory == destination
+        assert exp.parent_directory == destination
 
 
 class TestExperimentRegistry:
@@ -143,7 +143,7 @@ class TestGenericExperiment:
     def test_initialization(self, tmp_path):
         exp = GenericExperiment("GenericExperiment", tmp_path)
         assert exp.key == "GenericExperiment"
-        assert exp.base_directory == tmp_path
+        assert exp.parent_directory == tmp_path
         assert exp.file_tree.get("results").directory == tmp_path.joinpath("GenericExperiment").joinpath("results")
         assert exp.file_tree.get("figures").directory == tmp_path.joinpath("GenericExperiment").joinpath("figures")
 

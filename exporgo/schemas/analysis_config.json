@@ -1,5 +1,14 @@
 {
     "$defs": {
+        "Category": {
+            "enum": [
+                0,
+                1,
+                2
+            ],
+            "title": "Category",
+            "type": "integer"
+        },
         "Priority": {
             "enum": [
                 0,
@@ -8,23 +17,28 @@
                 3,
                 4,
                 5,
-                6,
-                {
-                    "extra": "forbid",
-                    "revalidate_instances": "always",
-                    "use_enum_values": true,
-                    "validate_assignment": true,
-                    "validate_default": false
-                }
+                6
             ],
-            "title": "Priority"
+            "title": "Priority",
+            "type": "integer"
+        },
+        "Status": {
+            "enum": [
+                0,
+                1,
+                2,
+                3,
+                4
+            ],
+            "title": "Status",
+            "type": "integer"
         }
     },
     "additionalProperties": false,
     "properties": {
-        "name": {
+        "key": {
             "default": null,
-            "title": "Recipe name",
+            "title": "Unique key for the analysis type in the registry",
             "type": "string"
         },
         "call": {
@@ -50,25 +64,25 @@
                         "type": "string"
                     },
                     "type": "array"
-                },
-                {
-                    "maxItems": 1,
-                    "minItems": 1,
-                    "prefixItems": [
-                        {
-                            "type": "string"
-                        }
-                    ],
-                    "type": "array"
                 }
             ],
             "default": null,
-            "title": "List of file sets for organizing experiment"
+            "title": "Collection of file sets for organizing experiment"
+        },
+        "category": {
+            "$ref": "#/$defs/Category",
+            "default": 1,
+            "title": "Category of the analysis"
         },
         "priority": {
             "$ref": "#/$defs/Priority",
             "default": 3,
             "title": "Priority of the analysis"
+        },
+        "status": {
+            "$ref": "#/$defs/Status",
+            "default": 1,
+            "title": "Status of the analysis"
         }
     },
     "title": "AnalysisConfig",
