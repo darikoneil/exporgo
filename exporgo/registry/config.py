@@ -1,6 +1,5 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict
 
-from ..types import FileFormats
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -15,14 +14,3 @@ MODEL_CONFIG = ConfigDict(extra="forbid",
                           validate_assignment=True,
                           validate_default=False
                           )
-
-"""
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// General settings for exporgo
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-"""
-
-
-class ExporgoSettings(BaseModel):
-    model_config = MODEL_CONFIG
-    file_format: FileFormats = Field(FileFormats.JSON, title="File format for storing experiment configurations")

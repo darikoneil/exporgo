@@ -10,8 +10,8 @@ from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
 from pydantic import BaseModel, Field
 
-from exporgo.options.options import MODEL_CONFIG
-from exporgo.types import Priority
+from .config import MODEL_CONFIG
+from ..types import Priority
 
 from .._color import TERMINAL_FORMATTER
 from ..exceptions import (DuplicateRegistrationError,

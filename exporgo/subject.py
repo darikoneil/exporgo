@@ -10,7 +10,7 @@ from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from ._validators import validate_version, convert_permitted_types_to_required
 from .exceptions import DuplicateExperimentError, MissingFilesError
 from .experiment import ExperimentFactory
-from .types import CollectionType, File, Folder, Modification, Priority
+from .types import CollectionType, File, Folder, Modification, Priority, Status
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -83,7 +83,7 @@ class Subject:
             self.meta.update(kwargs)
 
         #: :class:`Priority <exporgo.types.Priority>`\: The priority of the subject
-        self._priority = priority
+        self.priority = priority
 
         self._created = get_timestamp()
 
@@ -111,6 +111,7 @@ class Subject:
         string_to_print += TERMINAL_FORMATTER("Study: ", "emphasis")
         string_to_print += f"{self.study}\n"
 
+
         string_to_print += TERMINAL_FORMATTER("Meta:\n", "emphasis")
         if not self.meta:
             string_to_print += "\tNo Metadata Defined\n"
@@ -118,6 +119,9 @@ class Subject:
             for key, value in self.meta.items():
                 string_to_print += TERMINAL_FORMATTER(f"\t{key}: ", "BLUE")
                 string_to_print += f"{value}\n"
+
+        string_to_print += TERMINAL_FORMATTER("Priority:\n", "emphasis")
+        string_to_print += f"{self._priority}\n"
 
         string_to_print += TERMINAL_FORMATTER("Experiments:\n", "emphasis")
         if len(self.experiments) == 0:
@@ -213,6 +217,11 @@ class Subject:
         :meta read-only-properties:
         """
         return tuple(self._modifications)
+
+    @property
+    def status(self) -> Status:
+        return min([experiment.status for experiment in self._experiments.values()])\
+            if self._experiments else Status.EMPTY
 
     @classmethod
     def load(cls, file: Optional[File] = None) -> "Subject":

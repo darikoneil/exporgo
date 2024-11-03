@@ -27,7 +27,7 @@ class _AutoStrEnum(str, Enum):
         return self.value  # type: ignore
 
 
-class Category(Enum):
+class Category(IntEnum):
     PREPARE = 0
     ANALYZE = 1
     SUMMARIZE = 2
@@ -50,11 +50,12 @@ class Priority(IntEnum):
 
 
 class Status(IntEnum):
-    ERROR = -1
-    SOURCE = 1
-    COLLECT = 2
-    ANALYZE = 3
-    SUCCESS = 4
+    ERROR = -2
+    EMPTY = -1
+    SOURCE = 0
+    COLLECT = 1
+    ANALYZE = 2
+    SUCCESS = 3
 
 
 """

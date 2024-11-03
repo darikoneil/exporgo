@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from .._color import TERMINAL_FORMATTER
 from ..exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
-from ..options.options import MODEL_CONFIG
+from .config import MODEL_CONFIG
 from ..types import Analysis, Category, CollectionType, Status
 
 """

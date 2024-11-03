@@ -111,7 +111,7 @@ class FileTree:
         ...
 
     # noinspection PyUnusedLocal
-    @build.register(NoneType)
+    @build.register(type(None))
     def _(self, file_sets: NoneType) -> None:
         for file_set in self.values():
             if not (directory := file_set.directory).exists():

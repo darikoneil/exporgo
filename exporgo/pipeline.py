@@ -46,7 +46,7 @@ class AnalysisStep:
 
 class Pipeline:
     def __init__(self,
-                 steps,
+                 steps: AnalysisStep | CollectionType,
                  status: Status):
         self.steps = steps
         self._status = status
