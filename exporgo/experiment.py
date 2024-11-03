@@ -4,7 +4,7 @@ from typing import Generator, Optional
 
 from ._logging import get_timestamp
 from functools import singledispatchmethod
-#from ._tools import conditional_dispatch
+from ._tools import conditional_dispatch
 from ._validators import convert_permitted_types_to_required
 from .files import FileSet, FileTree
 from .pipeline import Pipeline
@@ -35,8 +35,8 @@ class Experiment:
         #: :class:`Folder <exporgo.types.Folder>`\: base directory of subject
         self._parent_directory = parent_directory
 
-        #: :class:`str` | :class:`CollectionType <exporgo.types.CollectionType>`\: experiment registry keys
-        self.keys = keys
+        #: :class:`tuple`: experiment registry keys
+        self._keys = (keys, ) if isinstance(keys, str) else keys
 
         #: :class:`FileTree <exporgo.files.FileTree>`\: file tree for the experiment
         self.file_tree = file_tree
@@ -96,6 +96,10 @@ class Experiment:
         :meta read-only-properties:
         """
         return self._name
+
+    @property
+    def keys(self) -> tuple[str , ...]:
+        return self._keys
 
     @property
     def status(self) -> Status:

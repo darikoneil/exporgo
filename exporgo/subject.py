@@ -101,6 +101,8 @@ class Subject:
         string_to_print = ""
 
         string_to_print += TERMINAL_FORMATTER(f"{self.name}\n", "header")
+        string_to_print += TERMINAL_FORMATTER("Priority: ", "emphasis")
+        string_to_print += f"{self.priority}, {self.priority.name}\n"
         string_to_print += TERMINAL_FORMATTER("Created: ", "emphasis")
         string_to_print += f"{self.created}\n"
         string_to_print += TERMINAL_FORMATTER("Last Modified: ", "emphasis")
@@ -118,9 +120,6 @@ class Subject:
                 string_to_print += TERMINAL_FORMATTER(f"\t{key}: ", "BLUE")
                 string_to_print += f"{value}\n"
 
-        string_to_print += TERMINAL_FORMATTER("Priority:\n", "emphasis")
-        string_to_print += f"{self.priority}\n"
-
         string_to_print += TERMINAL_FORMATTER("Experiments:\n", "emphasis")
         if len(self.experiments) == 0:
             string_to_print += "\tNo experiments defined\n"
@@ -129,8 +128,8 @@ class Subject:
                 string_to_print += TERMINAL_FORMATTER(f"\t{name}: \n", "BLUE")
                 string_to_print += TERMINAL_FORMATTER("\t\tCreated: ", "GREEN")
                 string_to_print += f"{experiment.created}\n"
-                string_to_print += TERMINAL_FORMATTER("\t\tProperties: ", "GREEN")
-                string_to_print += "".join([mix_in.__name__ + ", " for mix_in in experiment.mix_ins])[:-2]
+                string_to_print += TERMINAL_FORMATTER("\t\tKeys: ", "GREEN")
+                string_to_print += "".join([key + ", " for key in experiment.keys])[:-2]
                 string_to_print += "\n"
                 string_to_print += TERMINAL_FORMATTER("\t\tMeta: \n", "GREEN")
                 if not experiment.meta:
