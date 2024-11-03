@@ -103,7 +103,7 @@ def update_json_schema() -> None:
     def to_snake_case(name: str) -> str:
         return "".join(f"_{char.lower()}" if char.isupper() else char for char in name)[1:]
 
-    path = Path(__file__).parent
+    path = Path(__file__).parent.joinpath("schemas")
 
     for model in (AnalysisConfig, PipelineConfig, ExperimentConfig):
         with path.joinpath(f"{to_snake_case(model.__name__)}.json").open("w") as file:

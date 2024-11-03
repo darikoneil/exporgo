@@ -1,15 +1,2 @@
 {
-    "Generic Experiment": {
-        "key": "Generic Experiment",
-        "analyzer": {
-            "name": "Generic Analysis",
-            "call": "C:\\Users\\Yuste\\PycharmProjects\\exporgo\\helloworld.py",
-            "file_sets": [
-                "figures",
-                "results"
-            ],
-            "priority": 0
-        },
-        "priority": 3
-    }
 }
