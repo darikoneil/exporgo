@@ -3,7 +3,7 @@ from functools import singledispatchmethod
 from pathlib import Path
 from textwrap import indent
 from types import GeneratorType
-from typing import Optional
+from typing import Optional, Sequence
 
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
@@ -13,8 +13,11 @@ from pydantic import BaseModel, Field
 from .._color import TERMINAL_FORMATTER
 from ..exceptions import (DuplicateRegistrationError,
                           ExperimentNotRegisteredError)
+from .._tools import check_if_string_set
 from ..types import CollectionType, Priority
 from .config import MODEL_CONFIG
+from .pipelines import PipelineConfig
+
 
 __all__ = [
     "ExperimentConfig",
@@ -29,22 +32,20 @@ __all__ = [
 """
 
 
-
 class ExperimentConfig(BaseModel):
     """
     Recipe for defining an experiment
     """
     model_config = MODEL_CONFIG
     key: str = Field(None, title="Unique key for the experiment type in the registry")
-    supplemental_file_sets: Optional[str | list[str] | tuple[str, ...]]  = Field(None, title="List of file sets for organizing experiment")
+    additional_file_sets: str | Sequence[str] = Field(None, title="Additional file sets for organizing experiment")
+    pipeline: PipelineConfig = Field(None, title="Pipeline for the experiment")
     # sequence does not permit str / bytes, so this works to indicate the list or tuple
     priority: Priority = Field(Priority.NORMAL, title="Global priority of the experiment")
 
-    @staticmethod
-    def _parse_file_sets(file_sets: str | list[str] | tuple[str, ...]) -> set[str]:
-        if isinstance(file_sets, str):
-            return {file_sets, }
-        return set(file_sets)
+    @property
+    def file_sets(self) -> set[str]:
+        return check_if_string_set(self.additional_file_sets) | self.pipeline.file_sets
 
 
 """

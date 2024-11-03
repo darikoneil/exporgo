@@ -12,6 +12,7 @@ from portalocker.exceptions import BaseLockException
 from pydantic import BaseModel, Field
 
 from .._color import TERMINAL_FORMATTER
+from .._tools import check_if_string_set, unique_generator
 from ..exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
 from ..types import Analysis, Category, CollectionType, Status
 from .config import MODEL_CONFIG
@@ -37,6 +38,9 @@ class PipelineConfig(BaseModel):
     status: Status = Field(Status.SOURCE, title="Pipeline Status")
     model_config = MODEL_CONFIG
 
+    @property
+    def file_sets(self) -> set[str]:
+        return {file_set for step in self.steps for file_set in check_if_string_set(step.file_sets)}
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

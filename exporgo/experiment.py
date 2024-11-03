@@ -1,13 +1,14 @@
 from pathlib import Path
-from types import MappingProxyType
-from typing import Generator
+from types import GeneratorType, MappingProxyType
+from typing import Generator, Optional
 
 from ._logging import get_timestamp
-from ._tools import conditional_dispatch
+from functools import singledispatchmethod
+#from ._tools import conditional_dispatch
 from ._validators import convert_permitted_types_to_required
 from .files import FileSet, FileTree
 from .pipeline import Pipeline
-from .registry import ExperimentRegistry
+from .registry import ExperimentRegistry, ExperimentConfig
 from .types import CollectionType, Folder, Priority, Status
 
 """
@@ -202,14 +203,12 @@ class ExperimentFactory:
     def __init__(self,
                  name: str,
                  parent_directory: Folder,
+                 priority: Optional[Priority],
                  ):
         self.name = name
         self.parent_directory = parent_directory
+        self.priority = priority
         self.registry = None
-
-    @conditional_dispatch
-    def __call__(self, *args):
-        ...
 
     def __enter__(self):
         with ExperimentRegistry() as self.registry:
