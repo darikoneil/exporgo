@@ -1,11 +1,12 @@
-from functools import update_wrapper
-from types import MappingProxyType
-from typing import Any, Callable, Iterable, Generator
-from .registry.experiments import ExperimentConfig
-from .registry.pipelines import PipelineConfig, AnalysisConfig
-from pathlib import Path
 import json
+from contextlib import suppress
+from functools import update_wrapper
+from pathlib import Path
+from types import MappingProxyType
+from typing import Any, Callable, Generator, Iterable
 
+from .registry.experiments import ExperimentConfig
+from .registry.pipelines import AnalysisConfig, PipelineConfig
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -16,15 +17,13 @@ import json
 
 def _find_implementation(registry: dict, *args: Any, **kwargs: Any) -> Callable:
     for condition, function in reversed(registry.items()):
-        try:
+        with suppress(TypeError):
             if condition(*args, **kwargs):
                 return function
-        except TypeError:
-            pass
 
 
 # noinspection PyUnusedLocal
-def _always_true(*args: Any, **kwargs: Any):
+def _always_true(*args: Any, **kwargs: Any) -> bool:
     return True
 
 
@@ -72,6 +71,7 @@ def conditional_dispatch(func: Callable) -> Callable:
 // Miscellaneous Tools
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
+
 
 def unique_generator(iterable: Iterable) -> Generator[Any, None, None]:
     """

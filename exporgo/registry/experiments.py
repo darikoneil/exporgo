@@ -10,13 +10,11 @@ from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
 from pydantic import BaseModel, Field
 
-from .config import MODEL_CONFIG
-from ..types import Priority
-
 from .._color import TERMINAL_FORMATTER
 from ..exceptions import (DuplicateRegistrationError,
                           ExperimentNotRegisteredError)
-from ..types import CollectionType
+from ..types import CollectionType, Priority
+from .config import MODEL_CONFIG
 
 __all__ = [
     "ExperimentConfig",

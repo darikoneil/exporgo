@@ -7,7 +7,7 @@ from . import __current_version__
 from ._color import TERMINAL_FORMATTER
 from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
-from ._validators import validate_version, convert_permitted_types_to_required
+from ._validators import convert_permitted_types_to_required, validate_version
 from .exceptions import DuplicateExperimentError, MissingFilesError
 from .experiment import ExperimentFactory
 from .types import CollectionType, File, Folder, Modification, Priority, Status
@@ -46,7 +46,6 @@ class Subject:
                                          required=Priority,
                                          pos=5,
                                          key="priority")
-
     def __init__(self,
                  name: str,
                  directory: Optional[Folder] = None,
@@ -111,7 +110,6 @@ class Subject:
         string_to_print += TERMINAL_FORMATTER("Study: ", "emphasis")
         string_to_print += f"{self.study}\n"
 
-
         string_to_print += TERMINAL_FORMATTER("Meta:\n", "emphasis")
         if not self.meta:
             string_to_print += "\tNo Metadata Defined\n"
@@ -121,29 +119,30 @@ class Subject:
                 string_to_print += f"{value}\n"
 
         string_to_print += TERMINAL_FORMATTER("Priority:\n", "emphasis")
-        string_to_print += f"{self._priority}\n"
+        string_to_print += f"{self.priority}\n"
 
         string_to_print += TERMINAL_FORMATTER("Experiments:\n", "emphasis")
         if len(self.experiments) == 0:
             string_to_print += "\tNo experiments defined\n"
-        for name, experiment in self._experiments.items():
-            string_to_print += TERMINAL_FORMATTER(f"\t{name}: \n", "BLUE")
-            string_to_print += TERMINAL_FORMATTER("\t\tCreated: ", "GREEN")
-            string_to_print += f"{experiment.created}\n"
-            string_to_print += TERMINAL_FORMATTER("\t\tProperties: ", "GREEN")
-            string_to_print += "".join([mix_in.__name__ + ", " for mix_in in experiment.mix_ins])[:-2]
-            string_to_print += "\n"
-            string_to_print += TERMINAL_FORMATTER("\t\tMeta: \n", "GREEN")
-            if not experiment.meta:
-                string_to_print += "\t\t\tNo Metadata Defined\n"
-            else:
-                for key, value in experiment.meta.items():
-                    string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key}: ", "ORANGE")
-                    string_to_print += f"{value}\n"
-            string_to_print += TERMINAL_FORMATTER("\t\tFile Tree: \n", "GREEN")
-            for key, file_set in experiment.file_tree.items():
-                string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key.capitalize()}: ", "ORANGE")
-                string_to_print += f"{len(file_set.files)} Files\n"
+        else:
+            for name, experiment in self._experiments.items():
+                string_to_print += TERMINAL_FORMATTER(f"\t{name}: \n", "BLUE")
+                string_to_print += TERMINAL_FORMATTER("\t\tCreated: ", "GREEN")
+                string_to_print += f"{experiment.created}\n"
+                string_to_print += TERMINAL_FORMATTER("\t\tProperties: ", "GREEN")
+                string_to_print += "".join([mix_in.__name__ + ", " for mix_in in experiment.mix_ins])[:-2]
+                string_to_print += "\n"
+                string_to_print += TERMINAL_FORMATTER("\t\tMeta: \n", "GREEN")
+                if not experiment.meta:
+                    string_to_print += "\t\t\tNo Metadata Defined\n"
+                else:
+                    for key, value in experiment.meta.items():
+                        string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key}: ", "ORANGE")
+                        string_to_print += f"{value}\n"
+                string_to_print += TERMINAL_FORMATTER("\t\tFile Tree: \n", "GREEN")
+                for key, file_set in experiment.file_tree.items():
+                    string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key.capitalize()}: ", "ORANGE")
+                    string_to_print += f"{len(file_set.files)} Files\n"
 
         string_to_print += TERMINAL_FORMATTER("Recent Modifications:\n", "modifications")
         for modification in self.modifications[:5]:
@@ -299,7 +298,7 @@ class Subject:
             raise DuplicateExperimentError(name)
 
         with ExperimentFactory(name, self.directory) as factory:
-            self._experiments[name] =  factory(keys, priority, **kwargs)
+            self._experiments[name] = factory(keys, priority, **kwargs)
 
         self.record(name)
 

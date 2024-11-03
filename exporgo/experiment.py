@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import MappingProxyType
 from typing import Generator
 
 from ._logging import get_timestamp
@@ -7,7 +8,6 @@ from ._validators import convert_permitted_types_to_required
 from .files import FileSet, FileTree
 from .pipeline import Pipeline
 from .registry import ExperimentRegistry
-from types import MappingProxyType
 from .types import CollectionType, Folder, Priority, Status
 
 """

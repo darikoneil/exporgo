@@ -126,6 +126,7 @@ class AnalysisNotRegisteredError(KeyError):
         self.experiment = experiment
         super().__init__(f"{self.experiment} is not registered.")
 
+
 class InvalidExperimentTypeError(TypeError):
     """
     Raised when an experiment is not a subclass of :class:`Experiment`

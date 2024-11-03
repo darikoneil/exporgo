@@ -7,8 +7,8 @@ from joblib import parallel_config
 from exporgo._io import verbose_copy
 from exporgo.exceptions import MissingFilesError
 from exporgo.subject import Subject
-from tests.conftest import BlockPrinting
 from exporgo.types import Priority
+from tests.conftest import BlockPrinting
 
 
 class TestSubject:
@@ -45,12 +45,11 @@ class TestSubject:
                               meta = {"test": "details"},
                               priority=Priority.HIGH,
                               extra = "extra details")
-            subject.create_experiment("MockExperiment", "GenericExperiment")
             with BlockPrinting():
                 print(subject)
             assert mock_ipythonlogger.start_log.called_once()
 
-    @pytest.skip("Being refactored")
+    @pytest.mark.skip("Being refactored")
     def test_subject_indirect_get_experiment(self, tmp_path):
         with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="TestSubject",
@@ -63,7 +62,7 @@ class TestSubject:
             assert subject.get("MockExperiment") == "MockExperiment_"
             assert mock_ipythonlogger.start_log.called_once()
 
-    @pytest.skip("Being refactored")
+    @pytest.mark.skip("Being refactored")
     def test_subject_create_experiment(self, tmp_path):
         with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="TestSubject",
@@ -75,7 +74,7 @@ class TestSubject:
             assert "MockExperiment" in subject._experiments
             assert mock_ipythonlogger.start_log.called_once()
 
-    @pytest.skip("Being refactored")
+    @pytest.mark.skip("Being refactored")
     def test_subject_save_load(self, tmp_path, source):
         # noinspection PyUnusedLocal
         with patch("exporgo.subject.IPythonLogger") as mock_ipythonlogger:
@@ -97,7 +96,7 @@ class TestSubject:
             assert "MockExperiment" in subject_copy.experiments
             assert subject_copy.get("MockExperiment").file_tree.num_files == 9
 
-    @pytest.skip("Being refactored")
+    @pytest.mark.skip("Being refactored")
     def test_subject_validate(self, tmp_path):
         with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="TestSubject",
@@ -109,7 +108,7 @@ class TestSubject:
             subject.validate()
             assert mock_ipythonlogger.start_log.called_once()
 
-    @pytest.skip("Being refactored")
+    @pytest.mark.skip("Being refactored")
     def test_subject_validate_fail(self, tmp_path, source):
         with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="TestSubject",

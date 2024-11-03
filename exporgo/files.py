@@ -19,7 +19,7 @@ from .types import CollectionType, File, Folder
 
 class FileTree:
     """
-    A file tree that organizes data. 
+    A file tree that organizes data.
 
     For implementation concerns it is not an extension of the built-in dictionary type, but it replicates most
     of its built-in methods.
@@ -60,11 +60,6 @@ class FileTree:
     def tree_directory(self) -> Path:
         return self._directory
 
-    @parent_directory.setter
-    @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=0, key="directory")
-    def parent_directory(self, directory: Folder) -> None:
-        self.remap(directory)
-
     @property
     def num_files(self) -> int:
         """
@@ -101,35 +96,6 @@ class FileTree:
         :param index: Whether to index the file set upon creation
         """
         setattr(self, key, FileSet(key, self.tree_directory, index))
-
-    # noinspection PyUnusedLocal
-    @singledispatchmethod
-    def build(self, file_sets) -> None:
-        """
-        Builds the file-tree by initializing any file sets that do not yet exist
-        """
-        ...
-
-    # noinspection PyUnusedLocal
-    @build.register(type(None))
-    def _(self, file_sets: NoneType) -> None:
-        for file_set in self.values():
-            if not (directory := file_set.directory).exists():
-                directory.mkdir()
-
-    @build.register(list)
-    @build.register(tuple)
-    @build.register(set)
-    @build.register(GeneratorType)
-    def _(self, file_sets: CollectionType) -> None:
-        for file_set in file_sets:
-            self.add(file_set, index=False)
-        self.build(None)
-
-    @build.register
-    def _(self, file_sets: str) -> None:
-        self.add(file_sets, index=False)
-        self.build(None)
 
     def clear(self, delete: bool = False) -> None:
         """
@@ -275,6 +241,40 @@ class FileTree:
 
         """
         return (value for _, value in self.items())    # items call guarantees filesets only
+
+    @parent_directory.setter
+    @convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=0, key="directory")
+    def parent_directory(self, directory: Folder) -> None:
+        self.remap(directory)
+
+    # noinspection PyUnusedLocal
+    @singledispatchmethod
+    def build(self, file_sets) -> None:
+        """
+        Builds the file-tree by initializing any file sets that do not yet exist
+        """
+        ...
+
+    # noinspection PyUnusedLocal
+    @build.register(type(None))
+    def _(self, file_sets: NoneType) -> None:  # noqa: U100
+        for file_set in self.values():
+            if not (directory := file_set.directory).exists():
+                directory.mkdir()
+
+    @build.register(list)
+    @build.register(tuple)
+    @build.register(set)
+    @build.register(GeneratorType)
+    def _(self, file_sets: CollectionType) -> None:
+        for file_set in file_sets:
+            self.add(file_set, index=False)
+        self.build(None)
+
+    @build.register
+    def _(self, file_sets: str) -> None:
+        self.add(file_sets, index=False)
+        self.build(None)
 
     @singledispatchmethod
     def _delete(self, key: tuple[str] | list[str] | Generator[str, None, None] | Iterator[str]) -> None:

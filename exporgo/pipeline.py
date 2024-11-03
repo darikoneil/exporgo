@@ -1,17 +1,16 @@
 from functools import singledispatchmethod
-from pathlib import Path
-from types import MappingProxyType, NoneType, GeneratorType
-from typing import TYPE_CHECKING, Callable, Optional, Generator
 from os import PathLike
+from pathlib import Path
+from types import GeneratorType, MappingProxyType, NoneType
+from typing import TYPE_CHECKING, Callable, Generator, Optional
 
 if TYPE_CHECKING:
     from .subject import Subject
 
-
 from ._io import select_directory, verbose_copy
-from ._tools import unique_generator, check_if_string_set
-from .types import Category, CollectionType, File, Folder, Status
+from ._tools import check_if_string_set, unique_generator
 from .files import FileTree
+from .types import Category, CollectionType, File, Folder, Status
 
 
 class AnalysisStep:
