@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from .._color import TERMINAL_FORMATTER
 from ..exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
 from ..options.options import MODEL_CONFIG
-from ..types import Analysis, Category, CollectionType, Priority, Status
+from ..types import Analysis, Category, CollectionType, Status
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,13 +29,11 @@ class AnalysisConfig(BaseModel):
     call: Analysis = Field(None, title="Analyzer for the experiment")
     file_sets: str | list[str] | tuple[str, ...] = Field(None, title="Collection of file sets for organizing experiment")
     category: Category = Field(Category.ANALYZE, title="Category of the analysis")
-    priority: Priority = Field(Priority.NORMAL, title="Priority of the analysis")
     status: Status = Field(Status.SOURCE, title="Status of the analysis")
 
 
 class PipelineConfig(BaseModel):
     steps: AnalysisConfig | Sequence[AnalysisConfig] = Field(None, title="Sequence of analysis steps")
-    priority: Priority = Field(Priority.NORMAL, title="Pipeline Priority")
     status: Status = Field(Status.SOURCE, title="Pipeline Status")
     model_config = MODEL_CONFIG
 

@@ -1,4 +1,4 @@
-from enum import Enum, auto
+from enum import Enum, auto, IntEnum
 from os import PathLike
 from pathlib import Path
 from types import GeneratorType
@@ -39,18 +39,18 @@ class FileFormats(_AutoStrEnum):
     TOML = auto()
 
 
-class Priority(Enum):
-    CRITICAL = 0
-    HIGH = 1
-    ABOVE_NORMAL = 2
+class Priority(IntEnum):
+    IDLE = 0
+    LOW = 1
+    BELOW_NORMAL = 2
     NORMAL = 3
-    BELOW_NORMAL = 4
-    LOW = 5
-    IDLE = 6
+    ABOVE_NORMAL = 4
+    HIGH = 5
+    CRITICAL = 6
 
 
-class Status(Enum):
-    ERROR = 0
+class Status(IntEnum):
+    ERROR = -1
     SOURCE = 1
     COLLECT = 2
     ANALYZE = 3

@@ -380,6 +380,17 @@ class FileSet:
             self.index()
 
     @property
+    def name(self) -> str:
+        """
+        Name of the file set
+
+        :Return Type: :class:`str`
+
+        :meta read-only-properties:
+        """
+        return self._name
+
+    @property
     def files(self) -> "DictWithDuplicates":
         """
         The files in the file set (cached)

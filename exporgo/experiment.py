@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Generator
 
 from ._logging import get_timestamp
 from ._tools import conditional_dispatch
@@ -7,6 +7,7 @@ from ._validators import convert_permitted_types_to_required
 from .files import FileSet, FileTree
 from .pipeline import Pipeline
 from .registry import ExperimentRegistry
+from types import MappingProxyType
 from .types import CollectionType, Folder, Priority, Status
 
 """
@@ -16,6 +17,7 @@ from .types import CollectionType, Folder, Priority, Status
 """
 
 
+# noinspection PyUnresolvedReferences
 class Experiment:
 
     def __init__(self,
@@ -36,7 +38,7 @@ class Experiment:
         self.keys = keys
 
         #: :class:`FileTree <exporgo.files.FileTree>`\: file tree for the experiment
-        self.file_tree = file_tree,
+        self.file_tree = file_tree
 
         #: :class:`Pipeline <exporgo.pipeline.Pipeline>`\: pipeline for the experiment
         self.pipeline = pipeline
@@ -113,11 +115,26 @@ class Experiment:
     def parent_directory(self, parent_directory: Folder) -> None:
         self.remap(parent_directory)
 
+    @conditional_dispatch
+    def add_sources(self, *args) -> None:
+        ...
+
+    # noinspection PyUnresolvedReferences
+    @add_sources.register(lambda *args: len(args) == 2)
+    def _(self, sources: dict[str, Folder | CollectionType | None]) -> None:
+        for file_set, source in sources.items():
+            self.pipeline.add_source(file_set, source)
+
+    @add_sources.register(lambda *args: len(args) == 3)
+    def _(self, file_set: str, source: Folder | CollectionType | None) -> None:
+        self.pipeline.add_source(file_set, source)
+
     def analyze(self) -> None:
         self.pipeline.analyze()
 
-    def collect(self, sources: Optional[Folder | CollectionType] = None) -> None:
-        self.pipeline.collect(sources)
+    def collect(self) -> None:
+        # noinspection PyTypeChecker
+        self.pipeline.collect(self.file_tree)
 
     def find(self, identifier: str) -> Generator[Path, None, None]:
         """
@@ -160,6 +177,10 @@ class Experiment:
         # noinspection PyUnresolvedReferences
         self.file_tree.remap(parent_directory)
 
+    @property
+    def sources(self) -> MappingProxyType[str, Folder | CollectionType | None]:
+        return self.pipeline.sources
+
     def validate(self) -> None:
         """
         Validate the experiment's file tree
@@ -169,6 +190,7 @@ class Experiment:
 
     def __call__(self):
         if self.status == Status.COLLECT:
+            # noinspection PyArgumentList
             self.pipeline.collect()
         elif self.status == Status.ANALYZE:
             self.pipeline.analyze()

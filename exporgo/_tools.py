@@ -1,6 +1,13 @@
 from functools import update_wrapper
 from types import MappingProxyType
-from typing import Any, Callable
+from typing import Any, Callable, Iterable, Generator
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Conditional Dispatcher
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
 
 
 def _find_implementation(registry: dict, *args: Any, **kwargs: Any) -> Callable:
@@ -54,3 +61,31 @@ def conditional_dispatch(func: Callable) -> Callable:
     wrapper.registry = MappingProxyType(registry)
     update_wrapper(wrapper, func)
     return wrapper
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Miscellaneous Tools
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+def unique_generator(iterable: Iterable) -> Generator[Any, None, None]:
+    """
+    Generator that yields only the unique elements from an iterable. This isn't memory efficient because we
+    keep a set of all the elements we've seen so far (which has more overhead than a simple list due to the hashing),
+    but it's lazier than the alternative of grabbing everything at once--especially if we don't plan on using
+    everything.
+    """
+    unique = set()
+    for item in iterable:
+        if item not in unique:
+            unique.add(item)
+            yield item
+
+
+def check_if_string_set(iterable: Iterable) -> set:
+    """
+    Checks if an iterable is simply a string when constructing a set. This is useful for ensuring that we don't
+    accidentally create a set of characters when we really wanted a set of strings.
+    """
+    return {iterable, } if isinstance(iterable, str) else set(iterable)

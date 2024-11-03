@@ -7,7 +7,7 @@ from . import __current_version__
 from ._color import TERMINAL_FORMATTER
 from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
-from ._validators import validate_version
+from ._validators import validate_version, convert_permitted_types_to_required
 from .exceptions import DuplicateExperimentError, MissingFilesError
 from .experiment import ExperimentFactory
 from .types import CollectionType, File, Folder, Modification, Priority
@@ -42,12 +42,17 @@ class Subject:
     :type kwargs: :class:`Any <typing.Any>`
     """
 
+    @convert_permitted_types_to_required(permitted=(int, Priority),
+                                         required=Priority,
+                                         pos=5,
+                                         key="priority")
+
     def __init__(self,
                  name: str,
                  directory: Optional[Folder] = None,
                  study: Optional[str] = None,
                  meta: Optional[dict] = None,
-                 priority: Priority = Priority.NORMAL,
+                 priority: int | Priority = Priority.NORMAL,
                  **kwargs):
 
         # first to capture all modifications at creation
