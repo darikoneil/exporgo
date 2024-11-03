@@ -1,7 +1,7 @@
 import pytest
 
 from exporgo.exceptions import MissingFilesError
-from exporgo.files import MapWithDuplicates, FileSet, FileTree
+from exporgo.files import FileSet, FileTree, MapWithDuplicates
 
 
 class TestFileMap:

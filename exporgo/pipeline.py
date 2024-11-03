@@ -1,13 +1,12 @@
-from pathlib import Path
-from typing import Callable, TYPE_CHECKING, Optional
-from types import NoneType
 from functools import singledispatchmethod
-
+from pathlib import Path
+from types import NoneType
+from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
     from .subject import Subject
 
-from .types import Category, CollectionType, File, Priority, Status, Folder
+from .types import Category, CollectionType, File, Folder, Priority, Status
 
 
 class AnalysisStep:

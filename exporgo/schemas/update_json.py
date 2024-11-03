@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from ..registry import AnalysisConfig, ExperimentConfig, PipelineConfig
 from ..options.options import ExporgoSettings
+from ..registry import AnalysisConfig, ExperimentConfig, PipelineConfig
 
 
 def _update_json_schema() -> None:

@@ -10,7 +10,7 @@ from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from ._validators import validate_version
 from .exceptions import DuplicateExperimentError, MissingFilesError
 from .experiment import ExperimentFactory
-from .types import File, Folder, Modification, Priority, CollectionType
+from .types import CollectionType, File, Folder, Modification, Priority
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

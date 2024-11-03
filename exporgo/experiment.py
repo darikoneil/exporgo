@@ -1,5 +1,5 @@
 from pathlib import Path
-
+from typing import Generator, Optional
 
 from ._logging import get_timestamp
 from ._tools import conditional_dispatch
@@ -8,7 +8,6 @@ from .files import FileSet, FileTree
 from .pipeline import Pipeline
 from .registry import ExperimentRegistry
 from .types import CollectionType, Folder, Priority, Status
-from typing import Optional, Generator
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
