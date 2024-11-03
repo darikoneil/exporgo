@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "exporgo"
-version = "0.0.4"
+version = "0.0.5"
 description = "Experiment organizer"
 readme = "README.md"
 requires-python = ">=3.10, <=4.0"
@@ -105,7 +105,14 @@ all = [
 [tool.setuptools]
 packages = [
     "exporgo",
+    "exporgo.registry",
+    "exporgo.schemas",
     ]
+include-package-data = true
+
+[tool.setuptools.package-data]
+'exporgo.registry' = ['*.json']
+'exporgo.schemas' = ['*.json']
 
 [tool.pytest.ini_options]
 addopts = [
