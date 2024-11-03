@@ -8,18 +8,6 @@
             ],
             "title": "Category",
             "type": "integer"
-        },
-        "Status": {
-            "enum": [
-                -2,
-                -1,
-                0,
-                1,
-                2,
-                3
-            ],
-            "title": "Status",
-            "type": "integer"
         }
     },
     "additionalProperties": false,
@@ -61,13 +49,8 @@
             "$ref": "#/$defs/Category",
             "default": 1,
             "title": "Category of the analysis"
-        },
-        "status": {
-            "$ref": "#/$defs/Status",
-            "default": 0,
-            "title": "Status of the analysis"
         }
     },
-    "title": "AnalysisConfig",
+    "title": "StepConfig",
     "type": "object"
 }

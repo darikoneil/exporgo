@@ -1,11 +1,40 @@
-from .registry.experiments import ExperimentConfig
-from .registry.pipelines import AnalysisConfig, PipelineConfig
+from .registry import ExperimentConfig, PipelineConfig, StepConfig
 import json
 from pathlib import Path
 
+__all__ = [
+    "update_schema",
+    "update_json_schema",
+    "update_yaml_schema",
+    "update_toml_schema",
+]
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Functions to call before building documentation
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+def update_schema() -> None:
+    update_json_schema()
+    update_yaml_schema()
+    update_toml_schema()
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// JSON Schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
 def update_json_schema() -> None:
+    update_json_schema_for_registry_configurations()
+
+
+def update_json_schema_for_registry_configurations() -> None:
     """
-    Update JSON schema references
+    Update the JSON schema files for the registry configuration classes.
     """
 
     def to_snake_case(name: str) -> str:
@@ -13,7 +42,27 @@ def update_json_schema() -> None:
 
     path = Path(__file__).parent.joinpath("schemas")
 
-    for model in (AnalysisConfig, PipelineConfig, ExperimentConfig):
+    for model in (ExperimentConfig, PipelineConfig, StepConfig):
         with path.joinpath(f"{to_snake_case(model.__name__)}.json").open("w") as file:
             # noinspection PyTypeChecker
             json.dump(model.model_json_schema(), file, indent=4, sort_keys=False)
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// YAML Schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+def update_yaml_schema() -> None:
+    ...
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TOML Schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+def update_toml_schema() -> None:
+    ...

@@ -1,10 +1,11 @@
 from .experiments import ExperimentConfig, ExperimentRegistry
-from .pipelines import AnalysisConfig, AnalysisRegistry, PipelineConfig
+from .pipelines import PipelineConfig
+from .steps import StepConfig, StepRegistry
 
 __all__ = [
-    "AnalysisConfig",
-    "AnalysisRegistry",
     "ExperimentRegistry",
     "ExperimentConfig",
     "PipelineConfig",
+    "StepConfig",
+    "StepRegistry",
 ]

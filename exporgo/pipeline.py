@@ -13,7 +13,7 @@ from .files import FileTree
 from .types import Category, CollectionType, File, Folder, Status
 
 
-class AnalysisStep:
+class Step:
 
     def __init__(self,
                  key: str,
@@ -45,7 +45,7 @@ class AnalysisStep:
 
 class Pipeline:
     def __init__(self,
-                 steps: AnalysisStep | CollectionType,
+                 steps: Step | CollectionType,
                  status: Status):
         self.steps = steps
         self._status = status

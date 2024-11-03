@@ -1,17 +1,80 @@
 {
     "$defs": {
-        "Priority": {
+        "Category": {
             "enum": [
                 0,
                 1,
-                2,
-                3,
-                4,
-                5,
-                6
+                2
             ],
-            "title": "Priority",
+            "title": "Category",
             "type": "integer"
+        },
+        "PipelineConfig": {
+            "additionalProperties": false,
+            "properties": {
+                "steps": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/StepConfig"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/$defs/StepConfig"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Sequence of steps in the pipeline"
+                }
+            },
+            "title": "PipelineConfig",
+            "type": "object"
+        },
+        "StepConfig": {
+            "additionalProperties": false,
+            "properties": {
+                "key": {
+                    "default": null,
+                    "title": "Unique key for the analysis type in the registry",
+                    "type": "string"
+                },
+                "call": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "format": "path",
+                            "type": "string"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Analyzer for the experiment"
+                },
+                "file_sets": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Collection of file sets for organizing experiment"
+                },
+                "category": {
+                    "$ref": "#/$defs/Category",
+                    "default": 1,
+                    "title": "Category of the analysis"
+                }
+            },
+            "title": "StepConfig",
+            "type": "object"
         }
     },
     "additionalProperties": false,
@@ -22,7 +85,7 @@
             "title": "Unique key for the experiment type in the registry",
             "type": "string"
         },
-        "supplemental_file_sets": {
+        "additional_file_sets": {
             "anyOf": [
                 {
                     "type": "string"
@@ -32,18 +95,15 @@
                         "type": "string"
                     },
                     "type": "array"
-                },
-                {
-                    "type": "null"
                 }
             ],
             "default": null,
-            "title": "List of file sets for organizing experiment"
+            "title": "Additional file sets for organizing experiment"
         },
-        "priority": {
-            "$ref": "#/$defs/Priority",
-            "default": 3,
-            "title": "Global priority of the experiment"
+        "pipeline": {
+            "$ref": "#/$defs/PipelineConfig",
+            "default": null,
+            "title": "Pipeline for the experiment"
         }
     },
     "title": "ExperimentConfig",
