@@ -3,6 +3,7 @@ import warnings
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Tuple
+import inspect
 
 from pydantic import ConfigDict
 
@@ -14,9 +15,9 @@ from .exceptions import (InvalidExtensionWarning, InvalidFilenameError,
                          VersionForwardCompatibilityWarning)
 
 """
-Some functions useful for validation. Most of these functions are parameterized decorators that can be used to
-validate function arguments or perform runtime conversion between types that are commensurable but can't be directly
-duck-typed.
+Some functions useful for validation & a conserved config for all Pydantic BaseModels. Most of these functions are 
+parameterized decorators that can be used to validate function arguments or perform runtime conversion between types 
+that are commensurable but can't be directly duck-typed.
 """
 
 
@@ -25,6 +26,7 @@ __all__ = [
     "validate_extension",
     "validate_filename",
     "validate_version",
+    "MODEL_CONFIG",
 ]
 
 
@@ -252,6 +254,37 @@ def validate_filename(function: Callable, pos: int = 0, key: str = None) -> Call
     return decorator
 
 
+@_parameterize
+def validate_with_pydantic(function: Callable, model: Any, ignore_extra: bool = True) -> Callable:
+    """
+    Decorator for validating arguments with a Pydantic model
+
+    :param function: function to be decorated
+
+    :param model: Pydantic model to validate arguments
+
+    :param ignore_extra: whether to ignore extra arguments
+
+    :returns: decorated function
+
+    :raises ValidationError: This decorator will raise a Pydantic ValidationError if the argument does not
+        conform to the model
+    """
+    @wraps(function)
+    def decorator(*args, **kwargs) -> Callable:
+        # noinspection PyUnresolvedReferences
+        sig = inspect.signature(function)
+        bound_args = sig.bind_partial(*args[1:], **kwargs)
+        bound_args.apply_defaults()
+        bound_args.arguments.pop("kwargs", None)
+        keys = model.model_fields.keys()
+        parsed_args = model(**{key: bound_args.arguments.get(key) for key in keys
+                               if key in bound_args.arguments})
+        return function(args[0], {**bound_args.arguments, **vars(parsed_args)})
+
+    return decorator
+
+
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Validation Functions
@@ -288,6 +321,11 @@ def validate_version(version: str) -> None:
         warnings.warn(UpdateVersionWarning(version), stacklevel=2)
 
 
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Pydantic Configuration
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
 MODEL_CONFIG = ConfigDict(extra="forbid",
                           revalidate_instances="always",
                           validate_assignment=True,

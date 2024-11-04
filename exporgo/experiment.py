@@ -6,18 +6,18 @@ from textwrap import indent
 from types import GeneratorType, MappingProxyType
 from typing import Any, Generator, Optional, Sequence
 
-from numpy.f2py.auxfuncs import isintent_in
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, Field, field_validator, field_serializer
 
 from ._color import TERMINAL_FORMATTER
 from ._logging import get_timestamp
 from ._tools import check_if_string_set, conditional_dispatch
-from ._validators import MODEL_CONFIG, convert_permitted_types_to_required
+# noinspection PyProtectedMember
+from ._validators import MODEL_CONFIG, convert_permitted_types_to_required, validate_with_pydantic
 from .exceptions import (DispatchError, DuplicateRegistrationError,
-                         ExperimentNotRegisteredError)
+                         ExperimentNotRegisteredError, EnumNameValueMismatchError)
 from .files import FileSet, FileTree
 from .pipeline import Pipeline, PipelineConfig
 from .types import CollectionType, Folder, Priority, Status
@@ -30,6 +30,46 @@ __all__ = [
     "ValidExperiment",
 ]
 
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Experiment Model for Serialization & Validation
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+class ValidExperiment(BaseModel):
+    name: str = Field(..., title="Name of the experiment")
+    parent_directory: Path = Field(..., title="Parent directory of the experiment")
+    keys: str | Sequence[str] = Field(..., title="Keys for the experiment")
+    file_tree: Any = Field(..., title="File tree for the experiment")
+    pipeline: Any = Field(..., title="Pipeline for the experiment")
+    priority: Priority = Field(Priority.NORMAL, title="Priority of the experiment")
+    meta: dict = Field(dict(), title="Meta data for the experiment")
+    model_config = MODEL_CONFIG
+
+    @field_serializer("priority")
+    @classmethod
+    def serialize_priority(cls, v: Priority) -> str:
+        return f"({v.name}, {v.value})"
+
+    # noinspection PyUnboundLocalVariable
+    @field_validator("priority", mode="before")
+    @classmethod
+    def validate_priority(cls, v: Any) -> Priority:
+        with suppress(ValueError):
+            return Priority(v)
+        if isinstance(v, str):
+            name, value = v[1:-1].split(", ")
+            value = int(value)
+        elif isinstance(v, tuple):
+            name, value = v
+        priority = Priority(value)
+        try:
+            assert priority.name == name
+        except AssertionError as exc:
+            raise EnumNameValueMismatchError(Priority, name, value) from exc
+        return priority
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -210,14 +250,9 @@ class Experiment:
         self.file_tree.validate()
 
     @classmethod
-    def __deserialize__(cls, d: dict):
-        Experiment(d.get("name"),
-                   d.get("parent_directory"),
-                   d.get("keys"),
-                   d.get("file_tree").__deserialize__(),
-                   d.get("pipeline").__deserialize__(),
-                   Priority(d.get("priority")[1]),
-                   **d.get("meta"))
+    @validate_with_pydantic(ValidExperiment)
+    def __deserialize__(cls, dict_: dict):
+        Experiment(**dict_)
 
     def __serialize__(self) -> dict:
         return {
@@ -247,39 +282,6 @@ class Experiment:
             self.pipeline.analyze()
 
     # TODO: Experiment needs a __str__ method
-
-
-"""
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Experiment Model for Serialization & Validation
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-"""
-
-
-class ValidExperiment(BaseModel):
-    name: str = Field(..., title="Name of the experiment")
-    parent_directory: Path = Field(..., title="Parent directory of the experiment")
-    keys: str | Sequence[str] = Field(..., title="Keys for the experiment")
-    file_tree: Any = Field(..., title="File tree for the experiment")
-    pipeline: Any = Field(..., title="Pipeline for the experiment")
-    priority: Priority = Field(Priority.NORMAL, title="Priority of the experiment")
-    meta: dict = Field(dict(), title="Meta data for the experiment")
-    model_config = MODEL_CONFIG
-
-    # noinspection PyNestedDecorators,PyUnboundLocalVariable
-    @field_validator("priority", mode="before")
-    @classmethod
-    def validate_priority(cls, v: Any) -> Priority:
-        with suppress(ValueError):
-            return Priority(v)
-        if isinstance(v, str):
-            name, value = v[1:-1].split(", ")
-            value = int(value)
-        elif isinstance(v, tuple):
-            name, value = v
-        priority = Priority(value)
-        assert priority.name == name
-        return priority
 
 
 """

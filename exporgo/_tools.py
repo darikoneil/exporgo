@@ -25,8 +25,9 @@ def _always_true(*args: Any, **kwargs: Any) -> bool:
 def conditional_dispatch(func: Callable) -> Callable:
     """
     Conditional-dispatch generic function decorator that transforms a function into a generic function whose behavior is
-    defined by registered (arbitrary) conditional statements.
-
+    defined by registered (arbitrary) conditional statements. This is useful for breaking up a single function into
+    multiple implementations based on different conditions, without having to write a bunch of if-elif-else statements.
+    I hate those. You can also use it to implement a multiple-argument type dispatcher, which is pretty cool.
     """
     # implementation registry
     registry = {}
@@ -73,7 +74,7 @@ def unique_generator(iterable: Iterable) -> Generator[Any, None, None]:
     Generator that yields only the unique elements from an iterable. This isn't memory efficient because we
     keep a set of all the elements we've seen so far (which has more overhead than a simple list due to the hashing),
     but it's lazier than the alternative of grabbing everything at once--especially if we don't plan on using
-    everything.
+    everything. Honestly, I don't even remember why I wrote this function. I think I was just bored.
     """
     unique = set()
     for item in iterable:
