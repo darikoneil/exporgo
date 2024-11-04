@@ -1,19 +1,39 @@
-from pathlib import Path
-from types import GeneratorType, MappingProxyType
-from typing import Generator, Optional
-
-from ._logging import get_timestamp
+import json
+from contextlib import suppress
 from functools import singledispatchmethod
-from ._tools import conditional_dispatch
-from ._validators import convert_permitted_types_to_required
+from pathlib import Path
+from textwrap import indent
+from types import GeneratorType, MappingProxyType
+from typing import Any, Generator, Optional, Sequence
+
+from numpy.f2py.auxfuncs import isintent_in
+from portalocker import Lock
+from portalocker.constants import LOCK_EX
+from portalocker.exceptions import BaseLockException
+from pydantic import BaseModel, Field, field_serializer, field_validator
+
+from ._color import TERMINAL_FORMATTER
+from ._logging import get_timestamp
+from ._tools import check_if_string_set, conditional_dispatch
+from ._validators import MODEL_CONFIG, convert_permitted_types_to_required
+from .exceptions import (DispatchError, DuplicateRegistrationError,
+                         ExperimentNotRegisteredError)
 from .files import FileSet, FileTree
-from .pipeline import Pipeline
-from .registry import ExperimentRegistry, ExperimentConfig
+from .pipeline import Pipeline, PipelineConfig
 from .types import CollectionType, Folder, Priority, Status
+
+__all__ = [
+    "Experiment",
+    "ExperimentConfig",
+    "ExperimentFactory",
+    "ExperimentRegistry",
+    "ValidExperiment",
+]
+
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Combinatorial Experiment Factory & Functionality
+// Experiment Class for Managing File Collection, Access, and Analysis
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
 
@@ -87,19 +107,19 @@ class Experiment:
         return self._created
 
     @property
+    def keys(self) -> tuple[str , ...]:
+        return self._keys
+
+    @property
     def name(self) -> str:
         """
         The name of the experiment
-        
+
         :Return type: :class:`str`
-        
+
         :meta read-only-properties:
         """
         return self._name
-
-    @property
-    def keys(self) -> tuple[str , ...]:
-        return self._keys
 
     @property
     def status(self) -> Status:
@@ -112,17 +132,13 @@ class Experiment:
         """
         return self.pipeline.status
 
-    @staticmethod
-    def __name__() -> str:
-        return "Experiment"
-
     @parent_directory.setter
     def parent_directory(self, parent_directory: Folder) -> None:
         self.remap(parent_directory)
 
     @conditional_dispatch
     def add_sources(self, *args) -> None:
-        ...
+        raise DispatchError(self.add_sources.__name__, args)
 
     # noinspection PyUnresolvedReferences
     @add_sources.register(lambda *args: len(args) == 2)
@@ -193,12 +209,226 @@ class Experiment:
         # noinspection PyUnresolvedReferences
         self.file_tree.validate()
 
+    @classmethod
+    def __deserialize__(cls, d: dict):
+        Experiment(d.get("name"),
+                   d.get("parent_directory"),
+                   d.get("keys"),
+                   d.get("file_tree").__deserialize__(),
+                   d.get("pipeline").__deserialize__(),
+                   Priority(d.get("priority")[1]),
+                   **d.get("meta"))
+
+    def __serialize__(self) -> dict:
+        return {
+            "name": self.name,
+            "parent_directory": str(self.parent_directory),
+            "keys": self.keys,
+            "file_tree": self.file_tree.__serialize__(),
+            "pipeline": self.pipeline.__serialize__(),
+            "priority": (self.priority.name, self.priority.value),
+            "meta": self.meta,
+        }
+
+    def __repr__(self):
+        return (f"Experiment("
+                f"{self.name=}, "
+                f"{self.parent_directory=}, "
+                f"{self.keys=}, "
+                f"{self.file_tree=}, "
+                f"{self.pipeline=}, "
+                f"{self.priority=},"
+                f"{self.meta=})")
+
     def __call__(self):
         if self.status == Status.COLLECT:
             # noinspection PyArgumentList
             self.pipeline.collect()
         elif self.status == Status.ANALYZE:
             self.pipeline.analyze()
+
+    # TODO: Experiment needs a __str__ method
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Experiment Model for Serialization & Validation
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+class ValidExperiment(BaseModel):
+    name: str = Field(..., title="Name of the experiment")
+    parent_directory: Path = Field(..., title="Parent directory of the experiment")
+    keys: str | Sequence[str] = Field(..., title="Keys for the experiment")
+    file_tree: Any = Field(...,
+                                title="File tree for the experiment")
+    pipeline: Any = Field(..., title="Pipeline for the experiment")
+    priority: Priority = Field(Priority.NORMAL, title="Priority of the experiment")
+    meta: dict = Field(dict(), title="Meta data for the experiment")
+    model_config = MODEL_CONFIG
+
+    # noinspection PyNestedDecorators,PyUnboundLocalVariable
+    @field_validator("priority", mode="before")
+    @classmethod
+    def validate_priority(cls, v: Any) -> Priority:
+        with suppress(ValueError):
+            return Priority(v)
+        if isinstance(v, str):
+            name, value = v[1:-1].split(", ")
+            value = int(value)
+        elif isinstance(v, tuple):
+            name, value = v
+        priority = Priority(value)
+        assert priority.name == name
+        return priority
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Configuration for Registering Experiments and Registry Class
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+class ExperimentConfig(BaseModel):
+    """
+    Recipe for defining an experiment
+    """
+    model_config = MODEL_CONFIG
+    key: str = Field(None, title="Unique key for the experiment type in the registry")
+    additional_file_sets: str | Sequence[str] = Field(None, title="Additional file sets for organizing experiment")
+    pipeline: PipelineConfig = Field(None, title="Pipeline for the experiment")
+    # sequence does not permit str / bytes, so this works to indicate the list or tuple
+
+    @property
+    def file_sets(self) -> set[str]:
+        return check_if_string_set(self.additional_file_sets) | self.pipeline.file_sets
+
+
+
+class ExperimentRegistry:
+    """
+    Registry for storing experiment configurations
+    """
+    __registry = {}
+    __path = Path(__file__).parent.joinpath("registered_experiments.json")
+    __new_registration = False
+
+    # noinspection DuplicatedCode
+    @classmethod
+    def _save_registry(cls) -> None:
+        """
+        Save the registry to a JSON file
+        """
+        try:
+            with Lock(cls.__path, "w", flags=LOCK_EX) as file:
+                # noinspection PyTypeChecker
+                file.write("{\n")
+                for key, experiment in cls.__registry.items():
+                    file.write(indent(
+                        json.dumps(key)
+                        + f": {experiment.model_dump_json(exclude_defaults=True, indent=4)}\n",
+                        " " * 4))
+                file.write("}\n")
+        except FileNotFoundError:
+            cls.__path.touch(exist_ok=False)
+            cls._save_registry()
+        except (IOError, BaseLockException) as exc:
+            print(TERMINAL_FORMATTER(f"\nError saving registry: {exc}\n\n", "announcement"))
+
+    @classmethod
+    def has(cls, key: str) -> bool:
+        """
+        Check if an experiment configuration is registered
+        """
+        return key in cls.__registry
+
+    @classmethod
+    def get(cls, key: str) -> "ExperimentConfig":
+        """
+        Get an experiment configuration
+        """
+        if not cls.has(key):
+            raise ExperimentNotRegisteredError(key)
+        return cls.__registry[key]
+
+    @classmethod
+    def pop(cls, key: str) -> "ExperimentConfig":
+        """
+        Remove an experiment configuration
+        """
+        if not cls.has(key):
+            raise ExperimentNotRegisteredError(key)
+        config = cls.__registry.pop(key)
+        cls._save_registry()
+        return config
+
+    # noinspection PyNestedDecorators
+    @singledispatchmethod
+    @classmethod
+    def register(cls, experiment: "ExperimentConfig") -> None:
+        """
+        Register an experiment configuration
+        """
+        if experiment.key in cls.__registry:
+            raise DuplicateRegistrationError(experiment.key)
+        cls.__registry[experiment.key] = experiment
+        cls.__new_registration = True
+
+    # noinspection PyNestedDecorators
+    @register.register
+    @classmethod
+    def _(cls, experiment: dict) -> None:
+        cls.register(ExperimentConfig.model_validate(experiment))
+
+    # noinspection PyNestedDecorators
+    @register.register(list)
+    @register.register(tuple)
+    @register.register(set)
+    @register.register(GeneratorType)
+    @classmethod
+    def _(cls, experiment: CollectionType) -> None:
+        for config in experiment:
+            cls.register(config)
+
+    # noinspection PyNestedDecorators
+    @register.register
+    @classmethod
+    def _(cls, name: str, **kwargs) -> None:
+        cls.register(ExperimentConfig(name=name, **kwargs))
+
+    # noinspection DuplicatedCode
+    @classmethod
+    def _load_registry(cls) -> None:
+        """
+        Load the registry from a JSON file
+        """
+        try:
+            with Lock(cls.__path, "r", timeout=10) as file:
+                cls.register((ExperimentConfig.model_validate(config) for _, config in json.load(file).items()))
+        except FileNotFoundError:
+            cls.__path.touch(exist_ok=False)
+            cls._save_registry()
+        except (IOError, json.JSONDecodeError) as exc:
+            print(TERMINAL_FORMATTER(f"\nError loading registry: {exc}\n\n", "announcement"))
+
+    @classmethod
+    def __enter__(cls) -> "ExperimentRegistry":
+        cls._load_registry()
+        return cls()
+
+    @classmethod
+    def __exit__(cls, exc_type, exc_val, exc_tb): # noqa: ANN206
+        if cls.__new_registration:
+            cls._save_registry()
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Experiment Factory
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
 
 
 class ExperimentFactory:

@@ -252,3 +252,19 @@ class ImmutableInstanceWarning(RuntimeWarning):
     def __init__(self, instance: object):
         self.instance = instance
         super().__init__(f"{self.instance.__class__.__name__} is immutable and cannot be modified")
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Runtime Errors and Warnings
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+class DispatchError(RuntimeError):
+    """
+    Raised when a dispatch error occurs
+    """
+    def __init__(self, dispatcher: Any, args: Optional[Any] = None):
+        self.dispatcher = dispatcher
+        super().__init__(f"Dispatch error with {self.dispatcher} given {args}")

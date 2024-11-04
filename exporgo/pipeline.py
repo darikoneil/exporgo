@@ -2,45 +2,16 @@ from functools import singledispatchmethod
 from os import PathLike
 from pathlib import Path
 from types import GeneratorType, MappingProxyType, NoneType
-from typing import TYPE_CHECKING, Callable, Generator, Optional
+from typing import Generator, Optional, Sequence
 
-if TYPE_CHECKING:
-    from .subject import Subject
+from pydantic import BaseModel, Field
 
 from ._io import select_directory, verbose_copy
 from ._tools import check_if_string_set, unique_generator
+from ._validators import MODEL_CONFIG
 from .files import FileTree
-from .types import Category, CollectionType, File, Folder, Status
-
-
-class Step:
-
-    def __init__(self,
-                 key: str,
-                 call: str | Path | Callable,
-                 file_sets: str | list[str] | tuple[str, ...],
-                 category: Category,
-                 status: Status):
-        self._key = key
-        self._call = call
-        self._file_sets = file_sets
-        self._category = category
-        self.status = status
-
-    @property
-    def key(self) -> str:
-        return self._key
-
-    @property
-    def category(self) -> Category:
-        return self._category
-
-    @property
-    def file_sets(self) -> str | CollectionType:
-        return self._file_sets
-
-    def __call__(self, subject: File or "Subject"):
-        self._call(subject)
+from .step import Step, StepConfig
+from .types import CollectionType, Folder, Status, Category
 
 
 class Pipeline:
@@ -106,3 +77,28 @@ class Pipeline:
     def _(self, sources: NoneType, destination: Path, name: str) -> None:
         source = select_directory(title=f"Select the source directory for {name}")
         verbose_copy(source, destination, name)
+
+    @classmethod
+    def __deserialize(cls, data: dict) -> "Pipeline":
+        return Pipeline(
+            Step(key="step_0",
+                 call=lambda x: print(f"Step 0: {x=}"),
+                 file_sets="data",
+                 category=Category.ANALYZE,
+                 status=Status.SOURCE), Status.SOURCE)
+
+    def __serialize__(self) -> dict:
+        return {
+            "steps": 0,
+            "status": 1,
+            "sources": 2,
+        }
+
+
+class PipelineConfig(BaseModel):
+    steps: StepConfig | Sequence[StepConfig] = Field(None, title="Sequence of steps in the pipeline")
+    model_config = MODEL_CONFIG
+
+    @property
+    def file_sets(self) -> set[str]:
+        return {file_set for step in self.steps for file_set in check_if_string_set(step.file_sets)}

@@ -4,6 +4,8 @@ from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Tuple
 
+from pydantic import ConfigDict
+
 from . import __current_version__
 from .exceptions import (InvalidExtensionWarning, InvalidFilenameError,
                          NotPermittedTypeError, UpdateVersionWarning,
@@ -284,3 +286,10 @@ def validate_version(version: str) -> None:
         warnings.warn(VersionBackwardCompatibilityWarning(version), stacklevel=2)
     elif int(config_patch) > int(package_patch):
         warnings.warn(UpdateVersionWarning(version), stacklevel=2)
+
+
+MODEL_CONFIG = ConfigDict(extra="forbid",
+                          revalidate_instances="always",
+                          validate_assignment=True,
+                          validate_default=False
+                          )

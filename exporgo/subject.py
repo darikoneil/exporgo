@@ -9,7 +9,7 @@ from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from ._validators import convert_permitted_types_to_required, validate_version
 from .exceptions import DuplicateExperimentError, MissingFilesError
-from .experiment import ExperimentFactory
+from .experiment import ExperimentFactory, Experiment
 from .types import CollectionType, File, Folder, Modification, Priority, Status
 
 """
@@ -157,7 +157,7 @@ class Subject:
         self.logger.end()
 
         with open(self.file, "w") as file:
-            yaml.safe_dump(self.__to_dict__(),
+            yaml.safe_dump(self.__serialize__(),
                            file,
                            default_flow_style=False,
                            sort_keys=False)
@@ -244,10 +244,10 @@ class Subject:
             file = file.joinpath("organization.json")
         with open(file, "r") as file:
             _dict = yaml.safe_load(file)
-        return cls.__from_dict__(_dict)
+        return cls.__deserialize(_dict)
 
     @classmethod
-    def __from_dict__(cls, _dict: dict) -> "Subject":
+    def __deserialize(cls, _dict: dict) -> "Subject":
         """
         Creates a Subject instance from a dictionary.
 
@@ -267,6 +267,8 @@ class Subject:
             start_log=False
         )
 
+        for name, experiment in _dict.get("experiments").items():
+            subject._experiments[name] = Experiment(**experiment)
         subject._created = _dict.get("created")
         subject._modifications = ModificationLogger(_dict.get("modifications"))
         subject.logger.start()
@@ -343,7 +345,7 @@ class Subject:
         """
         return getattr(self, key)
 
-    def __to_dict__(self) -> dict[str, Any]:
+    def __serialize__(self) -> dict[str, Any]:
         """
         Converts the Subject object to a dictionary.
 
@@ -359,7 +361,7 @@ class Subject:
             "file": str(self.file),
             "study": self.study,
             "meta": self.meta,
-            "experiments": {name: experiment.__to_dict__() for name, experiment in self._experiments.items()},
+            "experiments": {name: experiment.__serialize__() for name, experiment in self._experiments.items()},
             "modifications": self.modifications,
             "version": __current_version__,
         }

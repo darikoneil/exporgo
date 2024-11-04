@@ -3,23 +3,51 @@ from functools import singledispatchmethod
 from pathlib import Path
 from textwrap import indent
 from types import GeneratorType
+from typing import TYPE_CHECKING, Callable
 
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
 from pydantic import BaseModel, Field
 
-from .._color import TERMINAL_FORMATTER
-from ..exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
-from ..types import Analysis, Category, CollectionType
-from .config import MODEL_CONFIG
+from ._color import TERMINAL_FORMATTER
+from ._validators import MODEL_CONFIG
+from .exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
+
+if TYPE_CHECKING:
+    from .subject import Subject
+
+from .types import Analysis, Category, CollectionType, File, Status
 
 
-"""
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Step Configurations for Creating Pipelines
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-"""
+class Step:
+
+    def __init__(self,
+                 key: str,
+                 call: str | Path | Callable,
+                 file_sets: str | list[str] | tuple[str, ...],
+                 category: Category,
+                 status: Status):
+        self._key = key
+        self._call = call
+        self._file_sets = file_sets
+        self._category = category
+        self.status = status
+
+    @property
+    def key(self) -> str:
+        return self._key
+
+    @property
+    def category(self) -> Category:
+        return self._category
+
+    @property
+    def file_sets(self) -> str | CollectionType:
+        return self._file_sets
+
+    def __call__(self, subject: File or "Subject"):
+        self._call(subject)
 
 
 class StepConfig(BaseModel):
@@ -28,13 +56,6 @@ class StepConfig(BaseModel):
     call: Analysis = Field(None, title="Analyzer for the experiment")
     file_sets: str | list[str] | tuple[str, ...] = Field(None, title="Collection of file sets for organizing experiment")
     category: Category = Field(Category.ANALYZE, title="Category of the analysis")
-
-
-"""
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Implementation of Registry for Step Configurations
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-"""
 
 
 class StepRegistry:

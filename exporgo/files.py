@@ -298,7 +298,7 @@ class FileTree:
         if isinstance(value, FileSet):
             rmtree(value.directory)
 
-    def __to_dict__(self) -> dict:
+    def __serialize__(self) -> dict:
         return {
             "directory": str(self.tree_directory),
             "file_sets": {key: file_set.__to_dict__() for key, file_set in self.items()}
