@@ -9,7 +9,7 @@ from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
 from ._validators import convert_permitted_types_to_required, validate_version
 from .exceptions import DuplicateExperimentError, MissingFilesError
-from .experiment import ExperimentFactory, Experiment
+from .experiment import Experiment, ExperimentFactory
 from .types import CollectionType, File, Folder, Modification, Priority, Status
 
 """

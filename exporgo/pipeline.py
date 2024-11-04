@@ -11,7 +11,7 @@ from ._tools import check_if_string_set, unique_generator
 from ._validators import MODEL_CONFIG
 from .files import FileTree
 from .step import Step, StepConfig
-from .types import CollectionType, Folder, Status, Category
+from .types import Category, CollectionType, Folder, Status
 
 
 class Pipeline:
