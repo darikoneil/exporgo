@@ -261,8 +261,7 @@ class ValidExperiment(BaseModel):
     name: str = Field(..., title="Name of the experiment")
     parent_directory: Path = Field(..., title="Parent directory of the experiment")
     keys: str | Sequence[str] = Field(..., title="Keys for the experiment")
-    file_tree: Any = Field(...,
-                                title="File tree for the experiment")
+    file_tree: Any = Field(..., title="File tree for the experiment")
     pipeline: Any = Field(..., title="Pipeline for the experiment")
     priority: Priority = Field(Priority.NORMAL, title="Priority of the experiment")
     meta: dict = Field(dict(), title="Meta data for the experiment")
