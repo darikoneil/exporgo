@@ -30,7 +30,7 @@ class IPythonLogger:
         self._IP = None
 
         #: pathlib.Path: path to log file
-        self._log_file = directory.joinpath("log.exporgo")
+        self._log_file = directory.joinpath("log.txt")
 
         if directory.exists() and not self._log_file.exists():
             self._create_log()

@@ -163,6 +163,7 @@ class Subject:
                            sort_keys=False)
 
         self.logger.start()
+        # TODO: FileFormats option
 
     @property
     def created(self) -> str:
@@ -194,7 +195,7 @@ class Subject:
 
         :meta read-only-properties:
         """
-        return self.directory.joinpath("organization.json")
+        return self.directory.joinpath("organization.yaml")
 
     @property
     def last_modified(self) -> str:
@@ -247,7 +248,7 @@ class Subject:
         return cls.__deserialize(_dict)
 
     @classmethod
-    def __deserialize(cls, _dict: dict) -> "Subject":
+    def __deserialize__(cls, _dict: dict) -> "Subject":
         """
         Creates a Subject instance from a dictionary.
 
@@ -264,6 +265,7 @@ class Subject:
             directory=_dict.get("directory"),
             study=_dict.get("study"),
             meta=_dict.get("meta"),
+            priority=Priority(_dict.get("priority")[1]),
             start_log=False
         )
 
@@ -355,10 +357,10 @@ class Subject:
         """
         return {
             "name": self.name,
+            "priority": f"{self.priority.name}, {self.priority.value}",
             "created": self.created,
             "last_modified": self.last_modified,
             "directory": str(self.directory),
-            "file": str(self.file),
             "study": self.study,
             "meta": self.meta,
             "experiments": {name: experiment.__serialize__() for name, experiment in self._experiments.items()},

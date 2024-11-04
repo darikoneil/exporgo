@@ -222,11 +222,10 @@ class Experiment:
     def __serialize__(self) -> dict:
         return {
             "name": self.name,
-            "parent_directory": str(self.parent_directory),
             "keys": self.keys,
             "file_tree": self.file_tree.__serialize__(),
             "pipeline": self.pipeline.__serialize__(),
-            "priority": (self.priority.name, self.priority.value),
+            "priority": f"{self.priority.name}, {self.priority.value}",
             "meta": self.meta,
         }
 
