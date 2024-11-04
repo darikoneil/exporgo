@@ -255,15 +255,13 @@ def validate_filename(function: Callable, pos: int = 0, key: str = None) -> Call
 
 
 @_parameterize
-def validate_with_pydantic(function: Callable, model: Any, ignore_extra: bool = True) -> Callable:
+def validate_with_pydantic(function: Callable, model: Any) -> Callable:
     """
     Decorator for validating arguments with a Pydantic model
 
     :param function: function to be decorated
 
     :param model: Pydantic model to validate arguments
-
-    :param ignore_extra: whether to ignore extra arguments
 
     :returns: decorated function
 
