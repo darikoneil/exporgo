@@ -10,7 +10,7 @@ from ._io import select_directory, verbose_copy
 from ._tools import check_if_string_set, unique_generator
 from ._validators import MODEL_CONFIG
 from .files import FileTree
-from .step import Step, RegisteredStep
+from .step import RegisteredStep, Step
 from .types import Category, CollectionType, Folder, Status
 
 

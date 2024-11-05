@@ -114,8 +114,8 @@ def verbose_copy(source: Folder,
     copier = partial(_copy, source, destination)
     message = f"Copying {feedback} files" if feedback else "Copying files"
     return all(Parallel(n_jobs=-1, backend="threading")(delayed(copier)(file) for file in tqdm(files,
-                                                                                          total=len(files),
-                                                                                          desc=message)))
+                                                                                               total=len(files),
+                                                                                               desc=message)))
 
 
 """
