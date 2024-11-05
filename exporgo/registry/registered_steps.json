@@ -1,0 +1,14 @@
+{
+    "Hello": {
+        "key": "Hello",
+        "call": {
+            "name": "hello",
+            "file": "C:\\Users\\Yuste\\PycharmProjects\\exporgo\\hello_world.py"
+        },
+        "file_sets": [
+            "data",
+            "blitz"
+        ],
+        "category": "(ANALYZE, 1)"
+    }
+}

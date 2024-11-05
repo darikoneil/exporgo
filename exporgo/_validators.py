@@ -237,13 +237,26 @@ def validate_method_with_pydantic(function: Callable, model: Any) -> Callable:
         bound_args = sig.bind_partial(*args, **kwargs)
         bound_args.apply_defaults()
         bound_args.arguments.pop("kwargs", None)
+        # I don't know why, but I gotta do this ->
+        if "cls" in bound_args.arguments:
+            func_get = lambda key: bound_args.arguments.get("cls").get(key)
+            container = bound_args.arguments.get("cls")
+            has_cls = True
+        else:
+            func_get = lambda key: bound_args.arguments.get(key)
+            container = bound_args.arguments
+            has_cls = False
+        # TODO: Read up on this, I don't know why I have to do this
         # Collect the parameters from the bound arguments that are in the Pydantic model
-        params = {key: bound_args.arguments.get("cls").get(key) for key in model.model_fields.keys()
-                  if key in bound_args.arguments.get("cls")}
+        params = {key: func_get(key) for key in model.model_fields.keys()
+                  if key in container}
         # Validate the parameters with the Pydantic model
         valid_args = model(**params)
         # Call the original function with the validated arguments (class and validated arguments)
-        return function(**{**bound_args.arguments, **vars(valid_args)})
+        if has_cls:
+            return function(**{**bound_args.arguments, **vars(valid_args)})
+        else:
+            return function(class_, **{**vars(valid_args)})
 
     return decorator
 
@@ -345,5 +358,6 @@ def validate_version(version: str) -> None:
 MODEL_CONFIG = ConfigDict(extra="forbid",
                           revalidate_instances="always",
                           validate_assignment=True,
-                          validate_default=False
+                          validate_default=False,
+                          arbitrary_types_allowed=True,
                           )

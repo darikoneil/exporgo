@@ -3,7 +3,7 @@ from functools import singledispatchmethod
 from pathlib import Path
 from textwrap import indent
 from types import GeneratorType
-from typing import TYPE_CHECKING, Callable, Any
+from typing import TYPE_CHECKING, Callable, Any, Optional
 from importlib.util import spec_from_file_location, module_from_spec
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
@@ -11,14 +11,14 @@ from portalocker.exceptions import BaseLockException
 from pydantic import BaseModel, field_serializer, field_validator
 
 from ._color import TERMINAL_FORMATTER
-from ._validators import MODEL_CONFIG, validate_status, validate_category
+from ._validators import MODEL_CONFIG, validate_status, validate_category, validate_dumping_with_pydantic, validate_method_with_pydantic
 from .exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
 from inspect import getsourcefile
 
 if TYPE_CHECKING:
     from .subject import Subject
 
-from .types import Analysis, Category, CollectionType, File, Status
+from .types import Category, CollectionType, File, Status
 
 
 """
@@ -68,9 +68,9 @@ def serialize_function(call: Callable) -> dict:
 class ValidStep(BaseModel):
     key: str
     call: str | Path | Callable
-    file_sets: str | list[str] | tuple[str, ...]
-    category: Category
-    status: Status
+    file_sets: Optional[str | list[str] | tuple[str, ...]] = None
+    category: Category = Category.ANALYZE
+    status: Status = Status.SOURCE
     model_config = MODEL_CONFIG
 
     @field_serializer("call", check_fields=True)
@@ -84,17 +84,20 @@ class ValidStep(BaseModel):
     @field_serializer("category", check_fields=True)
     @classmethod
     def serialize_category(cls, v: Category) -> str:
-        return f"{v.name}, {v.value}"
+        return f"({v.name}, {v.value})"
 
     @field_serializer("status", check_fields=True)
     @classmethod
     def serialize_status(cls, v: Status) -> str:
-        return f"{v.name}, {v.value}"
+        return f"({v.name}, {v.value})"
 
     @field_validator("call", mode="before", check_fields=True)
     @classmethod
     def validate_call(cls, v: Any) -> str | Path | Callable:
-        return v
+        if isinstance(v, dict):
+            return import_function_from_file(v["name"], v["file"])
+        else:
+            return v
 
     @field_validator("category", mode="before", check_fields=True)
     @classmethod
@@ -129,8 +132,8 @@ class Step:
         self.status = status
 
     @property
-    def key(self) -> str:
-        return self._key
+    def call(self) -> str | Path | Callable:
+        return self._call
 
     @property
     def category(self) -> Category:
@@ -140,18 +143,40 @@ class Step:
     def file_sets(self) -> str | CollectionType:
         return self._file_sets
 
+    @property
+    def key(self) -> str:
+        return self._key
+
+    @property
+    def status(self) -> Status:
+        return self._status
+
+    @status.setter
+    def status(self, value: Status):
+        self._status = Status(value)
+
+    @classmethod
+    @validate_method_with_pydantic(ValidStep)
+    def __deserialize__(cls,
+                        key: str,
+                        call: str | Path | Callable,
+                        file_sets: str | list[str] | tuple[str, ...],
+                        category: Category,
+                        status: Status
+                        ) -> "Step":
+        return cls(key, call, file_sets, category, status)
+
+    @classmethod
+    @validate_dumping_with_pydantic(ValidStep)
+    def __serialize__(cls, self: "Step") -> dict:
+        # noinspection PyTypeChecker
+        return dict(self)
+
     def __call__(self, subject: File or "Subject"):
-        self._call(subject)
-
-
-def _call_script() -> None:
-    ...
-
-def _call_notebook() -> None:
-    ...
-
-def _call_function() -> None:
-    ...
+        if isinstance(self._call, Callable):
+            return self._call(subject)
+        else:
+            raise NotImplementedError("File-based calls are not yet supported")
 
 
 """
@@ -161,12 +186,38 @@ def _call_function() -> None:
 """
 
 
-class RegisteredStep(BaseModel):
+class RegisteredStep(BaseModel, extra="ignore"):
     key: str
-    call: Analysis = lambda *args, **kwargs: print("DEFAULT")
+    call: str | Path | Callable
     file_sets: str | list[str] | tuple[str, ...]
     category: Category = Category.ANALYZE
     model_config = MODEL_CONFIG
+
+    @field_serializer("call", check_fields=True)
+    @classmethod
+    def serialize_call(cls, v: str | Path | Callable) -> str | dict:
+        if isinstance(v, Callable):
+            return serialize_function(v)
+        else:
+            return str(v)
+
+    @field_serializer("category", check_fields=True)
+    @classmethod
+    def serialize_category(cls, v: Category) -> str:
+        return f"({v.name}, {v.value})"
+
+    @field_validator("call", mode="before", check_fields=True)
+    @classmethod
+    def validate_call(cls, v: Any) -> str | Path | Callable:
+        if isinstance(v, dict):
+            return import_function_from_file(v["name"], v["file"])
+        else:
+            return v
+
+    @field_validator("category", mode="before", check_fields=True)
+    @classmethod
+    def validate_category(cls, v: Any) -> Category:
+        return validate_category(v)
 
 
 class StepRegistry:
@@ -174,7 +225,7 @@ class StepRegistry:
     Registry for storing analysis configurations
     """
     __registry = {}
-    __path = Path(__file__).parent.joinpath("registered_steps.json")
+    __path = Path(__file__).parent.joinpath("registry").joinpath("registered_steps.json")
     __new_registration = False
 
     @classmethod
@@ -228,20 +279,20 @@ class StepRegistry:
     # noinspection PyNestedDecorators
     @singledispatchmethod
     @classmethod
-    def register(cls, analysis: "RegisteredStep") -> None:
+    def register(cls, step: "RegisteredStep") -> None:
         """
         Register an experiment configuration
         """
-        if analysis.key in cls.__registry:
-            raise DuplicateRegistrationError(analysis.key)
-        cls.__registry[analysis.key] = analysis
+        if step.key in cls.__registry:
+            raise DuplicateRegistrationError(step.key)
+        cls.__registry[step.key] = step
         cls.__new_registration = True
 
     # noinspection PyNestedDecorators
     @register.register
     @classmethod
-    def _(cls, analysis: dict) -> None:
-        cls.register(Analysis.model_validate(analysis))
+    def _(cls, step: dict) -> None:
+        cls.register(RegisteredStep(**step))
 
     # noinspection PyNestedDecorators
     @register.register(list)
@@ -249,15 +300,20 @@ class StepRegistry:
     @register.register(set)
     @register.register(GeneratorType)
     @classmethod
-    def _(cls, analysis: CollectionType) -> None:
-        for config in analysis:
+    def _(cls, step: CollectionType) -> None:
+        for config in step:
             cls.register(config)
 
     # noinspection PyNestedDecorators
     @register.register
     @classmethod
-    def _(cls, name: str, **kwargs) -> None:
-        cls.register(Analysis(name=name, **kwargs))
+    def _(cls, step: str, **kwargs) -> None:
+        cls.register(Step(key=step, **kwargs))
+
+    @register.register
+    @classmethod
+    def _(cls, step: Step) -> None:
+        cls.register(step)
 
     @classmethod
     def _load_registry(cls) -> None:

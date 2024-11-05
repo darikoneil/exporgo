@@ -62,7 +62,7 @@ class ValidExperiment(BaseModel):
     @field_serializer("pipeline")
     @classmethod
     def serialize_pipeline(cls, v: Pipeline) -> dict:
-        return v.__serialize__()
+        return v.__serialize__(v)
 
     @field_serializer("priority")
     @classmethod
@@ -352,6 +352,7 @@ class RegisteredExperiment(BaseModel):
     @property
     def file_sets(self) -> set[str]:
         return check_if_string_set(self.additional_file_sets) | self.pipeline.file_sets
+
 
 
 class ExperimentRegistry:

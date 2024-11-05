@@ -29,30 +29,36 @@ __all__ = [
 
 
 class ValidPipeline(BaseModel):
-    steps: None
+    steps: Step | Sequence[Step] | None
     status: Status
-    sources: str #MappingProxyType[str, Folder | CollectionType | None]
+    sources: MappingProxyType[str, Folder | CollectionType | None]
     model_config = MODEL_CONFIG
 
     @field_serializer("sources", check_fields=True)
     @classmethod
-    def serialize_sources(cls, v: MappingProxyType[str, Folder | CollectionType | None]) -> str:
-        return f""
+    def serialize_sources(cls, v: MappingProxyType[str, Folder | CollectionType | None]) -> dict | None:
+        return {file_set: str(source) for file_set, source in v.items()}
 
     @field_serializer("status")
     @classmethod
     def serialize_status(cls, v: Status) -> str:
-        return f"{v.name}, {v.value}"
+        return f"({v.name}, {v.value})"
 
     @field_serializer("steps", check_fields=True)
     @classmethod
-    def serialize_steps(cls, v: Step | Sequence[Step] | None) -> str:
-        return f"{[step.__serialize__(step) for step in v]}"
+    def serialize_steps(cls, v: Step | Sequence[Step] | None) -> dict| list:
+        if isinstance(v, Step):
+            return v.__serialize__(v)
+        else:
+            return [step.__serialize__(step) for step in v]
 
     @field_validator("sources", mode="before", check_fields=True)
     @classmethod
     def validate_sources(cls, v: MappingProxyType[str, Folder | CollectionType | None]) -> MappingProxyType[str, Folder | CollectionType | None]:
-        return v
+        if isinstance(v, dict):
+            return MappingProxyType(v)
+        elif isinstance(v, MappingProxyType):
+            return v
 
     @field_validator("status", mode="before", check_fields=True)
     @classmethod
@@ -62,7 +68,12 @@ class ValidPipeline(BaseModel):
     @field_validator("steps", mode="before", check_fields=True)
     @classmethod
     def validate_steps(cls, v: Step | Sequence[Step] | None) -> Step | Sequence[Step] | None:
-        return v if isinstance(v, Step) or isinstance(v, Sequence) else None
+        if isinstance(v, (list, tuple)):
+            return [Step.__deserialize__(**step) if isinstance(step, dict) else step for step in v if isinstance(step, Step)]
+        elif isinstance(v, dict):
+            return Step(**v)
+        else:
+            return v
 
 
 """
@@ -70,6 +81,7 @@ class ValidPipeline(BaseModel):
 // Pipeline Class
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
+
 
 class Pipeline:
     def __init__(self,
@@ -137,30 +149,14 @@ class Pipeline:
         verbose_copy(source, destination, name)
 
     @classmethod
-    def __deserialize__(cls, data: dict) -> "Pipeline":
-        return Pipeline(
-            Step(key="step_0",
-                 call=lambda x: print(f"Step 0: {x=}"),
-                 file_sets="data",
-                 category=Category.ANALYZE,
-                 status=Status.SOURCE), Status.SOURCE)
-
-    @classmethod
     @validate_method_with_pydantic(ValidPipeline)
-    def __deserialize_two__(cls, steps, status, sources) -> "Pipeline":
+    def __deserialize__(cls, steps, status, sources) -> "Pipeline":
         return Pipeline(steps, status, sources)
 
     @classmethod
     @validate_dumping_with_pydantic(ValidPipeline)
-    def __serialize__two (cls, self) -> dict:
+    def __serialize__(cls, self) -> dict:
         return dict(self)
-
-    def __serialize__(self) -> dict:
-        return {
-            "steps": self.steps,
-            "status": self.status,
-            "sources": dict(self.sources),
-        }
 
 
 """
@@ -171,7 +167,7 @@ class Pipeline:
 
 
 class RegisteredPipeline(BaseModel):
-    steps: RegisteredStep | Sequence[RegisteredStep]
+    steps: RegisteredStep | Sequence[RegisteredStep] | None
     model_config = MODEL_CONFIG
 
     @property
