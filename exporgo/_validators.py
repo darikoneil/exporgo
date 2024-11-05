@@ -19,8 +19,8 @@ from .exceptions import (EnumNameValueMismatchError, InvalidExtensionWarning,
 from .types import Priority, Status
 
 """
-Some functions useful for validation & a conserved config for all Pydantic BaseModels. Most of these functions are 
-parameterized decorators that can be used to validate function arguments or perform runtime conversion between types 
+Some functions useful for validation & a conserved config for all Pydantic BaseModels. Most of these functions are
+parameterized decorators that can be used to validate function arguments or perform runtime conversion between types
 that are commensurable but can't be directly duck-typed.
 """
 
@@ -184,7 +184,7 @@ def validate_dumping_with_pydantic(function: Callable, model: Any) -> Callable:
 
     # noinspection PyUnusedLocal
     @wraps(function)
-    def decorator(class_, self_) -> Callable:
+    def decorator(class_, self_) -> Callable:  # noqa: ANN001, U100
         """
         Inner decorator function that performs the validation.
 
@@ -217,7 +217,7 @@ def validate_method_with_pydantic(function: Callable, model: Any) -> Callable:
 
     # noinspection PyUnusedLocal
     @wraps(function)
-    def decorator(class_, *args, **kwargs) -> Callable:
+    def decorator(class_, *args, **kwargs) -> Callable:  # noqa: ANN001, U100
         """
         Inner decorator function that performs the validation.
 
@@ -252,6 +252,7 @@ def validate_method_with_pydantic(function: Callable, model: Any) -> Callable:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
 
+
 def validate_priority(v: Any) -> Priority:
     with suppress(ValueError):
         return Priority(v)
@@ -267,6 +268,7 @@ def validate_priority(v: Any) -> Priority:
         raise EnumNameValueMismatchError(Priority, name, value) from exc
     return priority
 
+
 def validate_status(v: Any) -> Status:
     with suppress(ValueError):
         return Status(v)
@@ -281,6 +283,7 @@ def validate_status(v: Any) -> Status:
     except AssertionError as exc:
         raise EnumNameValueMismatchError(Status, name, value) from exc
     return status
+
 
 def validate_version(version: str) -> None:
     """

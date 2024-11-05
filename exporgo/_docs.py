@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from .experiment import RegisteredExperiment
-from .registry import PipelineConfig
+from .pipeline import RegisteredPipeline
 from .step import RegisteredStep
 
 __all__ = [
@@ -19,10 +19,12 @@ __all__ = [
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
 
+
 def update_schema() -> None:
     update_json_schema()
     update_yaml_schema()
     update_toml_schema()
+
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,7 +47,7 @@ def update_json_schema_for_registry_configurations() -> None:
 
     path = Path(__file__).parent.joinpath("schemas")
 
-    for model in (RegisteredExperiment, PipelineConfig, RegisteredStep):
+    for model in (RegisteredExperiment, RegisteredPipeline, RegisteredStep):
         with path.joinpath(f"{to_snake_case(model.__name__)}.json").open("w") as file:
             # noinspection PyTypeChecker
             json.dump(model.model_json_schema(), file, indent=4, sort_keys=False)
@@ -57,6 +59,7 @@ def update_json_schema_for_registry_configurations() -> None:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
 
+
 def update_yaml_schema() -> None:
     ...
 
@@ -66,6 +69,7 @@ def update_yaml_schema() -> None:
 // TOML Schema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
+
 
 def update_toml_schema() -> None:
     ...
