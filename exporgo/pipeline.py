@@ -3,6 +3,7 @@ from os import PathLike
 from pathlib import Path
 from types import GeneratorType, MappingProxyType, NoneType
 from typing import Any, Generator, Optional, Sequence
+from typing_extensions import Self
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
@@ -15,21 +16,61 @@ from .step import RegisteredStep, Step
 from .types import Category, CollectionType, Folder, Status
 
 
+__all__ = [
+    "Pipeline",
+    "RegisteredPipeline"
+]
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Pipeline Model for Serialization and Validation
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
 class ValidPipeline(BaseModel):
     steps: Step | Sequence[Step] | None
     status: Status
     sources: MappingProxyType[str, Folder | CollectionType | None]
+    model_config = MODEL_CONFIG
+
+    @field_serializer("sources", check_fields=True)
+    @classmethod
+    def serialize_sources(cls, v: MappingProxyType[str, Folder | CollectionType | None]) -> str:
+        return f""
 
     @field_serializer("status")
     @classmethod
     def serialize_status(cls, v: Status) -> str:
         return f"{v.name}, {v.value}"
 
+    @field_serializer("steps", check_fields=True)
+    @classmethod
+    def serialize_steps(cls, v: Step | Sequence[Step] | None) -> str:
+        return f"{[step.__serialize__(step) for step in v]}"
+
+    @field_validator("sources", mode="before", check_fields=True)
+    @classmethod
+    def validate_sources(cls, v: MappingProxyType[str, Folder | CollectionType | None]) -> MappingProxyType[str, Folder | CollectionType | None]:
+        return v
+
     @field_validator("status", mode="before", check_fields=True)
     @classmethod
     def validate_status(cls, v: Status) -> Status | Any:
         return validate_status(v)
 
+    @field_validator("steps", mode="before", check_fields=True)
+    @classmethod
+    def validate_steps(cls, v: Step | Sequence[Step] | None) -> Step | Sequence[Step] | None:
+        return v if isinstance(v, Step) or isinstance(v, Sequence) else None
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Pipeline Class
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
 
 class Pipeline:
     def __init__(self,
@@ -123,8 +164,15 @@ class Pipeline:
         }
 
 
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Pipeline Class for Registration
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
 class RegisteredPipeline(BaseModel):
-    steps: RegisteredStep | Sequence[RegisteredStep] = Field(None, title="Sequence of steps in the pipeline")
+    steps: RegisteredStep | Sequence[RegisteredStep]
     model_config = MODEL_CONFIG
 
     @property
