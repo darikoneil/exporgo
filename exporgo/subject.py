@@ -27,6 +27,7 @@ __all__ = [
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
 
+
 class ValidSubject(BaseModel):
     name: str
     directory: Path
@@ -172,7 +173,7 @@ class Subject:
         if len(self.contains) == 0:
             string_to_print += "\tNo experiments defined\n"
         else:
-            for name, experiment in self.experiments.items():
+            for experiment in self.experiments.values():
                 string_to_print + f"{experiment}\n"
 
         string_to_print += TERMINAL_FORMATTER("Recent Modifications:\n", "modifications")
@@ -297,7 +298,7 @@ class Subject:
             directory=_dict.get("directory"),
             study=_dict.get("study"),
             meta=_dict.get("meta"),
-            #priority=Priority(_dict.get("priority")[1]),
+            # priority=Priority(_dict.get("priority")[1]),
             start_log=False
         )
 
@@ -313,17 +314,17 @@ class Subject:
     @classmethod
     @validate_method_with_pydantic(ValidSubject)
     def __deserialize_two__(cls,
-                            name,
-                            status,
-                            priority,
-                            created,
-                            last_modified,
-                            directory,
-                            study,
-                            meta,
-                            experiments,
-                            modifications,
-                            version
+                            name: str,
+                            status: Status,
+                            priority: Priority,
+                            created: str,
+                            last_modified: str,
+                            directory: Path,
+                            study: Optional[str],
+                            meta: dict,
+                            experiments: dict,
+                            modifications: list,
+                            version: str,
                             ):
         # status, last_modified, version are not used
         subject = cls(name, directory, study, meta, priority, start_log=False)
@@ -413,17 +414,17 @@ class Subject:
         :rtype: dict[str, Any]
         """
         return {
-                "name": self.name,
-                "priority": f"{self.priority.name}, {self.priority.value}",
-                "created": self.created,
-                "last_modified": self.last_modified,
-                "directory": str(self.directory),
-                "study": self.study,
-                "meta": self.meta,
-                "experiments": {name: experiment.__serialize__(experiment)
-                                for name, experiment in self.experiments.items()},
-                "modifications": self.modifications,
-                "version": __current_version__,
+            "name": self.name,
+            "priority": f"{self.priority.name}, {self.priority.value}",
+            "created": self.created,
+            "last_modified": self.last_modified,
+            "directory": str(self.directory),
+            "study": self.study,
+            "meta": self.meta,
+            "experiments": {name: experiment.__serialize__(experiment)
+                            for name, experiment in self.experiments.items()},
+            "modifications": self.modifications,
+            "version": __current_version__,
         }
 
     @classmethod

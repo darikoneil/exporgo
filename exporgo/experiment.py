@@ -354,7 +354,6 @@ class RegisteredExperiment(BaseModel):
         return check_if_string_set(self.additional_file_sets) | self.pipeline.file_sets
 
 
-
 class ExperimentRegistry:
     """
     Registry for storing experiment configurations

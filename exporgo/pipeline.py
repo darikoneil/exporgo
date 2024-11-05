@@ -4,8 +4,7 @@ from pathlib import Path
 from types import GeneratorType, MappingProxyType, NoneType
 from typing import Any, Generator, Optional, Sequence
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
-from typing_extensions import Self
+from pydantic import BaseModel, field_serializer, field_validator
 
 from ._io import select_directory, verbose_copy
 from ._tools import check_if_string_set, unique_generator
@@ -13,7 +12,7 @@ from ._validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
                           validate_method_with_pydantic, validate_status)
 from .files import FileTree
 from .step import RegisteredStep, Step
-from .types import Category, CollectionType, Folder, Status
+from .types import CollectionType, Folder, Status
 
 __all__ = [
     "Pipeline",
@@ -46,7 +45,7 @@ class ValidPipeline(BaseModel):
 
     @field_serializer("steps", check_fields=True)
     @classmethod
-    def serialize_steps(cls, v: Step | Sequence[Step] | None) -> dict| list:
+    def serialize_steps(cls, v: Step | Sequence[Step] | None) -> dict | list:
         if isinstance(v, Step):
             return v.__serialize__(v)
         else:
@@ -54,7 +53,8 @@ class ValidPipeline(BaseModel):
 
     @field_validator("sources", mode="before", check_fields=True)
     @classmethod
-    def validate_sources(cls, v: MappingProxyType[str, Folder | CollectionType | None]) -> MappingProxyType[str, Folder | CollectionType | None]:
+    def validate_sources(cls, v: MappingProxyType[str, Folder | CollectionType | None]) \
+            -> MappingProxyType[str, Folder | CollectionType | None]:
         if isinstance(v, dict):
             return MappingProxyType(v)
         elif isinstance(v, MappingProxyType):
@@ -74,6 +74,7 @@ class ValidPipeline(BaseModel):
             return Step(**v)
         else:
             return v
+        # TODO: FIX ME, I don't always return a Step or Sequence[Step]
 
 
 """
@@ -90,7 +91,7 @@ class Pipeline:
                  sources: Optional[MappingProxyType[str, Folder | CollectionType | None]] = None) -> None:
         self.steps = steps
         self._status = status
-        self._sources = sources if sources else {file_set: None for file_set in self.file_sets}
+        self._sources = sources if sources else dict.fromkeys(self.file_sets, None)
         self._collected = set()
 
     @property
@@ -125,37 +126,41 @@ class Pipeline:
                 step.status = Status.ANALYZE
 
     @singledispatchmethod
-    def _collect(self, sources: Optional[Folder | CollectionType]) -> None:
+    def _collect(self, sources: Optional[Folder | CollectionType]) -> None:  # noqa: CCE001
         ...
 
     @_collect.register(list)
     @_collect.register(tuple)
     @_collect.register(set)
     @_collect.register(GeneratorType)
-    def _(self, sources: CollectionType, destination: Path, name: str) -> None:
+    def _(self, sources: CollectionType, destination: Path, name: str) -> None:  # noqa: CCE001
         for source in sources:
             self._collect(source, destination, name)
 
     @_collect.register(str)
     @_collect.register(Path)
     @_collect.register(PathLike)
-    def _(self, sources: Folder, destination: Path, name: str) -> None:
+    def _(self, sources: Folder, destination: Path, name: str) -> None:  # noqa: CCE001
         verbose_copy(sources, destination, name)
 
     # noinspection PyUnusedLocal
     @_collect.register(type(None))
-    def _(self, sources: NoneType, destination: Path, name: str) -> None:
+    def _(self, sources: NoneType, destination: Path, name: str) -> None:  # noqa: CCE001
         source = select_directory(title=f"Select the source directory for {name}")
         verbose_copy(source, destination, name)
 
     @classmethod
     @validate_method_with_pydantic(ValidPipeline)
-    def __deserialize__(cls, steps, status, sources) -> "Pipeline":
+    def __deserialize__(cls,
+                        steps: Step | Sequence[Step] | None,
+                        status: Status,
+                        sources: MappingProxyType[str, Folder | CollectionType | None]) -> "Pipeline":
         return Pipeline(steps, status, sources)
 
     @classmethod
     @validate_dumping_with_pydantic(ValidPipeline)
-    def __serialize__(cls, self) -> dict:
+    def __serialize__(cls, self: "Pipeline") -> dict:
+        # noinspection PyTypeChecker
         return dict(self)
 
 

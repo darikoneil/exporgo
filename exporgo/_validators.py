@@ -16,8 +16,7 @@ from .exceptions import (EnumNameValueMismatchError, InvalidExtensionWarning,
                          VersionBackwardCompatibilityError,
                          VersionBackwardCompatibilityWarning,
                          VersionForwardCompatibilityWarning)
-from .types import Priority, Status, Category
-
+from .types import Category, Priority, Status
 
 """
 Some functions useful for validation & a conserved config for all Pydantic BaseModels. Most of these functions are
@@ -239,11 +238,11 @@ def validate_method_with_pydantic(function: Callable, model: Any) -> Callable:
         bound_args.arguments.pop("kwargs", None)
         # I don't know why, but I gotta do this ->
         if "cls" in bound_args.arguments:
-            func_get = lambda key: bound_args.arguments.get("cls").get(key)
+            func_get = lambda key: bound_args.arguments.get("cls").get(key)  # noqa: E731
             container = bound_args.arguments.get("cls")
             has_cls = True
         else:
-            func_get = lambda key: bound_args.arguments.get(key)
+            func_get = lambda key: bound_args.arguments.get(key)  # noqa: E731
             container = bound_args.arguments
             has_cls = False
         # TODO: Read up on this, I don't know why I have to do this

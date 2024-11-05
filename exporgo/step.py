@@ -1,25 +1,27 @@
 import json
 from functools import singledispatchmethod
+from importlib.util import module_from_spec, spec_from_file_location
+from inspect import getsourcefile
 from pathlib import Path
 from textwrap import indent
 from types import GeneratorType
-from typing import TYPE_CHECKING, Callable, Any, Optional
-from importlib.util import spec_from_file_location, module_from_spec
+from typing import TYPE_CHECKING, Any, Callable, Optional
+
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
 from pydantic import BaseModel, field_serializer, field_validator
 
 from ._color import TERMINAL_FORMATTER
-from ._validators import MODEL_CONFIG, validate_status, validate_category, validate_dumping_with_pydantic, validate_method_with_pydantic
+from ._validators import (MODEL_CONFIG, validate_category,
+                          validate_dumping_with_pydantic,
+                          validate_method_with_pydantic, validate_status)
 from .exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
-from inspect import getsourcefile
 
 if TYPE_CHECKING:
     from .subject import Subject
 
 from .types import Category, CollectionType, File, Status
-
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -151,10 +153,6 @@ class Step:
     def status(self) -> Status:
         return self._status
 
-    @status.setter
-    def status(self, value: Status):
-        self._status = Status(value)
-
     @classmethod
     @validate_method_with_pydantic(ValidStep)
     def __deserialize__(cls,
@@ -171,6 +169,10 @@ class Step:
     def __serialize__(cls, self: "Step") -> dict:
         # noinspection PyTypeChecker
         return dict(self)
+
+    @status.setter
+    def status(self, value: Status) -> None:
+        self._status = Status(value)
 
     def __call__(self, subject: File or "Subject"):
         if isinstance(self._call, Callable):
@@ -335,6 +337,6 @@ class StepRegistry:
         return cls()
 
     @classmethod
-    def __exit__(cls, exc_type, exc_val, exc_tb): # noqa: ANN206
+    def __exit__(cls, exc_type, exc_val, exc_tb):  # noqa: ANN206, ANN201
         if cls.__new_registration:
             cls._save_registry()
