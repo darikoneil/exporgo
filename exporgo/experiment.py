@@ -16,9 +16,9 @@ from ._tools import check_if_string_set, conditional_dispatch
 # noinspection PyProtectedMember
 from ._validators import (MODEL_CONFIG, convert_permitted_types_to_required,
                           validate_dumping_with_pydantic,
-                          validate_method_with_pydantic,
-                          validate_priority)
-from .exceptions import (DispatchError, DuplicateRegistrationError, ExperimentNotRegisteredError)
+                          validate_method_with_pydantic, validate_priority)
+from .exceptions import (DispatchError, DuplicateRegistrationError,
+                         ExperimentNotRegisteredError)
 from .files import FileSet, FileTree
 from .pipeline import Pipeline, RegisteredPipeline
 from .types import CollectionType, Folder, Priority, Status
@@ -134,13 +134,36 @@ class Experiment:
         #: :class:`str`\: timestamp of creation
         self._created = get_timestamp()
 
+    def __str__(self) -> str:
+        string_to_print = TERMINAL_FORMATTER(f"\t{self.name}: \n", "BLUE")
+        string_to_print += TERMINAL_FORMATTER("\t\tPriority: ", "GREEN")
+        string_to_print += f"{self.priority.name}, {self.priority.value}"
+        string_to_print += TERMINAL_FORMATTER("\t\tStatus: ", "GREEN")
+        string_to_print += f"{self.status.name}, {self.status.value}"
+        string_to_print += TERMINAL_FORMATTER("\t\tCreated: ", "GREEN")
+        string_to_print += f"{self.created}\n"
+        string_to_print += TERMINAL_FORMATTER("\t\tKeys: ", "GREEN")
+        string_to_print += "".join([key + ", " for key in self.keys])[:-2]
+        string_to_print += TERMINAL_FORMATTER("\t\tMeta: \n", "GREEN")
+        if not self.meta:
+            string_to_print += "\t\t\tNo Metadata Defined\n"
+        else:
+            for key, value in self.experiment.meta.items():
+                string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key}: ", "ORANGE")
+                string_to_print += f"{value}\n"
+        string_to_print += TERMINAL_FORMATTER("\t\tFile Tree: \n", "GREEN")
+        for key, file_set in self.file_tree.items():
+            string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key.capitalize()}: ", "ORANGE")
+            string_to_print += f"{len(file_set.files)} Files\n"
+        return string_to_print
+
     @property
     def parent_directory(self) -> Path:
         """
         Parent directory of the experiment
-        
+
         :Return type: :class:`Path <pathlib.Path>`
-        
+
         :meta read-only-properties:
         """
         return self._parent_directory
@@ -149,9 +172,9 @@ class Experiment:
     def experiment_directory(self) -> Path:
         """
         Directory containing the experiment
-        
+
         :Return type: :class:`Path <pathlib.Path>`
-        
+
         :meta read-only-properties:
         """
         return self.parent_directory.joinpath(self.name)
@@ -162,13 +185,13 @@ class Experiment:
         The timestamp associated with the creation of the experiment.
 
         :Return type: :class:`str`
-        
+
         :meta read-only-properties:
         """
         return self._created
 
     @property
-    def keys(self) -> tuple[str , ...]:
+    def keys(self) -> tuple[str, ...]:
         return self._keys
 
     @property
@@ -183,15 +206,37 @@ class Experiment:
         return self._name
 
     @property
+    def sources(self) -> MappingProxyType[str, Folder | CollectionType | None]:
+        return self.pipeline.sources
+
+    @property
     def status(self) -> Status:
         """
         Current status of the experiment
-        
+
         :Return type: :class:`Status <exporgo.types.Status>`
-        
+
         :meta read-only-properties:
         """
         return self.pipeline.status
+
+    @classmethod
+    @validate_method_with_pydantic(ValidExperiment)
+    def __deserialize__(cls,
+                        name: str,
+                        parent_directory: Path,
+                        keys: dict,
+                        file_tree: FileTree,
+                        pipeline: Pipeline,
+                        priority: Priority,
+                        **kwargs) -> "Experiment":
+        return Experiment(name, parent_directory, keys, file_tree, pipeline, priority, **kwargs)
+
+    @classmethod
+    @validate_dumping_with_pydantic(ValidExperiment)
+    def __serialize__(cls, self: "Experiment") -> dict:
+        # noinspection PyTypeChecker
+        return dict(self)  # technically the dict constructor is not necessary, but it's here for clarity.
 
     @parent_directory.setter
     def parent_directory(self, parent_directory: Folder) -> None:
@@ -203,12 +248,12 @@ class Experiment:
 
     # noinspection PyUnresolvedReferences
     @add_sources.register(lambda *args: len(args) == 2)
-    def _(self, sources: dict[str, Folder | CollectionType | None]) -> None:
+    def _(self, sources: dict[str, Folder | CollectionType | None]) -> None:  # noqa: CCE001
         for file_set, source in sources.items():
             self.pipeline.add_source(file_set, source)
 
     @add_sources.register(lambda *args: len(args) == 3)
-    def _(self, file_set: str, source: Folder | CollectionType | None) -> None:
+    def _(self, file_set: str, source: Folder | CollectionType | None) -> None:  # noqa: CCE001
         self.pipeline.add_source(file_set, source)
 
     def analyze(self) -> None:
@@ -251,17 +296,14 @@ class Experiment:
     def remap(self, parent_directory: Folder) -> None:
         """
         Remap the experiment to a new parent directory
-        
+
         :param parent_directory: new parent directory
+
         :type parent_directory: :class:`Folder <exporgo.types.Folder>`
         """
         self._parent_directory = parent_directory
         # noinspection PyUnresolvedReferences
         self.file_tree.remap(parent_directory)
-
-    @property
-    def sources(self) -> MappingProxyType[str, Folder | CollectionType | None]:
-        return self.pipeline.sources
 
     def validate(self) -> None:
         """
@@ -269,46 +311,6 @@ class Experiment:
         """
         # noinspection PyUnresolvedReferences
         self.file_tree.validate()
-
-    @classmethod
-    @validate_method_with_pydantic(ValidExperiment)
-    def __deserialize__(cls,
-                        name,
-                        parent_directory,
-                        keys,
-                        file_tree,
-                        pipeline,
-                        priority,
-                        **kwargs) -> "Experiment":
-        return Experiment(name, parent_directory, keys, file_tree, pipeline, priority, **kwargs)
-
-    @classmethod
-    @validate_dumping_with_pydantic(ValidExperiment)
-    def __serialize__(cls, self) -> dict:
-        return dict(self)  # technically the dict constructor is not necessary, but it's here for clarity.
-
-    def __str__(self) -> str:
-        string_to_print = TERMINAL_FORMATTER(f"\t{self.name}: \n", "BLUE")
-        string_to_print += TERMINAL_FORMATTER("\t\tPriority: ", "GREEN")
-        string_to_print += f"{self.priority.name}, {self.priority.value}"
-        string_to_print += TERMINAL_FORMATTER("\t\tStatus: ", "GREEN")
-        string_to_print += f"{self.status.name}, {self.status.value}"
-        string_to_print += TERMINAL_FORMATTER("\t\tCreated: ", "GREEN")
-        string_to_print += f"{self.created}\n"
-        string_to_print += TERMINAL_FORMATTER("\t\tKeys: ", "GREEN")
-        string_to_print += "".join([key + ", " for key in experiment.keys])[:-2]
-        string_to_print += TERMINAL_FORMATTER("\t\tMeta: \n", "GREEN")
-        if not self.meta:
-            string_to_print += "\t\t\tNo Metadata Defined\n"
-        else:
-            for key, value in self.experiment.meta.items():
-                string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key}: ", "ORANGE")
-                string_to_print += f"{value}\n"
-        string_to_print += TERMINAL_FORMATTER("\t\tFile Tree: \n", "GREEN")
-        for key, file_set in self.file_tree.items():
-            string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key.capitalize()}: ", "ORANGE")
-            string_to_print += f"{len(file_set.files)} Files\n"
-        return string_to_print
 
     def __repr__(self):
         return (f"Experiment("
@@ -350,7 +352,6 @@ class RegisteredExperiment(BaseModel):
     @property
     def file_sets(self) -> set[str]:
         return check_if_string_set(self.additional_file_sets) | self.pipeline.file_sets
-
 
 
 class ExperimentRegistry:
@@ -465,7 +466,7 @@ class ExperimentRegistry:
         return cls()
 
     @classmethod
-    def __exit__(cls, exc_type, exc_val, exc_tb): # noqa: ANN206
+    def __exit__(cls, exc_type, exc_val, exc_tb):  # noqa: ANN206, ANN001
         if cls.__new_registration:
             cls._save_registry()
 
@@ -494,5 +495,5 @@ class ExperimentFactory:
         with ExperimentRegistry() as self.registry:
             return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: ANN206, ANN001
         ...

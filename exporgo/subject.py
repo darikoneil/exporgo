@@ -1,15 +1,17 @@
 from pathlib import Path
-from pydantic import BaseModel, field_validator, field_serializer
 from typing import Any, Optional
 
 import yaml
+from pydantic import BaseModel, field_serializer, field_validator
 
 from . import __current_version__
 from ._color import TERMINAL_FORMATTER
 from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
-from ._validators import (convert_permitted_types_to_required, validate_version, validate_priority,
-                          validate_dumping_with_pydantic, validate_method_with_pydantic)
+from ._validators import (convert_permitted_types_to_required,
+                          validate_dumping_with_pydantic,
+                          validate_method_with_pydantic, validate_priority,
+                          validate_version)
 from .exceptions import DuplicateExperimentError, MissingFilesError
 from .experiment import Experiment, ExperimentFactory
 from .types import CollectionType, File, Folder, Modification, Priority, Status

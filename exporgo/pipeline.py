@@ -2,13 +2,14 @@ from functools import singledispatchmethod
 from os import PathLike
 from pathlib import Path
 from types import GeneratorType, MappingProxyType, NoneType
-from typing import Generator, Optional, Sequence, Any
+from typing import Any, Generator, Optional, Sequence
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from ._io import select_directory, verbose_copy
 from ._tools import check_if_string_set, unique_generator
-from ._validators import MODEL_CONFIG, validate_status, validate_method_with_pydantic, validate_dumping_with_pydantic
+from ._validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
+                          validate_method_with_pydantic, validate_status)
 from .files import FileTree
 from .step import RegisteredStep, Step
 from .types import Category, CollectionType, Folder, Status
