@@ -46,6 +46,7 @@ class ValidExperiment(BaseModel):
     pipeline: Any
     priority: Priority
     meta: dict
+    status: Optional[Status]
     model_config = MODEL_CONFIG
 
     @field_serializer("file_tree")

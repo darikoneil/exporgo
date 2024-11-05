@@ -2,29 +2,42 @@ from functools import singledispatchmethod
 from os import PathLike
 from pathlib import Path
 from types import GeneratorType, MappingProxyType, NoneType
-from typing import Generator, Optional, Sequence
+from typing import Generator, Optional, Sequence, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from ._io import select_directory, verbose_copy
 from ._tools import check_if_string_set, unique_generator
-from ._validators import MODEL_CONFIG
+from ._validators import MODEL_CONFIG, validate_status, validate_method_with_pydantic, validate_dumping_with_pydantic
 from .files import FileTree
 from .step import RegisteredStep, Step
 from .types import Category, CollectionType, Folder, Status
 
 
 class ValidPipeline(BaseModel):
-    ...
+    steps: Step | Sequence[Step] | None
+    status: Status
+    sources: MappingProxyType[str, Folder | CollectionType | None]
+
+    @field_serializer("status")
+    @classmethod
+    def serialize_status(cls, v: Status) -> str:
+        return f"{v.name}, {v.value}"
+
+    @field_validator("status", mode="before", check_fields=True)
+    @classmethod
+    def validate_status(cls, v: Status) -> Status | Any:
+        return validate_status(v)
 
 
 class Pipeline:
     def __init__(self,
                  steps: Step | CollectionType,
-                 status: Status):
+                 status: Status,
+                 sources: Optional[MappingProxyType[str, Folder | CollectionType | None]] = None) -> None:
         self.steps = steps
         self._status = status
-        self._sources = {file_set: None for file_set in self.file_sets}
+        self._sources = sources if sources else {file_set: None for file_set in self.file_sets}
         self._collected = set()
 
     @property
@@ -90,6 +103,16 @@ class Pipeline:
                  file_sets="data",
                  category=Category.ANALYZE,
                  status=Status.SOURCE), Status.SOURCE)
+
+    @classmethod
+    @validate_method_with_pydantic(ValidPipeline)
+    def __deserialize_two__(cls, steps, status, sources) -> "Pipeline":
+        return Pipeline(steps, status, sources)
+
+    @classmethod
+    @validate_dumping_with_pydantic(ValidPipeline)
+    def __serialize__two (cls, self) -> dict:
+        return dict(self)
 
     def __serialize__(self) -> dict:
         return {

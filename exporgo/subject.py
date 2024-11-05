@@ -1,4 +1,5 @@
 from pathlib import Path
+from pydantic import BaseModel, field_validator, field_serializer
 from typing import Any, Optional
 
 import yaml
@@ -7,10 +8,56 @@ from . import __current_version__
 from ._color import TERMINAL_FORMATTER
 from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
-from ._validators import convert_permitted_types_to_required, validate_version
+from ._validators import (convert_permitted_types_to_required, validate_version, validate_priority,
+                          validate_dumping_with_pydantic, validate_method_with_pydantic)
 from .exceptions import DuplicateExperimentError, MissingFilesError
 from .experiment import Experiment, ExperimentFactory
 from .types import CollectionType, File, Folder, Modification, Priority, Status
+
+__all__ = [
+    "Subject",
+]
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Subject Model for Serialization and Validation
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+class ValidSubject(BaseModel):
+    name: str
+    directory: Path
+    study: Optional[str] = None
+    meta: Optional[dict] = None
+    priority: Priority = Priority.NORMAL
+    status: Optional[Status] = None
+    created: Optional[str] = None
+    last_modified: Optional[str] = None
+    experiments: dict[str, Experiment]
+    modifications: list[Modification]
+    meta: dict[str, Any]
+
+    @field_serializer("directory")
+    @classmethod
+    def serialize_directory(cls, v: Path) -> str:
+        return str(v)
+
+    @field_serializer("priority")
+    @classmethod
+    def serialize_priority(cls, v: Priority) -> str:
+        return f"{v.name}, {v.value}"
+
+    @field_serializer("status")
+    @classmethod
+    def serialize_status(cls, v: Status) -> str:
+        return f"{v.name}, {v.value}"
+
+    @field_validator("priority", mode="before", check_fields=True)
+    @classmethod
+    def validate_priority(cls, v: Any) -> Priority | Any:
+        return validate_priority(v)
+
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -260,6 +307,31 @@ class Subject:
 
         return subject
 
+    # noinspection PyUnusedLocal
+    @classmethod
+    @validate_method_with_pydantic(ValidSubject)
+    def __deserialize_two__(cls,
+                            name,
+                            status,
+                            priority,
+                            created,
+                            last_modified,
+                            directory,
+                            study,
+                            meta,
+                            experiments,
+                            modifications,
+                            version
+                            ):
+        # status, last_modified, version are not used
+        subject = cls(name, directory, study, meta, priority, start_log=False)
+        for name, experiment in experiments.items():
+            subject.experiments[name] = Experiment.__deserialize__(experiment)
+        subject._created = created
+        subject._modifications = ModificationLogger(modifications)
+        subject.logger.start()
+        return subject
+
     def create_experiment(self,
                           name: str,
                           keys: str | CollectionType,
@@ -339,18 +411,23 @@ class Subject:
         :rtype: dict[str, Any]
         """
         return {
-            "name": self.name,
-            "priority": f"{self.priority.name}, {self.priority.value}",
-            "created": self.created,
-            "last_modified": self.last_modified,
-            "directory": str(self.directory),
-            "study": self.study,
-            "meta": self.meta,
-            "experiments": {name: experiment.__serialize__(experiment)
-                            for name, experiment in self.experiments.items()},
-            "modifications": self.modifications,
-            "version": __current_version__,
+                "name": self.name,
+                "priority": f"{self.priority.name}, {self.priority.value}",
+                "created": self.created,
+                "last_modified": self.last_modified,
+                "directory": str(self.directory),
+                "study": self.study,
+                "meta": self.meta,
+                "experiments": {name: experiment.__serialize__(experiment)
+                                for name, experiment in self.experiments.items()},
+                "modifications": self.modifications,
+                "version": __current_version__,
         }
+
+    @classmethod
+    @validate_dumping_with_pydantic(ValidSubject)
+    def __serialize_two__(cls, self) -> dict:
+        return {**self, **{"version": __current_version__}}
 
     def __repr__(self) -> str:
         """

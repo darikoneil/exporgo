@@ -29,6 +29,8 @@ __all__ = [
     "validate_extension",
     "validate_filename",
     "validate_version",
+    "validate_priority",
+    "validate_status",
     "validate_dumping_with_pydantic",
     "validate_method_with_pydantic",
     "MODEL_CONFIG",
