@@ -86,7 +86,7 @@ class Subject:
 
         self._created = get_timestamp()
 
-        self._experiments = {}
+        self.experiments = {}
 
         # call this only after all attrs successfully initialized
         self._modifications.append("Instantiated")
@@ -111,7 +111,6 @@ class Subject:
         string_to_print += f"{self.directory}\n"
         string_to_print += TERMINAL_FORMATTER("Study: ", "emphasis")
         string_to_print += f"{self.study}\n"
-
         string_to_print += TERMINAL_FORMATTER("Meta:\n", "emphasis")
         if not self.meta:
             string_to_print += "\tNo Metadata Defined\n"
@@ -121,27 +120,11 @@ class Subject:
                 string_to_print += f"{value}\n"
 
         string_to_print += TERMINAL_FORMATTER("Experiments:\n", "emphasis")
-        if len(self.experiments) == 0:
+        if len(self.contains) == 0:
             string_to_print += "\tNo experiments defined\n"
         else:
-            for name, experiment in self._experiments.items():
-                string_to_print += TERMINAL_FORMATTER(f"\t{name}: \n", "BLUE")
-                string_to_print += TERMINAL_FORMATTER("\t\tCreated: ", "GREEN")
-                string_to_print += f"{experiment.created}\n"
-                string_to_print += TERMINAL_FORMATTER("\t\tKeys: ", "GREEN")
-                string_to_print += "".join([key + ", " for key in experiment.keys])[:-2]
-                string_to_print += "\n"
-                string_to_print += TERMINAL_FORMATTER("\t\tMeta: \n", "GREEN")
-                if not experiment.meta:
-                    string_to_print += "\t\t\tNo Metadata Defined\n"
-                else:
-                    for key, value in experiment.meta.items():
-                        string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key}: ", "ORANGE")
-                        string_to_print += f"{value}\n"
-                string_to_print += TERMINAL_FORMATTER("\t\tFile Tree: \n", "GREEN")
-                for key, file_set in experiment.file_tree.items():
-                    string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key.capitalize()}: ", "ORANGE")
-                    string_to_print += f"{len(file_set.files)} Files\n"
+            for name, experiment in self.experiments.items():
+                string_to_print + f"{experiment}\n"
 
         string_to_print += TERMINAL_FORMATTER("Recent Modifications:\n", "modifications")
         for modification in self.modifications[:5]:
@@ -176,7 +159,7 @@ class Subject:
         return self._created
 
     @property
-    def experiments(self) -> tuple[str, ...]:
+    def contains(self) -> tuple[str, ...]:
         """
         The names of the experiments associated with the subject.
 
@@ -184,7 +167,7 @@ class Subject:
         :Return type: :class:`tuple` [:class:`str`\, ...]
         :meta read-only-properties:
         """
-        return tuple(self._experiments.keys())
+        return tuple(self.experiments.keys())
 
     @property
     def file(self) -> Path:
@@ -219,8 +202,8 @@ class Subject:
 
     @property
     def status(self) -> Status:
-        return min([experiment.status for experiment in self._experiments.values()])\
-            if self._experiments else Status.EMPTY
+        return min([experiment.status for experiment in self.experiments.values()])\
+            if self.experiments else Status.EMPTY
 
     @classmethod
     def load(cls, file: Optional[File] = None) -> "Subject":
@@ -245,7 +228,7 @@ class Subject:
             file = file.joinpath("organization.json")
         with open(file, "r") as file:
             _dict = yaml.safe_load(file)
-        return cls.__deserialize(_dict)
+        return cls.__deserialize__(_dict)
 
     @classmethod
     def __deserialize__(cls, _dict: dict) -> "Subject":
@@ -265,12 +248,12 @@ class Subject:
             directory=_dict.get("directory"),
             study=_dict.get("study"),
             meta=_dict.get("meta"),
-            priority=Priority(_dict.get("priority")[1]),
+            #priority=Priority(_dict.get("priority")[1]),
             start_log=False
         )
 
         for name, experiment in _dict.get("experiments").items():
-            subject._experiments[name] = Experiment(**experiment)
+            subject.experiments[name] = Experiment.__deserialize__(experiment)
         subject._created = _dict.get("created")
         subject._modifications = ModificationLogger(_dict.get("modifications"))
         subject.logger.start()
@@ -297,11 +280,11 @@ class Subject:
         :type kwargs: :class:`Any <typing.Any>`
 
         """
-        if name in self.experiments:
+        if name in self.contains:
             raise DuplicateExperimentError(name)
 
         with ExperimentFactory(name, self.directory) as factory:
-            self._experiments[name] = factory(keys, priority, **kwargs)
+            self.experiments[name] = factory(keys, priority, **kwargs)
 
         self.record(name)
 
@@ -318,7 +301,7 @@ class Subject:
         """
          Indexes all experiments associated with the subject.
          """
-        for experiment in self._experiments.values():
+        for experiment in self.experiments.values():
             experiment.index()
 
     def validate(self) -> None:
@@ -328,7 +311,7 @@ class Subject:
         :raises MissingFilesError: If any files are missing in the experiments.
         """
         missing = {}
-        for experiment in self._experiments.values():
+        for experiment in self.experiments.values():
             try:
                 experiment.validate()
             except MissingFilesError as exc:
@@ -363,7 +346,8 @@ class Subject:
             "directory": str(self.directory),
             "study": self.study,
             "meta": self.meta,
-            "experiments": {name: experiment.__serialize__() for name, experiment in self._experiments.items()},
+            "experiments": {name: experiment.__serialize__(experiment)
+                            for name, experiment in self.experiments.items()},
             "modifications": self.modifications,
             "version": __current_version__,
         }
@@ -380,7 +364,7 @@ class Subject:
             f"{self.directory=}, "
             f"{self.study=}, "
             f"{self.meta=}): "
-            f"{self.experiments=}, "
+            f"{self.contains=}, "
             f"{self.exporgo_file=}, "
             f"{self.modifications=}, "
             f"{self._created=}"
@@ -404,8 +388,8 @@ class Subject:
 
         :returns: The attribute or experiment.
         """
-        if item in self.experiments:
-            return self._experiments.get(item)
+        if item in self.contains:
+            return self.experiments.get(item)
         else:
             return super().__getattribute__(item)
 

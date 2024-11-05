@@ -37,7 +37,7 @@ class Pipeline:
 
     @property
     def status(self) -> Status:
-        return min(step.status for step in self.steps)
+        return min(step.status for step in self.steps) if len(self.steps) > 0 else Status.EMPTY
 
     def add_source(self,
                    file_set: str,
@@ -83,7 +83,7 @@ class Pipeline:
         verbose_copy(source, destination, name)
 
     @classmethod
-    def __deserialize(cls, data: dict) -> "Pipeline":
+    def __deserialize__(cls, data: dict) -> "Pipeline":
         return Pipeline(
             Step(key="step_0",
                  call=lambda x: print(f"Step 0: {x=}"),
@@ -93,9 +93,9 @@ class Pipeline:
 
     def __serialize__(self) -> dict:
         return {
-            "steps": 0,
-            "status": 1,
-            "sources": 2,
+            "steps": self.steps,
+            "status": self.status,
+            "sources": dict(self.sources),
         }
 
 

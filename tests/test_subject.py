@@ -57,7 +57,7 @@ class TestSubject:
                               study="Study1",
                               meta = {"test": "details"},
                               extra = "extra details")
-            subject._experiments["MockExperiment"] = "MockExperiment_"
+            subject.experiments["MockExperiment"] = "MockExperiment_"
             assert getattr(subject, "MockExperiment") == "MockExperiment_"
             assert subject.get("MockExperiment") == "MockExperiment_"
             assert mock_ipythonlogger.start_log.called_once()
@@ -71,7 +71,7 @@ class TestSubject:
                               meta = {"test": "details"},
                               extra = "extra details")
             subject.create_experiment("MockExperiment", "GenericExperiment")
-            assert "MockExperiment" in subject._experiments
+            assert "MockExperiment" in subject.experiments
             assert mock_ipythonlogger.start_log.called_once()
 
     @pytest.mark.skip("Being refactored")
@@ -93,7 +93,7 @@ class TestSubject:
             assert subject_copy.name == "TestSubject"
             assert subject_copy.study == "Study1"
             assert subject_copy.meta == {"test": "details", "extra": "extra details"}
-            assert "MockExperiment" in subject_copy.experiments
+            assert "MockExperiment" in subject_copy.contains
             assert subject_copy.get("MockExperiment").file_tree.num_files == 9
 
     @pytest.mark.skip("Being refactored")

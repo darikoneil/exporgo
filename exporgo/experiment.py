@@ -1,5 +1,4 @@
 import json
-from contextlib import suppress
 from functools import singledispatchmethod
 from pathlib import Path
 from textwrap import indent
@@ -9,7 +8,7 @@ from typing import Any, Generator, Optional, Sequence
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, field_serializer, field_validator
 
 from ._color import TERMINAL_FORMATTER
 from ._logging import get_timestamp
@@ -17,20 +16,18 @@ from ._tools import check_if_string_set, conditional_dispatch
 # noinspection PyProtectedMember
 from ._validators import (MODEL_CONFIG, convert_permitted_types_to_required,
                           validate_dumping_with_pydantic,
-                          validate_method_with_pydantic)
-from .exceptions import (DispatchError, DuplicateRegistrationError,
-                         EnumNameValueMismatchError,
-                         ExperimentNotRegisteredError)
+                          validate_method_with_pydantic,
+                          validate_priority)
+from .exceptions import (DispatchError, DuplicateRegistrationError, ExperimentNotRegisteredError)
 from .files import FileSet, FileTree
 from .pipeline import Pipeline, RegisteredPipeline
 from .types import CollectionType, Folder, Priority, Status
 
 __all__ = [
     "Experiment",
-    "RegisteredExperiment",
     "ExperimentFactory",
     "ExperimentRegistry",
-    "ValidExperiment",
+    "RegisteredExperiment",
 ]
 
 
@@ -51,28 +48,47 @@ class ValidExperiment(BaseModel):
     meta: dict
     model_config = MODEL_CONFIG
 
+    @field_serializer("file_tree")
+    @classmethod
+    def serialize_file_tree(cls, v: FileTree) -> dict:
+        return v.__serialize__()
+
+    @field_serializer("parent_directory")
+    @classmethod
+    def serialize_parent_directory(cls, v: Path) -> str:
+        return str(v)
+
+    @field_serializer("pipeline")
+    @classmethod
+    def serialize_pipeline(cls, v: Pipeline) -> dict:
+        return v.__serialize__()
+
     @field_serializer("priority")
     @classmethod
     def serialize_priority(cls, v: Priority) -> str:
         return f"({v.name}, {v.value})"
 
+    @field_validator("file_tree", mode="before", check_fields=True)
+    @classmethod
+    def validate_file_tree(cls, v: dict) -> FileTree | Any:
+        if isinstance(v, dict):
+            return FileTree.__deserialize__(v)
+        else:
+            return v
+
+    @field_validator("parent_directory", mode="before", check_fields=True)
+    @classmethod
+    def validate_pipeline(cls, v: Any) -> Pipeline | Any:
+        if isinstance(v, dict):
+            return Pipeline.__deserialize__(v)
+        else:
+            return v
+
     # noinspection PyUnboundLocalVariable
     @field_validator("priority", mode="before", check_fields=True)
     @classmethod
     def validate_priority(cls, v: Any) -> Priority:
-        with suppress(ValueError):
-            return Priority(v)
-        if isinstance(v, str):
-            name, value = v[1:-1].split(", ")
-            value = int(value)
-        elif isinstance(v, tuple):
-            name, value = v
-        priority = Priority(value)
-        try:
-            assert priority.name == name
-        except AssertionError as exc:
-            raise EnumNameValueMismatchError(Priority, name, value) from exc
-        return priority
+        return validate_priority(v)
 
 
 """
@@ -270,6 +286,29 @@ class Experiment:
     def __serialize__(cls, self) -> dict:
         return dict(self)  # technically the dict constructor is not necessary, but it's here for clarity.
 
+    def __str__(self) -> str:
+        string_to_print = TERMINAL_FORMATTER(f"\t{self.name}: \n", "BLUE")
+        string_to_print += TERMINAL_FORMATTER("\t\tPriority: ", "GREEN")
+        string_to_print += f"{self.priority.name}, {self.priority.value}"
+        string_to_print += TERMINAL_FORMATTER("\t\tStatus: ", "GREEN")
+        string_to_print += f"{self.status.name}, {self.status.value}"
+        string_to_print += TERMINAL_FORMATTER("\t\tCreated: ", "GREEN")
+        string_to_print += f"{self.created}\n"
+        string_to_print += TERMINAL_FORMATTER("\t\tKeys: ", "GREEN")
+        string_to_print += "".join([key + ", " for key in experiment.keys])[:-2]
+        string_to_print += TERMINAL_FORMATTER("\t\tMeta: \n", "GREEN")
+        if not self.meta:
+            string_to_print += "\t\t\tNo Metadata Defined\n"
+        else:
+            for key, value in self.experiment.meta.items():
+                string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key}: ", "ORANGE")
+                string_to_print += f"{value}\n"
+        string_to_print += TERMINAL_FORMATTER("\t\tFile Tree: \n", "GREEN")
+        for key, file_set in self.file_tree.items():
+            string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key.capitalize()}: ", "ORANGE")
+            string_to_print += f"{len(file_set.files)} Files\n"
+        return string_to_print
+
     def __repr__(self):
         return (f"Experiment("
                 f"{self.name=}, "
@@ -301,11 +340,11 @@ class RegisteredExperiment(BaseModel):
     """
     Recipe for defining an experiment
     """
-    model_config = MODEL_CONFIG
-    key: str = Field(None, title="Unique key for the experiment type in the registry")
-    additional_file_sets: str | Sequence[str] = Field(None, title="Additional file sets for organizing experiment")
-    pipeline: RegisteredPipeline = Field(None, title="Pipeline for the experiment")
+    key: str
+    additional_file_sets: str | Sequence[str] | None
+    pipeline: RegisteredPipeline
     # sequence does not permit str / bytes, so this works to indicate the list or tuple
+    model_config = MODEL_CONFIG
 
     @property
     def file_sets(self) -> set[str]:

@@ -79,8 +79,8 @@ class FileTree:
         return sum(len(file_set.folders) for file_set in self.values()) + len(self)
 
     @classmethod
-    def __from_dict__(cls, _dict: dict) -> "FileTree":
-        file_tree = cls(_dict.pop("name"), _dict.pop("directory"), index=False)
+    def __deserialize__(cls, _dict: dict) -> "FileTree":
+        file_tree = cls(_dict.pop("directory"), populate=False)
         for value in _dict.get("file_sets").values():
             name = value.get("name")
             value["directory"] = Path(value.get("directory")).parent
