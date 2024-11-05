@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Callable, Any
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
-from pydantic import BaseModel, Field, field_serializer, field_validator, functional_validators
+from pydantic import BaseModel, field_serializer, field_validator
 
 from ._color import TERMINAL_FORMATTER
 from ._validators import MODEL_CONFIG, validate_status, validate_category
@@ -34,6 +34,11 @@ class ValidStep(BaseModel):
     status: Status
     model_config = MODEL_CONFIG
 
+    @field_serializer("call", check_fields=True)
+    @classmethod
+    def serialize_call(cls, v: str | Path | Callable) -> str | dict:
+        return str(v)
+
     @field_serializer("category", check_fields=True)
     @classmethod
     def serialize_category(cls, v: Category) -> str:
@@ -43,6 +48,11 @@ class ValidStep(BaseModel):
     @classmethod
     def serialize_status(cls, v: Status) -> str:
         return f"{v.name}, {v.value}"
+
+    @field_validator("call", mode="before", check_fields=True)
+    @classmethod
+    def validate_call(cls, v: Any) -> str | Path | Callable:
+        return v
 
     @field_validator("category", mode="before", check_fields=True)
     @classmethod
@@ -60,6 +70,7 @@ class ValidStep(BaseModel):
 // Step Class
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
+
 
 class Step:
 
@@ -91,6 +102,16 @@ class Step:
         self._call(subject)
 
 
+def _call_script() -> None:
+    ...
+
+def _call_notebook() -> None:
+    ...
+
+def _call_function() -> None:
+    ...
+
+
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Step Registry
@@ -99,11 +120,11 @@ class Step:
 
 
 class RegisteredStep(BaseModel):
+    key: str
+    call: Analysis = lambda *args, **kwargs: print("DEFAULT")
+    file_sets: str | list[str] | tuple[str, ...]
+    category: Category = Category.ANALYZE
     model_config = MODEL_CONFIG
-    key: str = Field(None, title="Unique key for the analysis type in the registry")
-    call: Analysis = Field(None, title="Analyzer for the experiment")
-    file_sets: str | list[str] | tuple[str, ...] = Field(None, title="Collection of file sets for organizing experiment")
-    category: Category = Field(Category.ANALYZE, title="Category of the analysis")
 
 
 class StepRegistry:
