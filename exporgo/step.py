@@ -4,7 +4,7 @@ from pathlib import Path
 from textwrap import indent
 from types import GeneratorType
 from typing import TYPE_CHECKING, Callable, Any
-
+from importlib.util import spec_from_file_location, module_from_spec
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
@@ -13,11 +13,50 @@ from pydantic import BaseModel, field_serializer, field_validator
 from ._color import TERMINAL_FORMATTER
 from ._validators import MODEL_CONFIG, validate_status, validate_category
 from .exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
+from inspect import getsourcefile
 
 if TYPE_CHECKING:
     from .subject import Subject
 
 from .types import Analysis, Category, CollectionType, File, Status
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Internal Functions
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+def import_function_from_file(name: str, file: Path) -> Callable:
+    """
+    Import a function from a file
+
+    :param name: name of the function
+
+    :param file: path to the file
+
+    :return: function
+    """
+    spec = spec_from_file_location(name, file)
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return getattr(module, name)
+
+
+def serialize_function(call: Callable) -> dict:
+    """
+    Serialize a function
+
+    :param call: function
+
+    :return: serialized function
+    """
+    return {
+        "name": call.__name__,
+        "file": getsourcefile(call)
+    }
+
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,7 +76,10 @@ class ValidStep(BaseModel):
     @field_serializer("call", check_fields=True)
     @classmethod
     def serialize_call(cls, v: str | Path | Callable) -> str | dict:
-        return str(v)
+        if isinstance(v, Callable):
+            return serialize_function(v)
+        else:
+            return str(v)
 
     @field_serializer("category", check_fields=True)
     @classmethod

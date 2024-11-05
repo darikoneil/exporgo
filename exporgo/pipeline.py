@@ -29,9 +29,9 @@ __all__ = [
 
 
 class ValidPipeline(BaseModel):
-    steps: Step | Sequence[Step] | None
+    steps: None
     status: Status
-    sources: MappingProxyType[str, Folder | CollectionType | None]
+    sources: str #MappingProxyType[str, Folder | CollectionType | None]
     model_config = MODEL_CONFIG
 
     @field_serializer("sources", check_fields=True)

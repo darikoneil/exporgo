@@ -36,8 +36,8 @@ class ValidSubject(BaseModel):
     status: Optional[Status] = None
     created: Optional[str] = None
     last_modified: Optional[str] = None
-    experiments: dict[str, Experiment]
-    modifications: list[Modification]
+    experiments: Any
+    modifications: Any
     meta: dict[str, Any]
 
     @field_serializer("directory")
