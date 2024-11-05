@@ -1,7 +1,104 @@
 from contextlib import suppress
 from functools import update_wrapper
 from types import MappingProxyType
-from typing import Any, Callable, Generator, Iterable
+from typing import Any, Callable, Generator, Iterable, Tuple
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Parameterized Decorators
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+def amend_args(arguments: tuple, amendment: Any, pos: int = 0) -> tuple:
+    """
+    Function amends arguments tuple (~scary tuple mutation~)
+
+    :param arguments: arguments to be amended
+
+    :param amendment: new value of argument
+
+    :param pos: index of argument to be converted
+
+    :returns: amended arguments tuple
+    """
+    arguments = list(arguments)
+    arguments[pos] = amendment
+    return tuple(arguments)
+
+
+def collector(pos: int, key: str, *args, **kwargs) -> Tuple[bool, Any, bool]:
+    """
+    Function collects the argument to be validated
+
+    :param pos: position of argument to be collected
+
+    :param key: key of argument to be collected
+
+    :param args: arguments for positional collection
+
+    :param kwargs: keyword arguments for keyword collection
+
+    :returns: A tuple containing an argument, target, and a boolean indicating whether to use positional arguments
+    """
+    # noinspection PyBroadException
+    try:
+        if key in kwargs:
+            collected = True
+            use_args = False
+            target = kwargs.get(key)
+        elif pos is not None and args[pos] is not None:
+            collected = True
+            use_args = True
+            target = args[pos]
+        else:
+            raise Exception
+
+    except Exception:  # if any exception, just report a failure to collect
+        collected = False
+        use_args = None
+        target = None
+
+    # noinspection PyUnboundLocalVariable
+    return collected, target, use_args
+
+
+def parameterize(decorator: Callable) -> Callable:
+    """
+    Function for parameterizing decorators
+
+    :param decorator: A decorator to parameterize
+
+    :returns: A decorator that can be parameterized
+    """
+
+    def outer(*args, **kwargs) -> Callable:
+        """
+        Outer function that takes arguments and keyword arguments for the decorator
+
+        :param args: Positional arguments for the decorator
+
+        :param kwargs: Keyword arguments for the decorator
+
+        :returns: A function that applies the decorator to the target function
+        """
+
+        def inner(func: Callable) -> Callable:
+            """
+            Inner function that applies the decorator to the target function
+
+            :param func: The target function to be decorated
+
+            :returns: The decorated function
+            """
+            # noinspection PyArgumentList
+            return decorator(func, *args, **kwargs)
+
+        return inner
+
+    return outer
+
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

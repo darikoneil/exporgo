@@ -4,10 +4,10 @@ import pytest
 
 from exporgo import __current_version__
 # noinspection PyProtectedMember
-from exporgo._validators import (_collector,
-                                 convert_permitted_types_to_required,
+from exporgo._validators import (convert_permitted_types_to_required,
                                  validate_extension, validate_filename,
                                  validate_version)
+from exporgo._tools import collector
 from exporgo.exceptions import (InvalidExtensionWarning, InvalidFilenameError,
                                 UpdateVersionWarning,
                                 VersionBackwardCompatibilityError,
@@ -19,7 +19,7 @@ def test_collector():
     # used kwargs
     args = None,
     kwargs = {"dummy": "dummy"}
-    collected, target, use_args = _collector(0, "dummy", *args, **kwargs)
+    collected, target, use_args = collector(0, "dummy", *args, **kwargs)
     assert collected
     assert not use_args
     assert (target == "dummy")
@@ -27,7 +27,7 @@ def test_collector():
     # used args
     args = ("dummy", "variable")
     kwargs = {}
-    collected, target, use_args = _collector(0, "dummy", *args, **kwargs)
+    collected, target, use_args = collector(0, "dummy", *args, **kwargs)
     assert collected
     assert use_args
     assert (target == "dummy")
@@ -35,7 +35,7 @@ def test_collector():
     # failure
     args = None,
     kwargs = {}
-    collected, target, use_args = _collector(0, "dummy", *args, **kwargs)
+    collected, target, use_args = collector(0, "dummy", *args, **kwargs)
     assert not collected
     assert not use_args
     assert not target

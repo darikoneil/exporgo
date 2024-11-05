@@ -15,7 +15,8 @@ from ._color import TERMINAL_FORMATTER
 from ._logging import get_timestamp
 from ._tools import check_if_string_set, conditional_dispatch
 # noinspection PyProtectedMember
-from ._validators import MODEL_CONFIG, convert_permitted_types_to_required, validate_with_pydantic
+from ._validators import (MODEL_CONFIG, convert_permitted_types_to_required, validate_method_with_pydantic,
+                          validate_dumping_with_pydantic)
 from .exceptions import (DispatchError, DuplicateRegistrationError,
                          ExperimentNotRegisteredError, EnumNameValueMismatchError)
 from .files import FileSet, FileTree
@@ -39,13 +40,13 @@ __all__ = [
 
 
 class ValidExperiment(BaseModel):
-    name: str = Field(..., title="Name of the experiment")
-    parent_directory: Path = Field(..., title="Parent directory of the experiment")
-    keys: str | Sequence[str] = Field(..., title="Keys for the experiment")
-    file_tree: Any = Field(..., title="File tree for the experiment")
-    pipeline: Any = Field(..., title="Pipeline for the experiment")
-    priority: Priority = Field(Priority.NORMAL, title="Priority of the experiment")
-    meta: dict = Field(dict(), title="Meta data for the experiment")
+    name: str
+    parent_directory: Path
+    keys: str | Sequence[str]
+    file_tree: Any
+    pipeline: Any
+    priority: Priority
+    meta: dict
     model_config = MODEL_CONFIG
 
     @field_serializer("priority")
@@ -54,7 +55,7 @@ class ValidExperiment(BaseModel):
         return f"({v.name}, {v.value})"
 
     # noinspection PyUnboundLocalVariable
-    @field_validator("priority", mode="before")
+    @field_validator("priority", mode="before", check_fields=True)
     @classmethod
     def validate_priority(cls, v: Any) -> Priority:
         with suppress(ValueError):
@@ -250,19 +251,21 @@ class Experiment:
         self.file_tree.validate()
 
     @classmethod
-    @validate_with_pydantic(ValidExperiment)
-    def __deserialize__(cls, dict_: dict):
-        Experiment(**dict_)
+    @validate_method_with_pydantic(ValidExperiment)
+    def __deserialize__(cls,
+                        name,
+                        parent_directory,
+                        keys,
+                        file_tree,
+                        pipeline,
+                        priority,
+                        **kwargs) -> "Experiment":
+        return Experiment(name, parent_directory, keys, file_tree, pipeline, priority, **kwargs)
 
-    def __serialize__(self) -> dict:
-        return {
-            "name": self.name,
-            "keys": self.keys,
-            "file_tree": self.file_tree.__serialize__(),
-            "pipeline": self.pipeline.__serialize__(),
-            "priority": f"{self.priority.name}, {self.priority.value}",
-            "meta": self.meta,
-        }
+    @classmethod
+    @validate_dumping_with_pydantic(ValidExperiment)
+    def __serialize__(cls, self) -> dict:
+        return dict(self)  # technically the dict constructor is not necessary, but it's here for clarity.
 
     def __repr__(self):
         return (f"Experiment("
