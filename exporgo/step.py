@@ -20,6 +20,10 @@ if TYPE_CHECKING:
 from .types import Analysis, Category, CollectionType, File, Status
 
 
+class ValidStep(BaseModel):
+    ...
+
+
 class Step:
 
     def __init__(self,
@@ -50,7 +54,7 @@ class Step:
         self._call(subject)
 
 
-class StepConfig(BaseModel):
+class RegisteredStep(BaseModel):
     model_config = MODEL_CONFIG
     key: str = Field(None, title="Unique key for the analysis type in the registry")
     call: Analysis = Field(None, title="Analyzer for the experiment")
@@ -95,7 +99,7 @@ class StepRegistry:
         return key in cls.__registry
 
     @classmethod
-    def get(cls, key: str) -> "StepConfig":
+    def get(cls, key: str) -> "RegisteredStep":
         """
         Get an analysis configuration
         """
@@ -104,7 +108,7 @@ class StepRegistry:
         return cls.__registry[key]
 
     @classmethod
-    def pop(cls, key: str) -> "StepConfig":
+    def pop(cls, key: str) -> "RegisteredStep":
         """
         Remove an experiment configuration
         """
@@ -117,7 +121,7 @@ class StepRegistry:
     # noinspection PyNestedDecorators
     @singledispatchmethod
     @classmethod
-    def register(cls, analysis: "StepConfig") -> None:
+    def register(cls, analysis: "RegisteredStep") -> None:
         """
         Register an experiment configuration
         """
@@ -155,7 +159,7 @@ class StepRegistry:
         """
         try:
             with Lock(cls.__path, "r", timeout=10) as file:
-                cls.register((StepConfig.model_validate(config) for _, config in json.load(file).items()))
+                cls.register((RegisteredStep.model_validate(config) for _, config in json.load(file).items()))
         except FileNotFoundError:
             cls.__path.touch(exist_ok=False)
             cls._save_registry()

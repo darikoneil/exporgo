@@ -1,9 +1,9 @@
+import inspect
 import string
 import warnings
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable
-import inspect
 
 from pydantic import ConfigDict
 

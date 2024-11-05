@@ -10,8 +10,12 @@ from ._io import select_directory, verbose_copy
 from ._tools import check_if_string_set, unique_generator
 from ._validators import MODEL_CONFIG
 from .files import FileTree
-from .step import Step, StepConfig
+from .step import Step, RegisteredStep
 from .types import Category, CollectionType, Folder, Status
+
+
+class ValidPipeline(BaseModel):
+    ...
 
 
 class Pipeline:
@@ -95,8 +99,8 @@ class Pipeline:
         }
 
 
-class PipelineConfig(BaseModel):
-    steps: StepConfig | Sequence[StepConfig] = Field(None, title="Sequence of steps in the pipeline")
+class RegisteredPipeline(BaseModel):
+    steps: RegisteredStep | Sequence[RegisteredStep] = Field(None, title="Sequence of steps in the pipeline")
     model_config = MODEL_CONFIG
 
     @property

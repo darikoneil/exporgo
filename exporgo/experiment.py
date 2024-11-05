@@ -9,23 +9,25 @@ from typing import Any, Generator, Optional, Sequence
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
-from pydantic import BaseModel, Field, field_validator, field_serializer
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from ._color import TERMINAL_FORMATTER
 from ._logging import get_timestamp
 from ._tools import check_if_string_set, conditional_dispatch
 # noinspection PyProtectedMember
-from ._validators import (MODEL_CONFIG, convert_permitted_types_to_required, validate_method_with_pydantic,
-                          validate_dumping_with_pydantic)
+from ._validators import (MODEL_CONFIG, convert_permitted_types_to_required,
+                          validate_dumping_with_pydantic,
+                          validate_method_with_pydantic)
 from .exceptions import (DispatchError, DuplicateRegistrationError,
-                         ExperimentNotRegisteredError, EnumNameValueMismatchError)
+                         EnumNameValueMismatchError,
+                         ExperimentNotRegisteredError)
 from .files import FileSet, FileTree
-from .pipeline import Pipeline, PipelineConfig
+from .pipeline import Pipeline, RegisteredPipeline
 from .types import CollectionType, Folder, Priority, Status
 
 __all__ = [
     "Experiment",
-    "ExperimentConfig",
+    "RegisteredExperiment",
     "ExperimentFactory",
     "ExperimentRegistry",
     "ValidExperiment",
@@ -71,6 +73,7 @@ class ValidExperiment(BaseModel):
         except AssertionError as exc:
             raise EnumNameValueMismatchError(Priority, name, value) from exc
         return priority
+
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -294,14 +297,14 @@ class Experiment:
 """
 
 
-class ExperimentConfig(BaseModel):
+class RegisteredExperiment(BaseModel):
     """
     Recipe for defining an experiment
     """
     model_config = MODEL_CONFIG
     key: str = Field(None, title="Unique key for the experiment type in the registry")
     additional_file_sets: str | Sequence[str] = Field(None, title="Additional file sets for organizing experiment")
-    pipeline: PipelineConfig = Field(None, title="Pipeline for the experiment")
+    pipeline: RegisteredPipeline = Field(None, title="Pipeline for the experiment")
     # sequence does not permit str / bytes, so this works to indicate the list or tuple
 
     @property
@@ -348,7 +351,7 @@ class ExperimentRegistry:
         return key in cls.__registry
 
     @classmethod
-    def get(cls, key: str) -> "ExperimentConfig":
+    def get(cls, key: str) -> "RegisteredExperiment":
         """
         Get an experiment configuration
         """
@@ -357,7 +360,7 @@ class ExperimentRegistry:
         return cls.__registry[key]
 
     @classmethod
-    def pop(cls, key: str) -> "ExperimentConfig":
+    def pop(cls, key: str) -> "RegisteredExperiment":
         """
         Remove an experiment configuration
         """
@@ -370,7 +373,7 @@ class ExperimentRegistry:
     # noinspection PyNestedDecorators
     @singledispatchmethod
     @classmethod
-    def register(cls, experiment: "ExperimentConfig") -> None:
+    def register(cls, experiment: "RegisteredExperiment") -> None:
         """
         Register an experiment configuration
         """
@@ -383,7 +386,7 @@ class ExperimentRegistry:
     @register.register
     @classmethod
     def _(cls, experiment: dict) -> None:
-        cls.register(ExperimentConfig.model_validate(experiment))
+        cls.register(RegisteredExperiment.model_validate(experiment))
 
     # noinspection PyNestedDecorators
     @register.register(list)
@@ -399,7 +402,7 @@ class ExperimentRegistry:
     @register.register
     @classmethod
     def _(cls, name: str, **kwargs) -> None:
-        cls.register(ExperimentConfig(name=name, **kwargs))
+        cls.register(RegisteredExperiment(name=name, **kwargs))
 
     # noinspection DuplicatedCode
     @classmethod
@@ -409,7 +412,7 @@ class ExperimentRegistry:
         """
         try:
             with Lock(cls.__path, "r", timeout=10) as file:
-                cls.register((ExperimentConfig.model_validate(config) for _, config in json.load(file).items()))
+                cls.register((RegisteredExperiment.model_validate(config) for _, config in json.load(file).items()))
         except FileNotFoundError:
             cls.__path.touch(exist_ok=False)
             cls._save_registry()

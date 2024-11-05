@@ -3,7 +3,6 @@ from functools import update_wrapper
 from types import MappingProxyType
 from typing import Any, Callable, Generator, Iterable, Tuple
 
-
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Parameterized Decorators

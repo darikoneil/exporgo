@@ -3,11 +3,11 @@ from pathlib import Path
 import pytest
 
 from exporgo import __current_version__
+from exporgo._tools import collector
 # noinspection PyProtectedMember
 from exporgo._validators import (convert_permitted_types_to_required,
                                  validate_extension, validate_filename,
                                  validate_version)
-from exporgo._tools import collector
 from exporgo.exceptions import (InvalidExtensionWarning, InvalidFilenameError,
                                 UpdateVersionWarning,
                                 VersionBackwardCompatibilityError,
