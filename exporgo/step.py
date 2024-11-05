@@ -3,22 +3,21 @@ from functools import singledispatchmethod
 from pathlib import Path
 from textwrap import indent
 from types import GeneratorType
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Any
 
 from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer, field_validator, functional_validators
 
 from ._color import TERMINAL_FORMATTER
-from ._validators import MODEL_CONFIG
+from ._validators import MODEL_CONFIG, validate_status, validate_category
 from .exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
 
 if TYPE_CHECKING:
     from .subject import Subject
 
 from .types import Analysis, Category, CollectionType, File, Status
-
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,7 +27,32 @@ from .types import Analysis, Category, CollectionType, File, Status
 
 
 class ValidStep(BaseModel):
-    ...
+    key: str
+    call: str | Path | Callable
+    file_sets: str | list[str] | tuple[str, ...]
+    category: Category
+    status: Status
+    model_config = MODEL_CONFIG
+
+    @field_serializer("category", check_fields=True)
+    @classmethod
+    def serialize_category(cls, v: Category) -> str:
+        return f"{v.name}, {v.value}"
+
+    @field_serializer("status", check_fields=True)
+    @classmethod
+    def serialize_status(cls, v: Status) -> str:
+        return f"{v.name}, {v.value}"
+
+    @field_validator("category", mode="before", check_fields=True)
+    @classmethod
+    def validate_category(cls, v: Any) -> Category:
+        return validate_category(v)
+
+    @field_validator("status", mode="before", check_fields=True)
+    @classmethod
+    def validate_status(cls, v: Any) -> Status:
+        return validate_status(v)
 
 
 """

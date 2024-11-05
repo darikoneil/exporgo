@@ -16,7 +16,8 @@ from .exceptions import (EnumNameValueMismatchError, InvalidExtensionWarning,
                          VersionBackwardCompatibilityError,
                          VersionBackwardCompatibilityWarning,
                          VersionForwardCompatibilityWarning)
-from .types import Priority, Status
+from .types import Priority, Status, Category
+
 
 """
 Some functions useful for validation & a conserved config for all Pydantic BaseModels. Most of these functions are
@@ -34,6 +35,7 @@ __all__ = [
     "validate_status",
     "validate_dumping_with_pydantic",
     "validate_method_with_pydantic",
+    "validate_category",
     "MODEL_CONFIG",
 ]
 
@@ -253,6 +255,24 @@ def validate_method_with_pydantic(function: Callable, model: Any) -> Callable:
 """
 
 
+# noinspection PyUnboundLocalVariable
+def validate_category(v: Any) -> Category:
+    with suppress(ValueError):
+        return Category(v)
+    if isinstance(v, str):
+        name, value = v[1:-1].split(", ")
+        value = int(value)
+    elif isinstance(v, tuple):
+        name, value = v
+    category = Category(value)
+    try:
+        assert category.name == name
+    except AssertionError as exc:
+        raise EnumNameValueMismatchError(Category, name, value) from exc
+    return category
+
+
+# noinspection PyUnboundLocalVariable
 def validate_priority(v: Any) -> Priority:
     with suppress(ValueError):
         return Priority(v)
@@ -269,6 +289,7 @@ def validate_priority(v: Any) -> Priority:
     return priority
 
 
+# noinspection PyUnboundLocalVariable
 def validate_status(v: Any) -> Status:
     with suppress(ValueError):
         return Status(v)

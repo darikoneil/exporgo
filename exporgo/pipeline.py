@@ -3,9 +3,9 @@ from os import PathLike
 from pathlib import Path
 from types import GeneratorType, MappingProxyType, NoneType
 from typing import Any, Generator, Optional, Sequence
-from typing_extensions import Self
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
+from typing_extensions import Self
 
 from ._io import select_directory, verbose_copy
 from ._tools import check_if_string_set, unique_generator
@@ -14,7 +14,6 @@ from ._validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
 from .files import FileTree
 from .step import RegisteredStep, Step
 from .types import Category, CollectionType, Folder, Status
-
 
 __all__ = [
     "Pipeline",
