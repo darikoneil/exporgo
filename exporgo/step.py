@@ -239,7 +239,7 @@ class StepRegistry:
             with Lock(cls.__path, "w", flags=LOCK_EX) as file:
                 # noinspection PyTypeChecker
                 file.write("{\n")
-                for  idx, key_step in enumerate(cls.__registry.items()):
+                for idx, key_step in enumerate(cls.__registry.items()):
                     key, step = key_step
                     str_step = indent(json.dumps(key)
                                       + f": {step.model_dump_json(exclude_defaults=True, indent=4)}",
