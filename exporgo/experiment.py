@@ -232,6 +232,7 @@ class Experiment:
         """
         return self.pipeline.status
 
+    # noinspection PyUnusedLocal
     @classmethod
     @validate_method_with_pydantic(ValidExperiment)
     def __deserialize__(cls,
@@ -374,7 +375,7 @@ class ExperimentRegistry:
     Registry for storing experiment configurations
     """
     __registry = {}
-    __path = Path(__file__).parent.joinpath("registered_experiments.json")
+    __path = Path(__file__).parent.joinpath("registry").joinpath("registered_experiments.json")
     __new_registration = False
 
     # noinspection DuplicatedCode
@@ -387,11 +388,13 @@ class ExperimentRegistry:
             with Lock(cls.__path, "w", flags=LOCK_EX) as file:
                 # noinspection PyTypeChecker
                 file.write("{\n")
-                for key, experiment in cls.__registry.items():
-                    file.write(indent(
-                        json.dumps(key)
-                        + f": {experiment.model_dump_json(exclude_defaults=True, indent=4)}\n",
-                        " " * 4))
+                for idx, key_experiment in enumerate(cls.__registry.items()):
+                    key, experiment = key_experiment
+                    str_experiment = indent(json.dumps(key)
+                                            + f": {experiment.model_dump_json(exclude_defaults=True, indent=4)}",
+                                            " " * 4)
+                    str_experiment += ",\n" if idx < len(cls.__registry) - 1 else "\n"
+                    file.write(str_experiment)
                 file.write("}\n")
         except FileNotFoundError:
             cls.__path.touch(exist_ok=False)

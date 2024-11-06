@@ -182,4 +182,7 @@ class RegisteredPipeline(BaseModel):
 
     @property
     def file_sets(self) -> set[str]:
-        return {file_set for step in self.steps for file_set in check_if_string_set(step.file_sets)}
+        if isinstance(self.steps, RegisteredStep):
+            return check_if_string_set(self.steps.file_sets)
+        if isinstance(self.steps, (list, tuple)):
+            return {file_set for step in self.steps for file_set in check_if_string_set(step.file_sets)}

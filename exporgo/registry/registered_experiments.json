@@ -1,0 +1,43 @@
+{
+    "Generic Experiment": {
+        "key": "Generic Experiment",
+        "additional_file_sets": [
+            "figures",
+            "results"
+        ],
+        "pipeline": {
+            "steps": {
+                "key": "Generic Step",
+                "call": {
+                    "name": "generic_function_call",
+                    "file": "C:\\Users\\Yuste\\PycharmProjects\\exporgo\\exporgo\\registry\\generics.py"
+                },
+                "file_sets": [
+                    "data"
+                ],
+                "category": "(ANALYZE, 1)"
+            }
+        }
+    },
+    "Generic Experiment_2": {
+        "key": "Generic Experiment_2",
+        "additional_file_sets": [
+            "figures",
+            "results"
+        ],
+        "pipeline": {
+            "steps": {
+                "key": "Generic Step",
+                "call": {
+                    "name": "generic_function_call",
+                    "file": "C:\\Users\\Yuste\\PycharmProjects\\exporgo\\exporgo\\registry\\generics.py"
+                },
+                "file_sets": [
+                    "data"
+                ],
+                "category": "(ANALYZE, 1)"
+            }
+        }
+    }
+
+}
