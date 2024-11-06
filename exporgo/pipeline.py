@@ -69,9 +69,13 @@ class ValidPipeline(BaseModel):
     @classmethod
     def validate_steps(cls, v: Step | Sequence[Step] | None) -> Step | Sequence[Step] | None:
         if isinstance(v, (list, tuple)):
-            return [Step.__deserialize__(**step) if isinstance(step, dict) else step for step in v if isinstance(step, Step)]
+            steps = []
+            for step in v:
+                if not isinstance(step, Step)  and isinstance(step, dict):
+                        steps.append(Step.__deserialize__(**step))
+            return steps
         elif isinstance(v, dict):
-            return Step(**v)
+            return Step.__deserialize__(**v)
         else:
             return v
         # TODO: FIX ME, I don't always return a Step or Sequence[Step]
@@ -92,6 +96,7 @@ class Pipeline:
         self.steps = steps
         self._status = status
         self._sources = sources if sources else dict.fromkeys(self.file_sets, None)
+        # TODO: This will fail, I  will need to fix this
         self._collected = set()
 
     @property
@@ -145,7 +150,7 @@ class Pipeline:
 
     # noinspection PyUnusedLocal
     @_collect.register(type(None))
-    def _(self, sources: NoneType, destination: Path, name: str) -> None:  # noqa: CCE001
+    def _(self, sources: NoneType, destination: Path, name: str) -> None:  # noqa: CCE001, U100
         source = select_directory(title=f"Select the source directory for {name}")
         verbose_copy(source, destination, name)
 

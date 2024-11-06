@@ -16,7 +16,8 @@ from ._tools import check_if_string_set, conditional_dispatch
 # noinspection PyProtectedMember
 from ._validators import (MODEL_CONFIG, convert_permitted_types_to_required,
                           validate_dumping_with_pydantic,
-                          validate_method_with_pydantic, validate_priority)
+                          validate_method_with_pydantic, validate_priority,
+                          validate_status)
 from .exceptions import (DispatchError, DuplicateRegistrationError,
                          ExperimentNotRegisteredError)
 from .files import FileSet, FileTree
@@ -42,8 +43,8 @@ class ValidExperiment(BaseModel):
     name: str
     parent_directory: Path
     keys: str | Sequence[str]
-    file_tree: Any
-    pipeline: Any
+    file_tree: FileTree
+    pipeline: Pipeline
     priority: Priority
     meta: dict
     status: Optional[Status]
@@ -69,6 +70,11 @@ class ValidExperiment(BaseModel):
     def serialize_priority(cls, v: Priority) -> str:
         return f"({v.name}, {v.value})"
 
+    @field_serializer("status")
+    @classmethod
+    def serialize_status(cls, v: Status) -> str:
+        return f"({v.name}, {v.value})"
+
     @field_validator("file_tree", mode="before", check_fields=True)
     @classmethod
     def validate_file_tree(cls, v: dict) -> FileTree | Any:
@@ -77,7 +83,7 @@ class ValidExperiment(BaseModel):
         else:
             return v
 
-    @field_validator("parent_directory", mode="before", check_fields=True)
+    @field_validator("pipeline", mode="before", check_fields=True)
     @classmethod
     def validate_pipeline(cls, v: Any) -> Pipeline | Any:
         if isinstance(v, dict):
@@ -90,6 +96,11 @@ class ValidExperiment(BaseModel):
     @classmethod
     def validate_priority(cls, v: Any) -> Priority:
         return validate_priority(v)
+
+    @field_validator("status", mode="before", check_fields=True)
+    @classmethod
+    def validate_status(cls, v: Any) -> Status | Any:
+        return validate_status(v)
 
 
 """
@@ -109,6 +120,7 @@ class Experiment:
                  file_tree: FileTree,
                  pipeline: Pipeline,
                  priority: Priority = Priority.NORMAL,
+                 meta: Optional[dict] = None,
                  **kwargs):
         #: :class:`str`\: name of the experiment
         self._name = name
@@ -129,7 +141,7 @@ class Experiment:
         self.priority = priority
 
         #: :class:`dict`\: meta data
-        self.meta = kwargs
+        self.meta = {**meta, **kwargs} if meta else kwargs
 
         #: :class:`str`\: timestamp of creation
         self._created = get_timestamp()
@@ -229,8 +241,11 @@ class Experiment:
                         file_tree: FileTree,
                         pipeline: Pipeline,
                         priority: Priority,
+                        status: Status,
+                        meta: dict,
                         **kwargs) -> "Experiment":
-        return Experiment(name, parent_directory, keys, file_tree, pipeline, priority, **kwargs)
+        # status is not used
+        return Experiment(name, parent_directory, keys, file_tree, pipeline, priority, meta, **kwargs)
 
     @classmethod
     @validate_dumping_with_pydantic(ValidExperiment)

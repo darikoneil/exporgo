@@ -337,6 +337,6 @@ class StepRegistry:
         return cls()
 
     @classmethod
-    def __exit__(cls, exc_type, exc_val, exc_tb):  # noqa: ANN206, ANN201
+    def __exit__(cls, exc_type, exc_val, exc_tb):  # noqa: ANN206, ANN201, ANN001
         if cls.__new_registration:
             cls._save_registry()

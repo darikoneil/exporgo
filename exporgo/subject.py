@@ -8,10 +8,10 @@ from . import __current_version__
 from ._color import TERMINAL_FORMATTER
 from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
-from ._validators import (convert_permitted_types_to_required,
+from ._validators import (MODEL_CONFIG, convert_permitted_types_to_required,
                           validate_dumping_with_pydantic,
                           validate_method_with_pydantic, validate_priority,
-                          validate_version)
+                          validate_status, validate_version)
 from .exceptions import DuplicateExperimentError, MissingFilesError
 from .experiment import Experiment, ExperimentFactory
 from .types import CollectionType, File, Folder, Modification, Priority, Status
@@ -32,34 +32,68 @@ class ValidSubject(BaseModel):
     name: str
     directory: Path
     study: Optional[str] = None
-    meta: Optional[dict] = None
-    priority: Priority = Priority.NORMAL
-    status: Optional[Status] = None
-    created: Optional[str] = None
-    last_modified: Optional[str] = None
-    experiments: Any
-    modifications: Any
+    priority: Priority
+    status: Status
+    created: str
+    last_modified: str
+    experiments: dict[str, Experiment | None]
+    modifications: tuple[Modification, ...]
     meta: dict[str, Any]
+    version: str
+    model_config = MODEL_CONFIG
 
     @field_serializer("directory")
     @classmethod
     def serialize_directory(cls, v: Path) -> str:
         return str(v)
 
+    @field_serializer("experiments")
+    @classmethod
+    def serialize_experiments(cls, v: dict[str, Experiment | None]) -> dict[str, dict]:
+        return {name: experiment.__serialize__(experiment) if experiment is not None else None
+                for name, experiment in v.items()}
+
     @field_serializer("priority")
     @classmethod
     def serialize_priority(cls, v: Priority) -> str:
-        return f"{v.name}, {v.value}"
+        return f"({v.name}, {v.value})"
 
     @field_serializer("status")
     @classmethod
     def serialize_status(cls, v: Status) -> str:
-        return f"{v.name}, {v.value}"
+        return f"({v.name}, {v.value})"
+
+    @field_validator("experiments", mode="before", check_fields=True)
+    @classmethod
+    def validate_experiments(cls, v: Any) -> Any:
+        if isinstance(v, dict):
+            if any(isinstance(value, Experiment) for value in v.values()):
+                return v
+            elif any(isinstance(value, dict) for value in v.values()):
+                return {key: Experiment.__deserialize__(**value) if value is not None else None
+                        for key, value in v.items()}
+            elif all((value is None for value in v.values())):
+                return v
+        return v
 
     @field_validator("priority", mode="before", check_fields=True)
     @classmethod
     def validate_priority(cls, v: Any) -> Priority | Any:
         return validate_priority(v)
+
+    @field_validator("status", mode="before", check_fields=True)
+    @classmethod
+    def validate_status(cls, v: Any) -> Status | Any:
+        return validate_status(v)
+
+    @field_validator("version", mode="after", check_fields=False)
+    @classmethod
+    def validate_version(cls, v: str) -> Any:
+        if v is None:
+            return __current_version__
+        else:
+            validate_version(v)
+            return v
 
 
 """
@@ -140,6 +174,8 @@ class Subject:
 
         # call this only after all attrs successfully initialized
         self._modifications.append("Instantiated")
+
+        self._version = __current_version__
 
     def __str__(self) -> str:
         """
@@ -255,6 +291,10 @@ class Subject:
         return min([experiment.status for experiment in self.experiments.values()])\
             if self.experiments else Status.EMPTY
 
+    @property
+    def version(self) -> str:
+        return self._version
+
     @classmethod
     def load(cls, file: Optional[File] = None) -> "Subject":
         """
@@ -280,60 +320,36 @@ class Subject:
             _dict = yaml.safe_load(file)
         return cls.__deserialize__(_dict)
 
-    @classmethod
-    def __deserialize__(cls, _dict: dict) -> "Subject":
-        """
-        Creates a Subject instance from a dictionary.
-
-        :param _dict: The dictionary containing subject data.
-
-        :returns: The created subject.
-        :rtype: :class:`Subject <exporgo.subject.Subject>`
-        """
-
-        validate_version(_dict.pop("version"))
-
-        subject = cls(
-            name=_dict.get("name"),
-            directory=_dict.get("directory"),
-            study=_dict.get("study"),
-            meta=_dict.get("meta"),
-            # priority=Priority(_dict.get("priority")[1]),
-            start_log=False
-        )
-
-        for name, experiment in _dict.get("experiments").items():
-            subject.experiments[name] = Experiment.__deserialize__(experiment)
-        subject._created = _dict.get("created")
-        subject._modifications = ModificationLogger(_dict.get("modifications"))
-        subject.logger.start()
-
-        return subject
-
     # noinspection PyUnusedLocal
     @classmethod
     @validate_method_with_pydantic(ValidSubject)
-    def __deserialize_two__(cls,
-                            name: str,
-                            status: Status,
-                            priority: Priority,
-                            created: str,
-                            last_modified: str,
-                            directory: Path,
-                            study: Optional[str],
-                            meta: dict,
-                            experiments: dict,
-                            modifications: list,
-                            version: str,
-                            ):
+    def __deserialize__(cls,
+                        name: str,
+                        status: Status,
+                        priority: Priority,
+                        created: str,
+                        last_modified: str,
+                        directory: Path,
+                        study: Optional[str],
+                        meta: dict,
+                        experiments: dict,
+                        modifications: list,
+                        version: str,
+                        ) -> "Subject":
         # status, last_modified, version are not used
         subject = cls(name, directory, study, meta, priority, start_log=False)
         for name, experiment in experiments.items():
-            subject.experiments[name] = Experiment.__deserialize__(experiment)
+            subject.experiments[name] = experiment
         subject._created = created
         subject._modifications = ModificationLogger(modifications)
         subject.logger.start()
         return subject
+
+    @classmethod
+    @validate_dumping_with_pydantic(ValidSubject)
+    def __serialize__(cls, self: "Subject") -> dict:
+        # noinspection PyTypeChecker
+        return dict(self)
 
     def create_experiment(self,
                           name: str,
@@ -404,33 +420,6 @@ class Subject:
         :returns: The attribute or experiment.
         """
         return getattr(self, key)
-
-    def __serialize__(self) -> dict[str, Any]:
-        """
-        Converts the Subject object to a dictionary.
-
-        :returns: The dictionary representation of the subject.
-
-        :rtype: dict[str, Any]
-        """
-        return {
-            "name": self.name,
-            "priority": f"{self.priority.name}, {self.priority.value}",
-            "created": self.created,
-            "last_modified": self.last_modified,
-            "directory": str(self.directory),
-            "study": self.study,
-            "meta": self.meta,
-            "experiments": {name: experiment.__serialize__(experiment)
-                            for name, experiment in self.experiments.items()},
-            "modifications": self.modifications,
-            "version": __current_version__,
-        }
-
-    @classmethod
-    @validate_dumping_with_pydantic(ValidSubject)
-    def __serialize_two__(cls, self) -> dict:
-        return {**self, **{"version": __current_version__}}
 
     def __repr__(self) -> str:
         """

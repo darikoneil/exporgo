@@ -64,11 +64,14 @@ class Status(IntEnum):
 
 
 Analysis = str | Path | Callable
+# TODO: I'm not sure if this is the best way to do this or necessary (Analysis)
 
 File = str | Path | PathLike
 
 Folder = str | Path | PathLike
 
 CollectionType = list | tuple | set | GeneratorType
+# TODO: I'm not sure if this is the best way to do this or necessary (CollectionType)
 
 Modification = tuple[str, str]
+# TODO: I'm not sure if this is the best way to do this or necessary (Modification)
