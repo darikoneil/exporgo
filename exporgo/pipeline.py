@@ -11,7 +11,7 @@ from ._tools import check_if_string_set, unique_generator
 from ._validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
                           validate_method_with_pydantic, validate_status)
 from .files import FileTree
-from .step import RegisteredStep, Step
+from .step import RegisteredStep, Step, StepRegistry
 from .types import CollectionType, Folder, Status
 
 __all__ = [
@@ -186,3 +186,17 @@ class RegisteredPipeline(BaseModel):
             return check_if_string_set(self.steps.file_sets)
         if isinstance(self.steps, (list, tuple)):
             return {file_set for step in self.steps for file_set in check_if_string_set(step.file_sets)}
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Pipeline Factory
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+class PipelineFactory:
+    def __init__(self, steps: RegisteredStep | Sequence[RegisteredStep] | None) -> None:
+        self.steps = steps
+
+    def create(self) -> Pipeline:

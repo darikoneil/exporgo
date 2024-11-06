@@ -51,7 +51,7 @@ repository = "https://github.com/darikoneil/exporgo"
 [project.optional-dependencies]
 toml = [
     "toml",
-    "toml-w"
+    "tomli-w"
 ]
 yaml = [
     "pyyaml"
@@ -80,8 +80,7 @@ development = [
     "flake8-eradicate",
     "flake8-isort",
     "tryceratops",
-    "icecream",
-    "toml",
+    "tomli-w",
     "twine"
 ]
 documentation = [

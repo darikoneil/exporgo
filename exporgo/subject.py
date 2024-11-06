@@ -29,43 +29,92 @@ __all__ = [
 
 
 class ValidSubject(BaseModel):
+    """
+    Pydantic model for validating serialization/deserialization of a Subject object.
+    """
+    #: The name or identifier of the subject.
     name: str
+    #: The directory where the subject's data is stored.
     directory: Path
+    #: The study the subject is associated with.
     study: Optional[str] = None
+    #: The priority of the subject.
     priority: Priority
+    #: The status of the subject.
     status: Status
+    #: The timestamp associated with the creation of the subject.
     created: str
+    #: The last timestamp associated with a modification to the subject.
     last_modified: str
+    #: The experiments associated with the subject.
     experiments: dict[str, Experiment | None]
+    #: The modifications made to the subject.
     modifications: tuple[Modification, ...]
+    #: Metadata associated with the subject.
     meta: dict[str, Any]
+    #: The version of the subject.
     version: str
     model_config = MODEL_CONFIG
 
     @field_serializer("directory")
     @classmethod
     def serialize_directory(cls, v: Path) -> str:
+        """
+        Serializes the directory field to a string.
+
+        :param v: The directory path to be serialized.
+
+        :return: The serialized directory path as a string.
+        """
         return str(v)
 
     @field_serializer("experiments")
     @classmethod
     def serialize_experiments(cls, v: dict[str, Experiment | None]) -> dict[str, dict]:
+        """
+        Serializes the experiments field to a dictionary.
+
+        :param v: The experiments dictionary to be serialized.
+
+        :return: The serialized dictionary of experiments
+                """
         return {name: experiment.__serialize__(experiment) if experiment is not None else None
                 for name, experiment in v.items()}
 
     @field_serializer("priority")
     @classmethod
     def serialize_priority(cls, v: Priority) -> str:
+        """
+        Serializes the priority field to a string.
+
+        :param v: The priority to be serialized.
+
+        :return: The serialized priority as a string.
+        """
         return f"({v.name}, {v.value})"
 
     @field_serializer("status")
     @classmethod
     def serialize_status(cls, v: Status) -> str:
+        """
+        Serializes the status field to a string.
+
+        :param v: The status to be serialized.
+
+        :return: The serialized status as a string.
+        """
         return f"({v.name}, {v.value})"
 
     @field_validator("experiments", mode="before", check_fields=True)
     @classmethod
     def validate_experiments(cls, v: Any) -> Any:
+        """
+        Validates the experiments field before assignment.
+
+        :param v: The value to be validated.
+
+        :return: The validated dictionary of experiments
+        """
         if isinstance(v, dict):
             if any(isinstance(value, Experiment) for value in v.values()):
                 return v
@@ -79,16 +128,37 @@ class ValidSubject(BaseModel):
     @field_validator("priority", mode="before", check_fields=True)
     @classmethod
     def validate_priority(cls, v: Any) -> Priority | Any:
+        """
+        Validates the priority field before assignment.
+
+        :param v: The value to be validated.
+
+        :return: The validated priority.
+        """
         return validate_priority(v)
 
     @field_validator("status", mode="before", check_fields=True)
     @classmethod
     def validate_status(cls, v: Any) -> Status | Any:
+        """
+        Validates the status field before assignment.
+
+        :param v: The value to be validated.
+
+        :return: The validated status.
+        """
         return validate_status(v)
 
     @field_validator("version", mode="after", check_fields=False)
     @classmethod
     def validate_version(cls, v: str) -> Any:
+        """
+        Validates the version field after assignment.
+
+        :param v: The value to be validated.
+
+        :return: The validated version.
+        """
         if v is None:
             return __current_version__
         else:
@@ -158,6 +228,7 @@ class Subject:
 
         # determine if auto-starting logging. This is a hidden feature and is taken from kwargs
         start_log = kwargs.pop("start_log", True)
+        #: :class:`IPythonLogger <exporgo._logging.IPythonLogger>`\: The logger associated with the subject.
         self.logger = IPythonLogger(self.directory, start_log)
 
         #: :class:`dict`\: Metadata associated with the subject.
@@ -168,13 +239,16 @@ class Subject:
         #: :class:`Priority <exporgo.types.Priority>`\: The priority of the subject
         self.priority = priority
 
+        #: :class:`str`\: The timestamp associated with the creation of the subject.
         self._created = get_timestamp()
 
+        #: :class:`dict`\[:class:`str`\, :class:`Experiment <exporgo.experiment.Experiment>`\: The experiments associated with the subject.
         self.experiments = {}
 
         # call this only after all attrs successfully initialized
         self._modifications.append("Instantiated")
 
+        #: :class:`str`\: The version of the subject.
         self._version = __current_version__
 
     def __str__(self) -> str:
@@ -288,11 +362,23 @@ class Subject:
 
     @property
     def status(self) -> Status:
+        """
+        The status of the subject based on the status of its experiments.
+
+        :Return type: :class:`Status <exporgo.types.Status>`
+        :meta read-only-properties:
+        """
         return min([experiment.status for experiment in self.experiments.values()])\
             if self.experiments else Status.EMPTY
 
     @property
     def version(self) -> str:
+        """
+        The version of exporgo
+
+        :Return type: :class:`str`
+        :meta read-only-properties:
+        """
         return self._version
 
     @classmethod
@@ -336,6 +422,36 @@ class Subject:
                         modifications: list,
                         version: str,
                         ) -> "Subject":
+        """
+        Deserializes the subject from a dictionary representation. The keys of the dictionary are sent to this method
+        as a parameter, and the method returns a Subject object. The deserialization process is validated using the
+        ValidSubject Pydantic model.
+
+
+        :param name: The name or identifier of the subject.
+
+        :param status: The status of the subject.
+
+        :param priority: The priority of the subject.
+
+        :param created: The timestamp associated with the creation of the subject.
+
+        :param last_modified: The last timestamp associated with a modification to the subject.
+
+        :param directory: The directory where the subject's data is stored.
+
+        :param study: The study the subject is associated with.
+
+        :param meta: The metadata associated with the subject.
+
+        :param experiments: The experiments associated with the subject.
+
+        :param modifications: The modifications made to the subject.
+
+        :param version: The version of the subject.
+
+        :return: The deserialized subject.
+        """
         # status, last_modified, version are not used
         subject = cls(name, directory, study, meta, priority, start_log=False)
         for name, experiment in experiments.items():
@@ -348,6 +464,15 @@ class Subject:
     @classmethod
     @validate_dumping_with_pydantic(ValidSubject)
     def __serialize__(cls, self: "Subject") -> dict:
+        """
+        Serializes the subject for saving to file. The subject (self) is sent to this method as a parameter, and
+        the method returns a dictionary representation of the subject. The serialization process is validated using
+        the ValidSubject Pydantic model.
+
+        :param self: The subject to be serialized.
+
+        :return: Serialized subject.
+        """
         # noinspection PyTypeChecker
         return dict(self)
 

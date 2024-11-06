@@ -99,99 +99,22 @@ typehints_use_signature_return = False
 
 
 autoclasstoc_sections = [
+    #'read-only-properties',
+    #'read-write-properties',
+    'public-attrs',
     'public-methods-without-dunders',
-    'read-only-properties',
-    'read-write-properties',
+    'private-methods',
+    'private-attrs',
     ]
 
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Custom Sections (AutoClassToc)
+// Autodoc Pydantic Configuration
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
 
-
-from autoclasstoc import Section
-
-
-class PropertiesSection(Section):
-    key = 'read-write-properties'
-    title = "Properties:"
-
-    def predicate(self, name, attr, meta):
-        return 'read-write-properties' in meta
-
-
-class ReadOnlyPropertiesSection(Section):
-    key = 'read-only-properties'
-    title = "Read-Only Properties:"
-
-    def predicate(self, name, attr, meta):
-        return 'read-only-properties' in meta
-
-
-"""
-class PublicAttributes(Section):
-    key = 'public-attrs'
-    title = "Public Attributes:"
-
-    def predicate(self, name, attr, meta):
-        return 'attribute' in meta
-    
-    
-class PublicInstanceMethods(Section):
-    key = 'public-methods'
-    title = "Public Methods:"
-
-    def predicate(self, name, attr, meta):
-        return 'method' in meta
-    
-
-class PublicClassMethods(Section):
-    key = 'public-class-methods'
-    title = "Public Class Methods:"
-
-    def predicate(self, name, attr, meta):
-        return 'classmethod' in meta
-    
-    
-class PublicStaticMethods(Section):
-    key = 'public-static-methods'
-    title = "Public Static Methods:"
-
-    def predicate(self, name, attr, meta):
-        return 'staticmethod' in meta
-    
-
-class PrivateAttributes(Section):
-    key = 'private-attrs'
-    title = "Private Attributes:"
-    
-    def predicate(self, name, attr, meta):
-        return 'private' in meta
-    
-    
-class PrivateInstanceMethods(Section):
-    key = 'private-methods'
-    title = "Private Methods:"
-    
-    def predicate(self, name, attr, meta):
-        return 'private' in meta
-    
-    
-class PrivateClassMethods(Section):
-    key = 'private-class-methods'
-    title = "Private Class Methods:"
-    
-    def predicate(self, name, attr, meta):
-        return 'private' in meta and 'classmethod' in meta
-    
-
-class PrivateStaticMethods(Section):
-    key = 'private-static-methods'
-    title = "Private Static Methods:"
-    
-    def predicate(self, name, attr, meta):
-        return 'private' in meta and 'staticmethod' in meta
-"""
+autodoc_pydantic_model_show_json = True
+autodoc_pydantic_model_show_config_summary = True
+autodoc_pydantic_model_show_validator_summary = True
+autodoc_pydantic_model_show_validator_members = True

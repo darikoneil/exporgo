@@ -502,16 +502,44 @@ class ExperimentFactory:
     def __init__(self,
                  name: str,
                  parent_directory: Folder,
-                 priority: Optional[Priority],
+                 priority: Optional[Priority] = Priority.NORMAL,
+                 meta: Optional[dict] = None,
+                    **kwargs
                  ):
         self.name = name
         self.parent_directory = parent_directory
+        self.experiment_directory = parent_directory.joinpath(name)
+        self.experiment_directory.mkdir(parents=True, exist_ok=True)
         self.priority = priority
         self.registry = None
+        self.meta = {**meta, **kwargs} if meta else kwargs
 
     def __enter__(self):
         with ExperimentRegistry() as self.registry:
             return self
+
+    def create(self, keys: str | list[str] | tuple[str, ...]):
+        experiment_ = self.registry.get(keys)
+        file_tree = self._make_file_tree(self.experiment_directory, experiment_.file_sets)
+        pipeline = self._make_pipeline(experiment_.pipeline)
+        return Experiment(self.name,
+                          self.parent_directory,
+                          keys,
+                          file_tree,
+                          pipeline,
+                          self.priority,
+                          self.meta)
+
+    @staticmethod
+    def _make_file_tree(experiment_directory: Path,
+                        file_sets: str | list[str] | tuple[str, ...]
+                        ) -> FileTree:
+        return FileTree(experiment_directory, file_sets, populate=True)
+
+    @staticmethod
+    def _make_pipeline(pipeline: RegisteredPipeline) -> Pipeline:
+        with PipelineFactory() as pipeline_factory:
+            return pipeline_factory.create(pipeline)
 
     def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: ANN206, ANN001
         ...
