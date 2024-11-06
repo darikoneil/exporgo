@@ -71,8 +71,8 @@ class ValidPipeline(BaseModel):
         if isinstance(v, (list, tuple)):
             steps = []
             for step in v:
-                if not isinstance(step, Step)  and isinstance(step, dict):
-                        steps.append(Step.__deserialize__(**step))
+                if not isinstance(step, Step) and isinstance(step, dict):
+                    steps.append(Step.__deserialize__(**step))
             return steps
         elif isinstance(v, dict):
             return Step.__deserialize__(**v)

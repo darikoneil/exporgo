@@ -1,13 +1,23 @@
 {
-    "Hello": {
-        "key": "Hello",
+    "Generic Step (Function Call)": {
+        "key": "Generic Step (Function Call)",
         "call": {
-            "name": "hello",
-            "file": "C:\\Users\\Yuste\\PycharmProjects\\exporgo\\hello_world.py"
+            "name": "generic_function_call",
+            "file": "C:\\Users\\Yuste\\PycharmProjects\\exporgo\\exporgo\\registry\\generics.py"
         },
         "file_sets": [
-            "data",
-            "blitz"
+            "data"
+        ],
+        "category": "(ANALYZE, 1)"
+    },
+    "Generic Step": {
+        "key": "Generic Step",
+        "call": {
+            "name": "generic_function_call",
+            "file": "C:\\Users\\Yuste\\PycharmProjects\\exporgo\\exporgo\\registry\\generics.py"
+        },
+        "file_sets": [
+            "data"
         ],
         "category": "(ANALYZE, 1)"
     }

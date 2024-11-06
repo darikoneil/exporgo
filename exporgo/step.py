@@ -239,11 +239,13 @@ class StepRegistry:
             with Lock(cls.__path, "w", flags=LOCK_EX) as file:
                 # noinspection PyTypeChecker
                 file.write("{\n")
-                for key, analysis in cls.__registry.items():
-                    file.write(indent(
-                        json.dumps(key)
-                        + f": {analysis.model_dump_json(exclude_defaults=True, indent=4)}\n",
-                        " " * 4))
+                for  idx, key_step in enumerate(cls.__registry.items()):
+                    key, step = key_step
+                    str_step = indent(json.dumps(key)
+                                      + f": {step.model_dump_json(exclude_defaults=True, indent=4)}",
+                                      " " * 4)
+                    str_step = f"{str_step},\n" if idx != len(cls.__registry) - 1 else f"{str_step}\n"
+                    file.write(str_step)
                 file.write("}\n")
         except FileNotFoundError:
             cls.__path.touch(exist_ok=False)
