@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "exporgo"
-version = "0.0.6"
+version = "0.0.7"
 description = "Experiment organizer"
 readme = "README.md"
 requires-python = ">=3.10, <=4.0"
@@ -51,7 +51,7 @@ repository = "https://github.com/darikoneil/exporgo"
 [project.optional-dependencies]
 toml = [
     "toml",
-    "toml-w"
+    "tomli-w"
 ]
 yaml = [
     "pyyaml"
@@ -64,7 +64,6 @@ testing = [
     "pytest-html"
 ]
 development = [
-    "boltons",
     "build",
     "coverage[toml]",
     "coveralls",
@@ -80,7 +79,6 @@ development = [
     "flake8-eradicate",
     "flake8-isort",
     "tryceratops",
-    "icecream",
     "toml",
     "twine"
 ]

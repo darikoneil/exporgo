@@ -11,7 +11,8 @@ from ._tools import check_if_string_set, unique_generator
 from ._validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
                           validate_method_with_pydantic, validate_status)
 from .files import FileTree
-from .step import RegisteredStep, Step
+# noinspection PyUnresolvedReferences
+from .step import RegisteredStep, Step, StepRegistry
 from .types import CollectionType, Folder, Status
 
 __all__ = [
@@ -186,3 +187,27 @@ class RegisteredPipeline(BaseModel):
             return check_if_string_set(self.steps.file_sets)
         if isinstance(self.steps, (list, tuple)):
             return {file_set for step in self.steps for file_set in check_if_string_set(step.file_sets)}
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Pipeline Factory
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+class PipelineFactory:
+    def __init__(self, steps: RegisteredStep | Sequence[RegisteredStep] | None) -> None:
+        self.steps = steps
+        self._registry = None
+
+    def create(self) -> Pipeline:
+        return Pipeline(self.steps, Status.EMPTY)
+
+    def __enter__(self):
+        with StepRegistry() as registry:
+            self._registry = registry
+            return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: U100, ANN201, ANN206, ANN001
+        self._registry = None
