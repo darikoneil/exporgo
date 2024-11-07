@@ -10,7 +10,7 @@
                 "key": "Generic Step",
                 "call": {
                     "name": "generic_function_call",
-                    "file": "C:\\Users\\Yuste\\PycharmProjects\\exporgo\\exporgo\\registry\\generics.py"
+                    "file": "C:\\Users\\sutter\\PycharmProjects\\exporgo\\exporgo\\registry\\generics.py"
                 },
                 "file_sets": [
                     "data"
@@ -30,7 +30,7 @@
                 "key": "Generic Step",
                 "call": {
                     "name": "generic_function_call",
-                    "file": "C:\\Users\\Yuste\\PycharmProjects\\exporgo\\exporgo\\registry\\generics.py"
+                    "file": "C:\\Users\\sutter\\PycharmProjects\\exporgo\\exporgo\\registry\\generics.py"
                 },
                 "file_sets": [
                     "data"
@@ -39,5 +39,4 @@
             }
         }
     }
-
 }
