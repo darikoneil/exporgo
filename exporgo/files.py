@@ -414,9 +414,9 @@ class FileSet:
 
     @classmethod
     def __from_dict__(cls, data: dict) -> "FileSet":
-        file_set = cls(data.pop("name"), data.pop("directory"), index=False)
-        file_set._files = DictWithDuplicates(data.pop("files"))
-        file_set._folders = DictWithDuplicates(data.pop("folders"))
+        file_set = FileSet(data.pop("name"), data.pop("directory"), index=False)
+        file_set._files = DictWithDuplicates({key: Path(value) for key, value in data.pop("files").items()})
+        file_set._folders = DictWithDuplicates({key: Path(value) for key, value in data.pop("folders").items()})
         return file_set
 
     def find(self, identifier: str) -> Generator[Path, None, None]:

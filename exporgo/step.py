@@ -162,7 +162,7 @@ class Step:
                         category: Category,
                         status: Status
                         ) -> "Step":
-        return cls(key, call, file_sets, category, status)
+        return Step(key, call, file_sets, category, status)
 
     @classmethod
     @validate_dumping_with_pydantic(ValidStep)

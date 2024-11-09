@@ -49,8 +49,10 @@ class ValidPipeline(BaseModel):
     def serialize_steps(cls, v: Step | Sequence[Step] | None) -> dict | list:
         if isinstance(v, Step):
             return v.__serialize__(v)
-        else:
+        elif isinstance(v, (list | tuple)):
             return [step.__serialize__(step) for step in v]
+        else:
+            return v
 
     @field_validator("sources", mode="before", check_fields=True)
     @classmethod
@@ -74,6 +76,8 @@ class ValidPipeline(BaseModel):
             for step in v:
                 if not isinstance(step, Step) and isinstance(step, dict):
                     steps.append(Step.__deserialize__(**step))
+                if isinstance(step, Step):
+                    steps.append(step)
             return steps
         elif isinstance(v, dict):
             return Step.__deserialize__(**v)

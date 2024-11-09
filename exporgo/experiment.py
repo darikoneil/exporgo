@@ -149,14 +149,14 @@ class Experiment:
     def __str__(self) -> str:
         string_to_print = TERMINAL_FORMATTER(f"\t{self.name}: \n", "BLUE")
         string_to_print += TERMINAL_FORMATTER("\t\tPriority: ", "GREEN")
-        string_to_print += f"{self.priority.name}, {self.priority.value}"
+        string_to_print += f"{self.priority.name}, {self.priority.value}\n"
         string_to_print += TERMINAL_FORMATTER("\t\tStatus: ", "GREEN")
-        string_to_print += f"{self.status.name}, {self.status.value}"
+        string_to_print += f"{self.status.name}, {self.status.value}\n"
         string_to_print += TERMINAL_FORMATTER("\t\tCreated: ", "GREEN")
         string_to_print += f"{self.created}\n"
         string_to_print += TERMINAL_FORMATTER("\t\tKeys: ", "GREEN")
         string_to_print += "".join([key + ", " for key in self.keys])[:-2]
-        string_to_print += TERMINAL_FORMATTER("\t\tMeta: \n", "GREEN")
+        string_to_print += TERMINAL_FORMATTER("\n\t\tMeta: \n", "GREEN")
         if not self.meta:
             string_to_print += "\t\t\tNo Metadata Defined\n"
         else:
@@ -287,7 +287,7 @@ class Experiment:
 
         :returns: generator of paths
         """
-        return self.find(identifier)
+        return self.file_tree.find(identifier)
 
     def get(self, key: str) -> FileSet:
         """

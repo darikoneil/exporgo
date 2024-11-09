@@ -285,7 +285,7 @@ class Subject:
             string_to_print += "\tNo experiments defined\n"
         else:
             for experiment in self.experiments.values():
-                string_to_print + f"{experiment}\n"
+                string_to_print += f"{experiment}\n"
 
         string_to_print += TERMINAL_FORMATTER("Recent Modifications:\n", "modifications")
         for modification in self.modifications[:5]:
@@ -301,7 +301,7 @@ class Subject:
         self.logger.end()
 
         with open(self.file, "w") as file:
-            yaml.safe_dump(self.__serialize__(),
+            yaml.safe_dump(self.__serialize__(self),
                            file,
                            default_flow_style=False,
                            sort_keys=False)
@@ -454,7 +454,7 @@ class Subject:
         :return: The deserialized subject.
         """
         # status, last_modified, version are not used
-        subject = cls(name, directory, study, meta, priority, start_log=False)
+        subject = Subject(name, directory, study, meta, priority, start_log=False)
         for name, experiment in experiments.items():
             subject.experiments[name] = experiment
         subject._created = created

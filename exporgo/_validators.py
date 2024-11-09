@@ -4,7 +4,7 @@ import warnings
 from contextlib import suppress
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from pydantic import ConfigDict
 
@@ -90,6 +90,44 @@ def convert_permitted_types_to_required(function: Callable,
                 kwargs[key] = allowed_input
 
         return function(*args, **kwargs)
+
+    return decorator
+
+@parameterize
+def convert_permitted_types_to_required_(function: Callable,
+                                          parameter: str,
+                                          permitted: tuple,
+                                          required: Any,
+                                          converter: Optional[Callable] = None,
+                                            ) -> Callable:
+    """
+    Decorator that converts an argument from any of the permitted types to the expected/required type.
+
+    :param function: function to be decorated
+
+    :param permitted: the types permitted by code
+
+    :param required: the type required by code
+
+    :param pos: index of argument to be converted
+
+    :param key: keyword of argument to be converted
+
+    :returns: decorated function
+
+    :raises: :class:`NotPermittedTypeError <exceptions.NotPermittedTypeError>`
+
+    .. warning::  The required type must be capable of converting the permitted types using the __call__ magic method.
+    """
+    @wraps(function)
+    def decorator(*args, **kwargs) -> Callable:
+        sig = inspect.signature(function)
+        bound_args = sig.bind(*args, **kwargs)
+        bound_args.apply_defaults()
+        param = bound_args.arguments.get(parameter)
+        if isinstance(param, permitted):
+            bound_args.arguments[parameter] = converter(param) if converter else required(param)
+        return function(**bound_args.arguments)
 
     return decorator
 
