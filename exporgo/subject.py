@@ -8,7 +8,7 @@ from . import __current_version__
 from ._color import TERMINAL_FORMATTER
 from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
-from ._validators import (MODEL_CONFIG, convert_permitted_types_to_required,
+from ._validators import (MODEL_CONFIG, convert_permitted_types_to_required_,
                           validate_dumping_with_pydantic,
                           validate_method_with_pydantic, validate_priority,
                           validate_status, validate_version)
@@ -196,10 +196,9 @@ class Subject:
     :type kwargs: :class:`Any <typing.Any>`
     """
 
-    @convert_permitted_types_to_required(permitted=(int, Priority),
-                                         required=Priority,
-                                         pos=5,
-                                         key="priority")
+    @convert_permitted_types_to_required_(parameter="priority",
+                                          permitted=(int, Priority),
+                                          required=Priority)
     def __init__(self,
                  name: str,
                  directory: Optional[Folder] = None,

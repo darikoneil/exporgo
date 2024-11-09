@@ -26,7 +26,7 @@ that are commensurable but can't be directly duck-typed.
 
 
 __all__ = [
-    "convert_permitted_types_to_required",
+    "convert_permitted_types_to_required_",
     "validate_extension",
     "validate_filename",
     "validate_version",
@@ -95,30 +95,12 @@ def convert_permitted_types_to_required(function: Callable,
 
 @parameterize
 def convert_permitted_types_to_required_(function: Callable,
-                                          parameter: str,
-                                          permitted: tuple,
-                                          required: Any,
-                                          converter: Optional[Callable] = None,
+                                         parameter: str,
+                                         permitted: tuple,
+                                         required: Any,
+                                         converter: Optional[Callable] = None,
                                             ) -> Callable:
-    """
-    Decorator that converts an argument from any of the permitted types to the expected/required type.
 
-    :param function: function to be decorated
-
-    :param permitted: the types permitted by code
-
-    :param required: the type required by code
-
-    :param pos: index of argument to be converted
-
-    :param key: keyword of argument to be converted
-
-    :returns: decorated function
-
-    :raises: :class:`NotPermittedTypeError <exceptions.NotPermittedTypeError>`
-
-    .. warning::  The required type must be capable of converting the permitted types using the __call__ magic method.
-    """
     @wraps(function)
     def decorator(*args, **kwargs) -> Callable:
         sig = inspect.signature(function)

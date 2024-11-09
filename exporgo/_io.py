@@ -10,8 +10,10 @@ from typing import Callable, Optional
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
-from ._validators import convert_permitted_types_to_required
+# noinspection PyProtectedMember
+from ._validators import convert_permitted_types_to_required_
 from .types import File, Folder
+
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,8 +71,8 @@ def select_directory(**kwargs) -> Path:
 """
 
 
-@convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=0, key="source")
-@convert_permitted_types_to_required(permitted=(Folder, ), required=Path, pos=1, key="destination")
+@convert_permitted_types_to_required_(parameter="source", permitted=(Folder, ), required=Path)
+@convert_permitted_types_to_required_(parameter="destination", permitted=(Folder, ), required=Path)
 def verbose_copy(source: Folder,
                  destination: Folder,
                  feedback: Optional[str] = None) -> bool:
@@ -125,7 +127,7 @@ def verbose_copy(source: Folder,
 """
 
 
-@convert_permitted_types_to_required(permitted=(File, ), required=Path, pos=2, key="path")
+@convert_permitted_types_to_required_(parameter="path", permitted=(File, ), required=Path)
 def import_callable_from_file(name: str, module: str, path: File) -> Callable:
     spec = spec_from_file_location(module, path)
     module_ = module_from_spec(spec)
