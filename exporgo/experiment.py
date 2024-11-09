@@ -497,7 +497,7 @@ class ExperimentRegistry:
 
 class ExperimentFactory:
 
-    @convert(paremeter="parent_directory", permitted=(Folder,), required=Path)
+    @convert(parameter="parent_directory", permitted=(Folder,), required=Path)
     def __init__(self,
                  name: str,
                  parent_directory: Folder,

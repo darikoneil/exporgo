@@ -8,10 +8,10 @@ from . import __current_version__
 from ._color import TERMINAL_FORMATTER
 from ._io import select_directory, select_file
 from ._logging import IPythonLogger, ModificationLogger, get_timestamp
+from ._tools import convert
 from ._validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
                           validate_method_with_pydantic, validate_priority,
                           validate_status, validate_version)
-from ._tools import convert
 from .exceptions import DuplicateExperimentError, MissingFilesError
 from .experiment import Experiment, ExperimentFactory
 from .types import CollectionType, File, Folder, Modification, Priority, Status

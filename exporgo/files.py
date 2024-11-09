@@ -25,7 +25,7 @@ class FileTree:
     of its built-in methods.
     """
 
-    @convert(key="directory", permitted=(Folder,), required=Path)
+    @convert(parameter="directory", permitted=(Folder,), required=Path)
     def __init__(self,
                  directory: Folder,
                  file_sets: Optional[str | CollectionType] = None,
