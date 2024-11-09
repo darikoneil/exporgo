@@ -4,15 +4,14 @@ import warnings
 from contextlib import suppress
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from pydantic import ConfigDict
 
 from . import __current_version__
 from ._tools import amend_args, collector, parameterize
 from .exceptions import (EnumNameValueMismatchError, InvalidExtensionWarning,
-                         InvalidFilenameError, NotPermittedTypeError,
-                         UpdateVersionWarning,
+                         InvalidFilenameError, UpdateVersionWarning,
                          VersionBackwardCompatibilityError,
                          VersionBackwardCompatibilityWarning,
                          VersionForwardCompatibilityWarning)
@@ -26,7 +25,6 @@ that are commensurable but can't be directly duck-typed.
 
 
 __all__ = [
-    "convert_permitted_types_to_required_",
     "validate_extension",
     "validate_filename",
     "validate_version",
@@ -44,74 +42,6 @@ __all__ = [
 // Validation Decorators
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
-
-
-@parameterize
-def convert_permitted_types_to_required(function: Callable,
-                                        permitted: tuple,
-                                        required: Any,
-                                        pos: int = 0,
-                                        key: str = None,
-                                        ) -> Callable:
-    """
-    Decorator that converts an argument from any of the permitted types to the expected/required type.
-
-    :param function: function to be decorated
-
-    :param permitted: the types permitted by code
-
-    :param required: the type required by code
-
-    :param pos: index of argument to be converted
-
-    :param key: keyword of argument to be converted
-
-    :returns: decorated function
-
-    :raises: :class:`NotPermittedTypeError <exceptions.NotPermittedTypeError>`
-
-    .. warning::  The required type must be capable of converting the permitted types using the __call__ magic method.
-    """
-    @wraps(function)
-    def decorator(*args, **kwargs) -> Callable:
-
-        collected, allowed_input, use_args = collector(pos, key, *args, **kwargs)
-
-        if collected:
-            if isinstance(allowed_input, permitted):
-                allowed_input = required(allowed_input)
-
-            if not isinstance(allowed_input, required):
-                raise NotPermittedTypeError(key, pos, permitted, allowed_input)
-
-            if use_args:
-                args = amend_args(args, allowed_input, pos)
-            else:
-                kwargs[key] = allowed_input
-
-        return function(*args, **kwargs)
-
-    return decorator
-
-@parameterize
-def convert_permitted_types_to_required_(function: Callable,
-                                         parameter: str,
-                                         permitted: tuple,
-                                         required: Any,
-                                         converter: Optional[Callable] = None,
-                                            ) -> Callable:
-
-    @wraps(function)
-    def decorator(*args, **kwargs) -> Callable:
-        sig = inspect.signature(function)
-        bound_args = sig.bind(*args, **kwargs)
-        bound_args.apply_defaults()
-        param = bound_args.arguments.get(parameter)
-        if isinstance(param, permitted):
-            bound_args.arguments[parameter] = converter(param) if converter else required(param)
-        return function(**bound_args.arguments)
-
-    return decorator
 
 
 @parameterize

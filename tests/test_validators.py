@@ -3,10 +3,9 @@ from pathlib import Path
 import pytest
 
 from exporgo import __current_version__
-from exporgo._tools import collector
+from exporgo._tools import collector, convert
 # noinspection PyProtectedMember
-from exporgo._validators import (convert_permitted_types_to_required_,
-                                 validate_extension, validate_filename,
+from exporgo._validators import (validate_extension, validate_filename,
                                  validate_version)
 from exporgo.exceptions import (InvalidExtensionWarning, InvalidFilenameError,
                                 UpdateVersionWarning,
@@ -44,7 +43,7 @@ def test_collector():
 def test_convert_permitted_types_to_required():
     # generate_decorated function
     # noinspection PyUnusedLocal
-    @convert_permitted_types_to_required_(parameter="a", permitted=(str, Path), required=Path)
+    @convert(parameter="a", permitted=(str, Path), required=Path)
     def valid_handle(a, b):
         return 0
 

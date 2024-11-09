@@ -6,7 +6,7 @@ from shutil import rmtree
 from types import GeneratorType, NoneType
 from typing import Any, Generator, Iterable, Iterator, Mapping, Optional
 
-from ._validators import convert_permitted_types_to_required_
+from ._tools import convert
 from .exceptions import MissingFilesError
 from .types import CollectionType, File, Folder
 
@@ -25,7 +25,7 @@ class FileTree:
     of its built-in methods.
     """
 
-    @convert_permitted_types_to_required_(key="directory", permitted=(Folder, ), required=Path)
+    @convert(key="directory", permitted=(Folder,), required=Path)
     def __init__(self,
                  directory: Folder,
                  file_sets: Optional[str | CollectionType] = None,
@@ -204,7 +204,7 @@ class FileTree:
         for file_set in self.values():
             file_set.index()
 
-    @convert_permitted_types_to_required_(parameter="parent_directory", permitted=(Folder, ), required=Path)
+    @convert(parameter="parent_directory", permitted=(Folder,), required=Path)
     def remap(self, parent_directory: str | Path) -> None:
         """
         Remap the fileset to a new location after moving the folder
@@ -243,7 +243,7 @@ class FileTree:
         return (value for _, value in self.items())    # items call guarantees filesets only
 
     @parent_directory.setter
-    @convert_permitted_types_to_required_(parameter="directory", permitted=(Folder, ), required=Path)
+    @convert(parameter="directory", permitted=(Folder,), required=Path)
     def parent_directory(self, directory: Folder) -> None:
         self.remap(directory)
 
@@ -346,7 +346,7 @@ class FileSet:
     several methods for keeping track of datasets.
     """
 
-    @convert_permitted_types_to_required_(parameter="parent_directory", permitted=(Folder, ), required=Path)
+    @convert(parameter="parent_directory", permitted=(Folder,), required=Path)
     def __init__(self,
                  name: str,
                  parent_directory: Folder,
@@ -440,7 +440,7 @@ class FileSet:
         self._files.update(((file.stem, file) for file in self.directory.rglob("*") if file.is_file()))
         self._folders.update(((folder.stem, folder) for folder in self.directory.rglob("*") if not folder.is_file()))
 
-    @convert_permitted_types_to_required_(parameter="parent_directory", permitted=(Folder, ), required=Path)
+    @convert(parameter="parent_directory", permitted=(Folder,), required=Path)
     def remap(self, parent_directory: Folder) -> None:
         """
         Remaps all files and folders in the file set following a change in the parent directory or parent file tree
@@ -525,7 +525,7 @@ class DictWithDuplicates(dict):
         for key, value in items:
             self.__setitem__(key, value)
 
-    @convert_permitted_types_to_required_(parameter="value", permitted=(File, Folder), required=Path)
+    @convert(parameter="value", permitted=(File, Folder), required=Path)
     def __setitem__(self, key: str, value: File | Folder) -> None:
         """
         Implementation of setitem magic method. Appends an integer to duplicate keys before storing as a new key-value

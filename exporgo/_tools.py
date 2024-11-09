@@ -1,7 +1,8 @@
+import inspect
 from contextlib import suppress
-from functools import update_wrapper
+from functools import update_wrapper, wraps
 from types import MappingProxyType
-from typing import Any, Callable, Generator, Iterable, Tuple
+from typing import Any, Callable, Generator, Iterable, Optional, Tuple
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -185,3 +186,24 @@ def check_if_string_set(iterable: Iterable) -> set:
     accidentally create a set of characters when we really wanted a set of strings.
     """
     return {iterable, } if isinstance(iterable, str) else set(iterable)
+
+
+@parameterize
+def convert(function: Callable,
+            parameter: str,
+            permitted: tuple,
+            required: Any,
+            converter: Optional[Callable] = None,
+            ) -> Callable:
+
+    @wraps(function)
+    def decorator(*args, **kwargs) -> Callable:
+        sig = inspect.signature(function)
+        bound_args = sig.bind(*args, **kwargs)
+        bound_args.apply_defaults()
+        param = bound_args.arguments.get(parameter)
+        if isinstance(param, permitted):
+            bound_args.arguments[parameter] = converter(param) if converter else required(param)
+        return function(**bound_args.arguments)
+
+    return decorator

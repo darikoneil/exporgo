@@ -12,10 +12,9 @@ from pydantic import BaseModel, field_serializer, field_validator
 
 from ._color import TERMINAL_FORMATTER
 from ._logging import get_timestamp
-from ._tools import check_if_string_set, conditional_dispatch
+from ._tools import check_if_string_set, conditional_dispatch, convert
 # noinspection PyProtectedMember
-from ._validators import (MODEL_CONFIG, convert_permitted_types_to_required_,
-                          validate_dumping_with_pydantic,
+from ._validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
                           validate_method_with_pydantic, validate_priority,
                           validate_status)
 from .exceptions import (DispatchError, DuplicateRegistrationError,
@@ -308,7 +307,7 @@ class Experiment:
         # noinspection PyArgumentList
         self.file_tree.index()
 
-    @convert_permitted_types_to_required_(parameter="parent_directory", permitted=(Folder, ), required=Path)
+    @convert(parameter="parent_directory", permitted=(Folder,), required=Path)
     def remap(self, parent_directory: Folder) -> None:
         """
         Remap the experiment to a new parent directory
@@ -498,7 +497,7 @@ class ExperimentRegistry:
 
 class ExperimentFactory:
 
-    @convert_permitted_types_to_required_(paremeter="parent_directory", permitted=(Folder, ), required=Path)
+    @convert(paremeter="parent_directory", permitted=(Folder,), required=Path)
     def __init__(self,
                  name: str,
                  parent_directory: Folder,
