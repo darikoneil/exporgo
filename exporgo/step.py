@@ -126,7 +126,7 @@ class Step:
                  call: str | Path | Callable,
                  file_sets: str | list[str] | tuple[str, ...],
                  category: Category,
-                 status: Status):
+                 status: Status = Status.SOURCE):
         self._key = key
         self._call = call
         self._file_sets = file_sets
@@ -326,7 +326,7 @@ class StepRegistry:
         """
         try:
             with Lock(cls.__path, "r", timeout=10) as file:
-                cls.register((RegisteredStep.model_validate(config) for _, config in json.load(file).items()))
+                cls.__registry = {key: RegisteredStep.model_validate(config) for key, config in json.load(file).items()}
         except FileNotFoundError:
             cls.__path.touch(exist_ok=False)
             cls._save_registry()
@@ -336,7 +336,7 @@ class StepRegistry:
     @classmethod
     def __enter__(cls) -> "StepRegistry":
         cls._load_registry()
-        return cls()
+        return StepRegistry()
 
     @classmethod
     def __exit__(cls, exc_type, exc_val, exc_tb):  # noqa: ANN206, ANN201, ANN001

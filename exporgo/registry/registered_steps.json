@@ -3,7 +3,7 @@
         "key": "Generic Step (Function Call)",
         "call": {
             "name": "generic_function_call",
-            "file": "C:\\Users\\Yuste\\PycharmProjects\\exporgo\\exporgo\\registry\\generics.py"
+            "file": "C:\\Users\\Darik\\PycharmProjects\\exporgo\\exporgo\\registry\\generics.py"
         },
         "file_sets": [
             "data"
@@ -14,10 +14,22 @@
         "key": "Generic Step",
         "call": {
             "name": "generic_function_call",
-            "file": "C:\\Users\\Yuste\\PycharmProjects\\exporgo\\exporgo\\registry\\generics.py"
+            "file": "C:\\Users\\Darik\\PycharmProjects\\exporgo\\exporgo\\registry\\generics.py"
         },
         "file_sets": [
             "data"
+        ],
+        "category": "(ANALYZE, 1)"
+    },
+    "STEP_ONE": {
+        "key": "STEP_ONE",
+        "call": {
+            "name": "generic_function_call",
+            "file": "C:\\Users\\Darik\\PycharmProjects\\exporgo\\exporgo\\registry\\generics.py"
+        },
+        "file_sets": [
+            "file_set_one",
+            "file_set_two"
         ],
         "category": "(ANALYZE, 1)"
     }

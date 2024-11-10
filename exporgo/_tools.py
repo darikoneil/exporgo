@@ -5,8 +5,8 @@ from types import MappingProxyType
 from typing import Any, Callable, Generator, Iterable, Optional, Tuple
 
 __all__ = [
-    "amend_args",
-    "collector",
+    "amend_args",  # TODO: This function can be removed in favor of using the standard `inspect` module
+    "collector",  # TODO: This function can be removed in favor of using the standard `inspect` module
     "parameterize",
     "conditional_dispatch",
     "unique_generator",

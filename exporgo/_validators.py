@@ -186,7 +186,7 @@ def validate_method_with_pydantic(function: Callable, model: Any) -> Callable:
         bound_args = sig.bind_partial(*args, **kwargs)
         bound_args.apply_defaults()
         bound_args.arguments.pop("kwargs", None)
-        # I don't know why, but I gotta do this ->
+        # I don't know why, but I have to do this ->
         if "cls" in bound_args.arguments:
             func_get = lambda key: bound_args.arguments.get("cls").get(key)  # noqa: E731
             container = bound_args.arguments.get("cls")

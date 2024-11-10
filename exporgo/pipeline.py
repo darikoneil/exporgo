@@ -185,12 +185,40 @@ class RegisteredPipeline(BaseModel):
     steps: RegisteredStep | Sequence[RegisteredStep] | None
     model_config = MODEL_CONFIG
 
+
     @property
     def file_sets(self) -> set[str]:
         if isinstance(self.steps, RegisteredStep):
             return check_if_string_set(self.steps.file_sets)
         if isinstance(self.steps, (list, tuple)):
             return {file_set for step in self.steps for file_set in check_if_string_set(step.file_sets)}
+
+    @field_serializer("steps", check_fields=True)
+    @classmethod
+    def serialize_steps(cls, v: RegisteredStep | Sequence[RegisteredStep] | None) -> list | Any:
+        if isinstance(v, RegisteredStep):
+            return [v.key, ]
+        elif isinstance(v, (list | tuple)):
+            return [step.key for step in v]
+        else:
+            return v
+
+    @field_validator("steps", mode="before", check_fields=True)
+    @classmethod
+    def validate_steps(cls, v: RegisteredStep | Sequence[RegisteredStep] | None) -> RegisteredStep | Sequence[RegisteredStep] | None:
+        if isinstance(v, RegisteredStep):
+            return v
+        elif isinstance(v, (list, tuple)):
+            steps = []
+            for step in v:
+                if isinstance(step, RegisteredStep):
+                    steps.append(step)
+                elif isinstance(step, str):
+                    with StepRegistry() as registry:
+                        steps.append(registry.get(step))
+            return steps
+        else:
+            return v
 
 
 """
@@ -205,8 +233,14 @@ class PipelineFactory:
         self.steps = steps
         self._registry = None
 
+    def _build(self) -> None:
+        self.steps = [Step.__deserialize__(**vars(step)) for step in self.steps] \
+            if isinstance(self.steps, (list, tuple)) \
+            else Step.__deserialize__(**vars(self.steps))
+
     def create(self) -> Pipeline:
-        return Pipeline(self.steps, Status.EMPTY)
+        self._build()
+        return Pipeline(self.steps, Status.SOURCE)
 
     def __enter__(self):
         with StepRegistry() as registry:

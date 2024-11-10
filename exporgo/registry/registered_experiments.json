@@ -6,17 +6,9 @@
             "results"
         ],
         "pipeline": {
-            "steps": {
-                "key": "Generic Step",
-                "call": {
-                    "name": "generic_function_call",
-                    "file": "C:\\Users\\sutter\\PycharmProjects\\exporgo\\exporgo\\registry\\generics.py"
-                },
-                "file_sets": [
-                    "data"
-                ],
-                "category": "(ANALYZE, 1)"
-            }
+            "steps": [
+                "Generic Step"
+            ]
         }
     },
     "Generic Experiment_2": {
@@ -26,17 +18,21 @@
             "results"
         ],
         "pipeline": {
-            "steps": {
-                "key": "Generic Step",
-                "call": {
-                    "name": "generic_function_call",
-                    "file": "C:\\Users\\sutter\\PycharmProjects\\exporgo\\exporgo\\registry\\generics.py"
-                },
-                "file_sets": [
-                    "data"
-                ],
-                "category": "(ANALYZE, 1)"
-            }
+            "steps": [
+                "Generic Step"
+            ]
+        }
+    },
+    "BOOP": {
+        "key": "BOOP",
+        "additional_file_sets": [
+            "file_set_three",
+            "file_set_four"
+        ],
+        "pipeline": {
+            "steps": [
+                "STEP_ONE"
+            ]
         }
     }
 }

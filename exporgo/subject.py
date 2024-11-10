@@ -499,8 +499,8 @@ class Subject:
         if name in self.contains:
             raise DuplicateExperimentError(name)
 
-        with ExperimentFactory(name, self.directory) as factory:
-            self.experiments[name] = factory(keys, priority, **kwargs)
+        with ExperimentFactory(name, self.directory, self.priority, self.meta) as factory:
+            self.experiments[name] = factory.create(keys)
 
         self.record(name)
 
