@@ -185,7 +185,6 @@ class RegisteredPipeline(BaseModel):
     steps: RegisteredStep | Sequence[RegisteredStep] | None
     model_config = MODEL_CONFIG
 
-
     @property
     def file_sets(self) -> set[str]:
         if isinstance(self.steps, RegisteredStep):
@@ -205,7 +204,8 @@ class RegisteredPipeline(BaseModel):
 
     @field_validator("steps", mode="before", check_fields=True)
     @classmethod
-    def validate_steps(cls, v: RegisteredStep | Sequence[RegisteredStep] | None) -> RegisteredStep | Sequence[RegisteredStep] | None:
+    def validate_steps(cls, v: RegisteredStep | Sequence[RegisteredStep] | None) \
+            -> RegisteredStep | Sequence[RegisteredStep] | None:
         if isinstance(v, RegisteredStep):
             return v
         elif isinstance(v, (list, tuple)):
@@ -233,14 +233,14 @@ class PipelineFactory:
         self.steps = steps
         self._registry = None
 
+    def create(self) -> Pipeline:
+        self._build()
+        return Pipeline(self.steps, Status.SOURCE)
+
     def _build(self) -> None:
         self.steps = [Step.__deserialize__(**vars(step)) for step in self.steps] \
             if isinstance(self.steps, (list, tuple)) \
             else Step.__deserialize__(**vars(self.steps))
-
-    def create(self) -> Pipeline:
-        self._build()
-        return Pipeline(self.steps, Status.SOURCE)
 
     def __enter__(self):
         with StepRegistry() as registry:

@@ -401,7 +401,7 @@ class Subject:
         """
         file = file if file else select_file(title="Select organization file")
         if not file.is_file():
-            file = file.joinpath("organization.json")
+            file = file.joinpath("organization.yaml")
         with open(file, "r") as file:
             _dict = yaml.safe_load(file)
         return cls.__deserialize__(_dict)
@@ -480,6 +480,7 @@ class Subject:
                           name: str,
                           keys: str | CollectionType,
                           priority: Optional[Priority] = None,
+                          meta: Optional[dict] = None,
                           **kwargs) -> None:
         """
         Creates an experiment associated with the subject.
@@ -492,14 +493,16 @@ class Subject:
         :param priority: Override the priority of the experiment.
         :type priority: :class:`Optional <typing.Optional>`\[:class:`Priority <exporgo.types.Priority>`\]
 
+        :param meta: Metadata associated with the experiment.
+
         :param kwargs: Additional keyword arguments to be stored in the experiment's metadata dictionary.
         :type kwargs: :class:`Any <typing.Any>`
 
         """
         if name in self.contains:
             raise DuplicateExperimentError(name)
-
-        with ExperimentFactory(name, self.directory, self.priority, self.meta) as factory:
+        priority = priority if priority else self.priority
+        with ExperimentFactory(name, self.directory, priority, meta, **kwargs) as factory:
             self.experiments[name] = factory.create(keys)
 
         self.record(name)

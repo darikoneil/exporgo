@@ -9,7 +9,6 @@ from portalocker import Lock
 from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
 from pydantic import BaseModel, field_serializer, field_validator
-from sqlalchemy.orm import registry
 
 from ._color import TERMINAL_FORMATTER
 from ._logging import get_timestamp
@@ -471,7 +470,8 @@ class ExperimentRegistry:
         """
         try:
             with Lock(cls.__path, "r", timeout=10) as file:
-                    cls.__registry = {key: RegisteredExperiment.model_validate(config) for key, config in json.load(file).items()}
+                cls.__registry = {key: RegisteredExperiment.model_validate(config)
+                                  for key, config in json.load(file).items()}
         except FileNotFoundError:
             cls.__path.touch(exist_ok=False)
             cls._save_registry()
