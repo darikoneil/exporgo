@@ -9,7 +9,7 @@ from typing import Any, Callable
 from pydantic import ConfigDict
 
 from . import __current_version__
-from ._tools import amend_args, collector, parameterize
+from ._tools import parameterize
 from .exceptions import (EnumNameValueMismatchError, InvalidExtensionWarning,
                          InvalidFilenameError, UpdateVersionWarning,
                          VersionBackwardCompatibilityError,
@@ -45,53 +45,36 @@ __all__ = [
 
 
 @parameterize
-def validate_extension(function: Callable, required_extension: str, pos: int = 0, key: str = None) -> Callable:
+def validate_extension(function: Callable, parameter: str, required_extension: str) -> Callable:
     """
-    Decorator for validating a required extension on a file path
-
-    :param function: function to be decorated
-
-    :param required_extension: required extension
-
-    :param pos: index of the argument to be validated
-
-    :param key: keyword of the argument to be validated
-
-    :returns: decorated function
-
-    raises:: :class:`InvalidExtensionWarning <exceptions.InvalidExtensionWarning>`
-
     .. note:: This decorator will convert the extension of the file to the required extension if it is not already,
         rather than raising a fatal error.
     """
     @wraps(function)
     def decorator(*args, **kwargs) -> Callable:
-        _original_type = type(args[pos])
-        if not Path(args[pos]).suffix:
-            args = amend_args(args, _original_type("".join([str(args[pos]), required_extension])), pos)
-        if Path(args[pos]).suffix != required_extension:
-            warnings.warn(InvalidExtensionWarning(key, pos, Path(args[pos]).suffix, required_extension),
+        # noinspection DuplicatedCode
+        sig = inspect.signature(function)
+        bound_args = sig.bind(*args, **kwargs)
+        bound_args.apply_defaults()
+        bound_args.arguments = {**bound_args.kwargs, **bound_args.arguments}
+        bound_args.arguments.pop("kwargs", None)
+        param = Path(bound_args.arguments.get(parameter))
+        if param.suffix != required_extension:
+            warnings.warn(InvalidExtensionWarning(parameter,
+                                                  param.suffix,
+                                                  required_extension,
+                                                  coerced=required_extension),
                           stacklevel=4)
-            args = amend_args(args, _original_type(Path(args[pos]).with_suffix(required_extension)), pos)
-        # noinspection PyArgumentList
-        return function(*args, **kwargs)
+            bound_args.arguments[parameter] = param.with_suffix(required_extension)
+        return function(**bound_args.arguments)
     return decorator
 
 
 @parameterize
-def validate_filename(function: Callable, pos: int = 0, key: str = None) -> Callable:
+def validate_filename(function: Callable, parameter: str) -> Callable:
     """
     Decorator for validating filenames adhere to best practices for naming files. Specifically, filenames should only
-    contain ascii letters, digits, periods, and underscores. The decorator will validate the entire path, not just
-    the filename.
-
-    :param function: function to be decorated
-
-    :param pos: index of the argument to be validated
-
-    :param key: keyword of the argument to be validated
-
-    :returns: decorated function
+    contain ascii letters, digits, periods, spaces, and underscores.
 
     raises:: :class:`InvalidFilenameError <exceptions.InvalidFilenameError>`
 
@@ -100,18 +83,16 @@ def validate_filename(function: Callable, pos: int = 0, key: str = None) -> Call
     """
     @wraps(function)
     def decorator(*args, **kwargs) -> Callable:
-
-        collected, allowed_input, use_args = collector(pos, key, *args, **kwargs)
-
-        if collected:
-            if use_args:
-                string_input = str(args[pos])
-            else:
-                string_input = str(kwargs.get(key))
-            string_input = string_input.split("\\")[-1]
-            if not set(string_input) <= set(string.ascii_letters + string.digits + "." + "_"):
-                raise InvalidFilenameError(key, pos, string_input)
-
+        # noinspection DuplicatedCode
+        sig = inspect.signature(function)
+        bound_args = sig.bind(*args, **kwargs)
+        bound_args.apply_defaults()
+        bound_args.arguments = {**bound_args.kwargs, **bound_args.arguments}
+        bound_args.arguments.pop("kwargs", None)
+        param = bound_args.arguments.get(parameter)
+        str_param = str(param).split("\\")[-1]
+        if not set(str_param) <= set(string.ascii_letters + string.digits + " " + "." + "_"):
+            raise InvalidFilenameError(parameter, str_param)
         # noinspection PyArgumentList
         return function(*args, **kwargs)
     return decorator

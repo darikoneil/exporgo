@@ -39,17 +39,6 @@ class _TerminalFormatter:
             raise SingletonError(cls)
         return cls.instance
 
-    def __str__(self):
-        return "Terminal Formatter"
-
-    @property
-    def type(self) -> str:
-        """
-        :Getter: Blue font style for type hinting
-        :Getter Type: :class:`str`
-        """
-        return self.BLUE
-
     @property
     def emphasis(self) -> str:
         """
@@ -57,18 +46,6 @@ class _TerminalFormatter:
         :Getter Type: :class:`str`
         """
         return self.YELLOW
-
-    @property
-    def modifications(self) -> str:
-        """
-        :Getter: Green font style for modifications
-        :Getter Type: :class:`str`
-        """
-        return self.YELLOW
-
-    @property
-    def experiment(self) -> str:
-        return self.GREEN
 
     @property
     def header(self) -> str:

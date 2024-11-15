@@ -286,7 +286,7 @@ class Subject:
             for experiment in self.experiments.values():
                 string_to_print += f"{experiment}\n"
 
-        string_to_print += TERMINAL_FORMATTER("Recent Modifications:\n", "modifications")
+        string_to_print += TERMINAL_FORMATTER("Recent Modifications:\n", "emphasis")
         for modification in self.modifications[:5]:
             string_to_print += TERMINAL_FORMATTER(f"\t{modification[0]}: ", "BLUE")
             string_to_print += f"{modification[1]}\n"

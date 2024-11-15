@@ -1,11 +1,12 @@
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from joblib import parallel_config
 
 # noinspection PyProtectedMember
-from exporgo._io import select_directory, select_file, verbose_copy
+from exporgo._io import (import_callable_from_file, select_directory,
+                         select_file, verbose_copy)
 
 
 # noinspection PyUnusedLocal
@@ -52,3 +53,18 @@ def test_verbose_copy(source, destination):
     source_files = list(source.rglob("*"))
     destination_files = list(destination.rglob("*"))
     assert len(source_files) == len(destination_files)
+
+
+class TestImportCallableFromFile:
+
+    def test_callable_imported_successfully(self):
+        with patch('exporgo._io.spec_from_file_location') as mock_spec, \
+             patch('exporgo._io.module_from_spec') as mock_module, \
+             patch('exporgo._io.modules') as mock_modules:
+            mock_loader = MagicMock()
+            mock_spec.return_value.loader = mock_loader
+            mock_module.return_value.some_callable = lambda: "test"
+            mock_modules.__setitem__.return_value = None
+
+            result = import_callable_from_file('some_callable', 'some_module', 'some_path')
+            assert result() == "test"

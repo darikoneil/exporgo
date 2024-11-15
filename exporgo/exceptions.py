@@ -21,12 +21,11 @@ class InvalidFilenameError(ValueError):
     :param filename: filename that is invalid
     :type filename: :class:`str` or :class:`Path <pathlib.Path>`
     """
-    def __init__(self, key: str, pos: int, filename: str | Path):
+    def __init__(self, key: str, filename: str | Path):
         self.key = key
         self.filename = filename
-        self.pos = pos
-        super().__init__(f"Argument {self.key} at position {self.pos} has invalid filename {self.filename}."
-                         f"Please use only alphanumeric characters and underscores.")
+        super().__init__(f"Argument {self.key} has invalid filename {self.filename}."
+                         f"Please use only alphanumeric characters, spaces, and underscores.")
 
 
 class InvalidExtensionWarning(UserWarning):
@@ -47,16 +46,14 @@ class InvalidExtensionWarning(UserWarning):
     """
     def __init__(self,
                  key: str,
-                 pos: int,
                  extension: str,
                  permitted: str | tuple[str, ...],
                  coerced: Optional[str] = None):
         self.key = key
-        self.pos = pos
         self.extension = extension
         self.permitted = permitted
         self.coerced = coerced if coerced else permitted
-        super().__init__(f"Argument {self.key} at position {self.pos} has invalid file extension {self.extension}. "
+        super().__init__(f"Argument {self.key} has invalid file extension {self.extension}. "
                          f"Expected extension {self.permitted} and coerced to {self.permitted}.")
 
 

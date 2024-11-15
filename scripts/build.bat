@@ -4,7 +4,7 @@
 cd ..
 
 :: remove dist directory
-rm -rf dist
+rmdir dist /s /q
 
 :: re-add dist directory
 mkdir dist

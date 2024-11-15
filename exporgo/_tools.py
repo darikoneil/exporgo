@@ -2,11 +2,9 @@ import inspect
 from contextlib import suppress
 from functools import update_wrapper, wraps
 from types import MappingProxyType
-from typing import Any, Callable, Generator, Iterable, Optional, Tuple
+from typing import Any, Callable, Generator, Iterable, Optional
 
 __all__ = [
-    "amend_args",  # TODO: This function can be removed in favor of using the standard `inspect` module
-    "collector",  # TODO: This function can be removed in favor of using the standard `inspect` module
     "parameterize",
     "conditional_dispatch",
     "unique_generator",
@@ -18,59 +16,6 @@ __all__ = [
 // Parameterized Decorators
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
-
-
-def amend_args(arguments: tuple, amendment: Any, pos: int = 0) -> tuple:
-    """
-    Function amends arguments tuple (~scary tuple mutation~)
-
-    :param arguments: arguments to be amended
-
-    :param amendment: new value of argument
-
-    :param pos: index of argument to be converted
-
-    :returns: amended arguments tuple
-    """
-    arguments = list(arguments)
-    arguments[pos] = amendment
-    return tuple(arguments)
-
-
-def collector(pos: int, key: str, *args, **kwargs) -> Tuple[bool, Any, bool]:
-    """
-    Function collects the argument to be validated
-
-    :param pos: position of argument to be collected
-
-    :param key: key of argument to be collected
-
-    :param args: arguments for positional collection
-
-    :param kwargs: keyword arguments for keyword collection
-
-    :returns: A tuple containing an argument, target, and a boolean indicating whether to use positional arguments
-    """
-    # noinspection PyBroadException
-    try:
-        if key in kwargs:
-            collected = True
-            use_args = False
-            target = kwargs.get(key)
-        elif pos is not None and args[pos] is not None:
-            collected = True
-            use_args = True
-            target = args[pos]
-        else:
-            raise Exception
-
-    except Exception:  # if any exception, just report a failure to collect
-        collected = False
-        use_args = None
-        target = None
-
-    # noinspection PyUnboundLocalVariable
-    return collected, target, use_args
 
 
 def parameterize(decorator: Callable) -> Callable:

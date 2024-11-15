@@ -8,7 +8,7 @@ from exporgo.exceptions import ImmutableInstanceWarning, SingletonError
 def test_terminal_scheme():
 
     # check properties
-    for attr in ["type", "emphasis", "header", "announcement"]:
+    for attr in ["emphasis", "header", "announcement"]:
         getattr(TERMINAL_FORMATTER, attr)
 
     # check all styles unique
@@ -16,7 +16,7 @@ def test_terminal_scheme():
     assert (len(keys) == len({getattr(TERMINAL_FORMATTER, key) for key in keys}))
 
     # check wrapping messages actually resets
-    new_msg = TERMINAL_FORMATTER("42!", "type")
+    new_msg = TERMINAL_FORMATTER("42!", "emphasis")
     msg_parts = new_msg.split("!")
     assert(msg_parts[-1] == "\x1b[0m")
 
