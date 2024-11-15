@@ -1,8 +1,11 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from exporgo.experiment import Experiment, ExperimentFactory, ExperimentRegistry, RegisteredExperiment
-from exporgo.pipeline import Pipeline, RegisteredPipeline
+
+from exporgo.experiment import (Experiment, ExperimentFactory,
+                                ExperimentRegistry, RegisteredExperiment)
 from exporgo.files import FileTree
+from exporgo.pipeline import Pipeline, RegisteredPipeline
 from exporgo.types import Folder, Priority, Status
 
 

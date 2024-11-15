@@ -1,11 +1,13 @@
-import pytest
-from unittest.mock import patch, MagicMock
-from exporgo.pipeline import Pipeline, ValidPipeline, RegisteredPipeline, PipelineFactory
-from exporgo.step import Step, RegisteredStep, StepRegistry
-from exporgo.types import Folder, CollectionType, Status
-from exporgo.files import FileTree
-from exporgo.types import Category
 from types import MappingProxyType
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from exporgo.files import FileTree
+from exporgo.pipeline import (Pipeline, PipelineFactory, RegisteredPipeline,
+                              ValidPipeline)
+from exporgo.step import RegisteredStep, Step, StepRegistry
+from exporgo.types import Category, CollectionType, Folder, Status
 
 
 class TestPipeline:
