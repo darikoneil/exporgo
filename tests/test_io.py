@@ -5,8 +5,8 @@ import pytest
 from joblib import parallel_config
 
 # noinspection PyProtectedMember
-from exporgo._io import (import_callable_from_file, select_directory,
-                         select_file, verbose_copy)
+from exporgo._io import (import_callable_from_file, import_function_from_file,
+                         select_directory, select_file, verbose_copy)
 
 
 # noinspection PyUnusedLocal
@@ -55,9 +55,7 @@ def test_verbose_copy(source, destination):
     assert len(source_files) == len(destination_files)
 
 
-class TestImportCallableFromFile:
-
-    def test_callable_imported_successfully(self):
+def test_callable_imported_successfully():
         with patch('exporgo._io.spec_from_file_location') as mock_spec, \
              patch('exporgo._io.module_from_spec') as mock_module, \
              patch('exporgo._io.modules') as mock_modules:
@@ -68,3 +66,15 @@ class TestImportCallableFromFile:
 
             result = import_callable_from_file('some_callable', 'some_module', 'some_path')
             assert result() == "test"
+
+
+def test_function_imported_successfully():
+    with patch('exporgo._io.spec_from_file_location') as mock_spec, \
+         patch('exporgo._io.module_from_spec') as mock_module:
+        mock_loader = MagicMock()
+        mock_spec.return_value.loader = mock_loader
+        mock_module.return_value.some_function = lambda: "test"
+        mock_loader.exec_module.return_value = None
+
+        result = import_function_from_file('some_function', Path('some_path'))
+        assert result() == "test"

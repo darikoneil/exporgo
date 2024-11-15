@@ -1,6 +1,7 @@
 import inspect
 from contextlib import suppress
 from functools import update_wrapper, wraps
+from inspect import getsourcefile
 from types import MappingProxyType
 from typing import Any, Callable, Generator, Iterable, Optional
 
@@ -165,3 +166,17 @@ def check_if_string_set(iterable: Iterable) -> set:
     accidentally create a set of characters when we really wanted a set of strings.
     """
     return {iterable, } if isinstance(iterable, str) else set(iterable)
+
+
+def serialize_function(call: Callable) -> dict:
+    """
+    Serialize a function
+
+    :param call: function
+
+    :return: serialized function
+    """
+    return {
+        "name": call.__name__,
+        "file": getsourcefile(call)
+    }

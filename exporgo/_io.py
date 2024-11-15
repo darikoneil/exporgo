@@ -133,3 +133,19 @@ def import_callable_from_file(name: str, module: str, path: File) -> Callable:
     modules[module] = module_
     spec.loader.exec_module(module_)
     return getattr(module_, name)
+
+
+def import_function_from_file(name: str, file: Path) -> Callable:
+    """
+    Import a function from a file
+
+    :param name: name of the function
+
+    :param file: path to the file
+
+    :return: function
+    """
+    spec = spec_from_file_location(name, file)
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return getattr(module, name)

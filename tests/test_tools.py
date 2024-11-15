@@ -1,10 +1,11 @@
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
 # noinspection PyProtectedMember
 from exporgo._tools import (check_if_string_set, conditional_dispatch, convert,
-                            unique_generator)
+                            serialize_function, unique_generator)
 
 
 def test_convert():
@@ -123,3 +124,9 @@ class TestConditionalDispatch:
 
         assert func(0) == "default"
         assert func(100) == "default"
+
+
+def test_function_name_and_file():
+    result = serialize_function(check_if_string_set)
+    assert result["name"] == "check_if_string_set"
+    assert "_tools.py" in result["file"]

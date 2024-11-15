@@ -1,7 +1,5 @@
 import json
 from functools import singledispatchmethod
-from importlib.util import module_from_spec, spec_from_file_location
-from inspect import getsourcefile
 from pathlib import Path
 from textwrap import indent
 from types import GeneratorType
@@ -13,6 +11,8 @@ from portalocker.exceptions import BaseLockException
 from pydantic import BaseModel, field_serializer, field_validator
 
 from ._color import TERMINAL_FORMATTER
+# noinspection PyProtectedMember
+from ._tools import serialize_function
 from ._validators import (MODEL_CONFIG, validate_category,
                           validate_dumping_with_pydantic,
                           validate_method_with_pydantic, validate_status)
@@ -21,44 +21,8 @@ from .exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
 if TYPE_CHECKING:
     from .subject import Subject
 
+from ._io import import_function_from_file
 from .types import Category, CollectionType, File, Status
-
-"""
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Internal Functions
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-"""
-
-
-def import_function_from_file(name: str, file: Path) -> Callable:
-    """
-    Import a function from a file
-
-    :param name: name of the function
-
-    :param file: path to the file
-
-    :return: function
-    """
-    spec = spec_from_file_location(name, file)
-    module = module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return getattr(module, name)
-
-
-def serialize_function(call: Callable) -> dict:
-    """
-    Serialize a function
-
-    :param call: function
-
-    :return: serialized function
-    """
-    return {
-        "name": call.__name__,
-        "file": getsourcefile(call)
-    }
-
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -321,9 +285,10 @@ class StepRegistry:
 
     @classmethod
     def _load_registry(cls) -> None:
+        # noinspection DuplicatedCode
         """
-        Load the registry from a JSON file
-        """
+                Load the registry from a JSON file
+                """
         try:
             with Lock(cls.__path, "r", timeout=10) as file:
                 cls.__registry = {key: RegisteredStep.model_validate(config) for key, config in json.load(file).items()}
