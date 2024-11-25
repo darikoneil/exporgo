@@ -1,16 +1,17 @@
 import inspect
-from unittest.mock import MagicMock
-from typing import Callable, Generator
-import pytest
 from pathlib import Path
+from typing import Callable, Generator
+from unittest.mock import MagicMock
+from uuid import uuid1
 
-from exporgo.registry import generic_function_call, PATH_STEPS
+import pytest
+
 from exporgo.exceptions import (AnalysisNotRegisteredError,
                                 DuplicateRegistrationError)
+from exporgo.registry import PATH_STEPS, generic_function_call
 from exporgo.step import (Category, RegisteredStep, Status, Step, StepRegistry,
                           ValidStep)
 from exporgo.tools import serialize_function
-from uuid import uuid1
 
 
 class TestValidStep:

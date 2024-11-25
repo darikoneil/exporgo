@@ -24,6 +24,7 @@ class _AutoStrEnum(str, Enum):
     def _generate_next_value_(name: str, start: int, count: int, last_values: list) -> str:  # noqa: U100
         return name
 
+
 class _ExporgoIntEnum(IntEnum):
     """
     IntEnum that can be serialized (and todo: validated)

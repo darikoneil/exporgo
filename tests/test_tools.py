@@ -129,4 +129,4 @@ class TestConditionalDispatch:
 def test_function_name_and_file():
     result = serialize_function(check_if_string_set)
     assert result["name"] == "check_if_string_set"
-    assert "_tools.py" in result["file"]
+    assert "tools.py" in result["file"]

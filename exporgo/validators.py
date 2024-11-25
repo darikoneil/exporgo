@@ -9,12 +9,12 @@ from typing import Any, Callable
 from pydantic import ConfigDict
 
 from . import __current_version__
-from .tools import parameterize
 from .exceptions import (EnumNameValueMismatchError, InvalidExtensionWarning,
                          InvalidFilenameError, UpdateVersionWarning,
                          VersionBackwardCompatibilityError,
                          VersionBackwardCompatibilityWarning,
                          VersionForwardCompatibilityWarning)
+from .tools import parameterize
 from .types import Category, Priority, Status
 
 """

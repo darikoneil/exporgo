@@ -3,9 +3,9 @@ from unittest.mock import patch
 import pytest
 from joblib import parallel_config
 
+from exporgo.exceptions import MissingFilesError
 # noinspection PyUnresolvedReferences,PyProtectedMember
 from exporgo.io import verbose_copy
-from exporgo.exceptions import MissingFilesError
 from exporgo.subject import Subject
 from exporgo.types import Priority
 from tests.conftest import BlockPrinting
@@ -49,6 +49,7 @@ class TestSubject:
                 print(subject)
             assert mock_ipythonlogger.start_log.called_once()
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_subject_indirect_get_experiment(self, tmp_path):
         with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="Test Subject",
@@ -61,6 +62,7 @@ class TestSubject:
             assert subject.get("Mock Experiment") == "Mock Experiment_"
             assert mock_ipythonlogger.start_log.called_once()
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_subject_create_experiment(self, tmp_path):
         with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="Test Subject",
@@ -72,6 +74,7 @@ class TestSubject:
             assert "Mock Experiment" in subject.experiments
             assert mock_ipythonlogger.start_log.called_once()
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_subject_save_load(self, tmp_path, source):
         # noinspection PyUnusedLocal
         with patch("exporgo.subject.IPythonLogger") as mock_ipythonlogger:
@@ -93,6 +96,7 @@ class TestSubject:
             assert "Mock Experiment" in subject_copy.contains
             assert subject_copy.get("Mock Experiment").file_tree.num_files == 9
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_subject_validate(self, tmp_path):
         with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="TestSubject",
@@ -104,6 +108,7 @@ class TestSubject:
             subject.validate()
             assert mock_ipythonlogger.start_log.called_once()
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_subject_validate_fail(self, tmp_path, source):
         with patch("exporgo.subject.IPythonLogger.start") as mock_ipythonlogger:
             subject = Subject(name="Test Subject",

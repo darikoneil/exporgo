@@ -2,22 +2,24 @@ from functools import singledispatchmethod
 from os import PathLike
 from pathlib import Path
 from types import GeneratorType, MappingProxyType, NoneType
-from typing import Any, Generator, Optional, Sequence
+from typing import Any, Generator, Mapping, Optional, Sequence
 
 from pydantic import BaseModel, field_serializer, field_validator
 
-from .io import select_directory, verbose_copy
-from .tools import check_if_string_set, unique_generator
-from .validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
-                         validate_method_with_pydantic, validate_status)
 from .files import FileTree
+from .io import select_directory, verbose_copy
 # noinspection PyUnresolvedReferences
 from .step import RegisteredStep, Step, StepRegistry
+from .tools import check_if_string_set, unique_generator
 from .types import CollectionType, Folder, Status
+from .validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
+                         validate_method_with_pydantic, validate_status)
 
 __all__ = [
     "Pipeline",
-    "RegisteredPipeline"
+    "PipelineFactory",
+    "RegisteredPipeline",
+    "ValidPipeline",
 ]
 
 
@@ -37,7 +39,33 @@ class ValidPipeline(BaseModel):
     @field_serializer("sources", check_fields=True)
     @classmethod
     def serialize_sources(cls, v: MappingProxyType[str, Folder | CollectionType | None]) -> dict | None:
-        return {file_set: str(source) for file_set, source in v.items()}
+        return {file_set: cls._inner_serialize_source(source) for file_set, source in v.items()}
+
+    @singledispatchmethod
+    @classmethod
+    def _inner_serialize_source(cls, source):
+        return str(source)
+
+    @_inner_serialize_source.register(str)
+    @_inner_serialize_source.register(Path)
+    @_inner_serialize_source.register(PathLike)
+    @classmethod
+    def _(cls, source: Folder):
+        return str(source)
+
+    @_inner_serialize_source.register(list)
+    @_inner_serialize_source.register(tuple)
+    @_inner_serialize_source.register(set)
+    @_inner_serialize_source.register(GeneratorType)
+    @classmethod
+    def _(cls, source):
+        return [cls._inner_serialize_source(s) for s in source]
+
+    # noinspection PyUnusedLocal
+    @_inner_serialize_source.register(type(None))
+    @classmethod
+    def _(cls, source: NoneType):
+        return None
 
     @field_serializer("status")
     @classmethod
@@ -46,7 +74,7 @@ class ValidPipeline(BaseModel):
 
     @field_serializer("steps", check_fields=True)
     @classmethod
-    def serialize_steps(cls, v: Step | Sequence[Step] | None) -> dict | list:
+    def serialize_steps(cls, v: Step | Sequence[Step] | None) -> dict | list | None:
         if isinstance(v, Step):
             return v.__serialize__(v)
         elif isinstance(v, (list | tuple)):
@@ -56,21 +84,23 @@ class ValidPipeline(BaseModel):
 
     @field_validator("sources", mode="before", check_fields=True)
     @classmethod
-    def validate_sources(cls, v: MappingProxyType[str, Folder | CollectionType | None]) \
+    def validate_sources(cls, v: Any) \
             -> MappingProxyType[str, Folder | CollectionType | None]:
         if isinstance(v, dict):
             return MappingProxyType(v)
         elif isinstance(v, MappingProxyType):
             return v
+        else:
+            return v
 
     @field_validator("status", mode="before", check_fields=True)
     @classmethod
-    def validate_status(cls, v: Status) -> Status | Any:
+    def validate_status(cls, v: Any) -> Status | Any:
         return validate_status(v)
 
     @field_validator("steps", mode="before", check_fields=True)
     @classmethod
-    def validate_steps(cls, v: Step | Sequence[Step] | None) -> Step | Sequence[Step] | None:
+    def validate_steps(cls, v: Any) -> Step | Sequence[Step] | None:
         if isinstance(v, (list, tuple)):
             steps = []
             for step in v:
@@ -97,10 +127,10 @@ class Pipeline:
     def __init__(self,
                  steps: Step | CollectionType,
                  status: Status,
-                 sources: Optional[MappingProxyType[str, Folder | CollectionType | None]] = None) -> None:
+                 sources: Optional[Mapping[str, Folder | CollectionType | None]] = None) -> None:
         self.steps = steps
         self._status = status
-        self._sources = sources if sources else dict.fromkeys(self.file_sets, None)
+        self._sources = dict(sources) if sources else dict.fromkeys(self.file_sets, None)
         # TODO: This will fail, I  will need to fix this
         self._collected = set()
 
@@ -134,6 +164,7 @@ class Pipeline:
                         self._collect(sources, destination, file_set_name)
                         self._collected.add(file_set_name)
                 step.status = Status.ANALYZE
+        file_tree.index()
 
     @singledispatchmethod
     def _collect(self, sources: Optional[Folder | CollectionType]) -> None:  # noqa: CCE001
@@ -204,7 +235,7 @@ class RegisteredPipeline(BaseModel):
 
     @field_validator("steps", mode="before", check_fields=True)
     @classmethod
-    def validate_steps(cls, v: RegisteredStep | Sequence[RegisteredStep] | None) \
+    def validate_steps(cls, v: Any) \
             -> RegisteredStep | Sequence[RegisteredStep] | None:
         if isinstance(v, RegisteredStep):
             return v

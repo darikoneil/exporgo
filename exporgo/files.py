@@ -6,8 +6,8 @@ from shutil import rmtree
 from types import GeneratorType, NoneType
 from typing import Any, Generator, Iterable, Iterator, Mapping, Optional
 
-from .tools import convert
 from .exceptions import MissingFilesError
+from .tools import convert
 from .types import CollectionType, File, Folder
 
 """

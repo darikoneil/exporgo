@@ -3,14 +3,14 @@ from pathlib import Path
 import pytest
 
 from exporgo import __current_version__
-# noinspection PyProtectedMember
-from exporgo.validators import (validate_extension, validate_filename,
-                                validate_version)
 from exporgo.exceptions import (InvalidExtensionWarning, InvalidFilenameError,
                                 UpdateVersionWarning,
                                 VersionBackwardCompatibilityError,
                                 VersionBackwardCompatibilityWarning,
                                 VersionForwardCompatibilityWarning)
+# noinspection PyProtectedMember
+from exporgo.validators import (validate_extension, validate_filename,
+                                validate_version)
 
 
 def test_validate_extension():

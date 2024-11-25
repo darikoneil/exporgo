@@ -11,12 +11,12 @@ from portalocker.exceptions import BaseLockException
 from pydantic import BaseModel, field_serializer, field_validator
 
 from ._color import TERMINAL_FORMATTER
+from .exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
 # noinspection PyProtectedMember
 from .tools import serialize_function
 from .validators import (MODEL_CONFIG, validate_category,
                          validate_dumping_with_pydantic,
                          validate_method_with_pydantic, validate_status)
-from .exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
 
 if TYPE_CHECKING:
     from .subject import Subject
@@ -145,12 +145,15 @@ class Step:
         elif isinstance(self._call, File):
             raise NotImplementedError("File-based calls are not yet supported")
         else:
-            raise ValueError("Invalid call type")
+            raise TypeError("Invalid call type")
 
-    def __eq__(self, other):
-        return self.key == other.key
+    def __eq__(self, other: Any) -> bool:
+        try:
+            return self.key == other.key
+        except AttributeError:
+            return False
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def __hash__(self):
@@ -197,10 +200,16 @@ class RegisteredStep(BaseModel, extra="ignore"):
     def validate_category(cls, v: Any) -> Category:
         return validate_category(v)
 
-    def __eq__(self, other):
-        return self.key == other.key
+    def __serialize__(self) -> dict:
+        return dict(self)
 
-    def __ne__(self, other):
+    def __eq__(self, other: Any) -> bool:
+        try:
+            return self.key == other.key
+        except AttributeError:
+            return False
+
+    def __ne__(self, other: Any) -> bool:
         return not self.__eq__(other)
 
     def __hash__(self):

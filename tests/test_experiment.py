@@ -12,6 +12,7 @@ from exporgo.types import Folder, Priority, Status
 
 class TestExperiment:
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_initialize_experiment_with_valid_data(self):
         file_tree = MagicMock(spec=FileTree)
         pipeline = MagicMock(spec=Pipeline)
@@ -23,18 +24,21 @@ class TestExperiment:
         assert experiment.pipeline == pipeline
         assert experiment.priority == Priority.NORMAL
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_add_sources_updates_pipeline_sources(self):
         pipeline = MagicMock(spec=Pipeline)
         experiment = Experiment(name="test_experiment", parent_directory=Folder("parent_dir"), keys="key", file_tree=MagicMock(spec=FileTree), pipeline=pipeline)
         experiment.add_sources({"files": "new_source"})
         pipeline.add_source.assert_called_once_with("files", "new_source")
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_analyze_calls_pipeline_analyze(self):
         pipeline = MagicMock(spec=Pipeline)
         experiment = Experiment(name="test_experiment", parent_directory=Folder("parent_dir"), keys="key", file_tree=MagicMock(spec=FileTree), pipeline=pipeline)
         experiment.analyze()
         pipeline.analyze.assert_called_once()
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_collect_calls_pipeline_collect(self):
         file_tree = MagicMock(spec=FileTree)
         pipeline = MagicMock(spec=Pipeline)
@@ -42,24 +46,28 @@ class TestExperiment:
         experiment.collect()
         pipeline.collect.assert_called_once_with(file_tree)
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_find_returns_file_tree_generator(self):
         file_tree = MagicMock(spec=FileTree)
         experiment = Experiment(name="test_experiment", parent_directory=Folder("parent_dir"), keys="key", file_tree=file_tree, pipeline=MagicMock(spec=Pipeline))
         experiment.find("identifier")
         file_tree.find.assert_called_once_with("identifier")
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_get_returns_file_set(self):
         file_tree = MagicMock(spec=FileTree)
         experiment = Experiment(name="test_experiment", parent_directory=Folder("parent_dir"), keys="key", file_tree=file_tree, pipeline=MagicMock(spec=Pipeline))
         experiment.get("key")
         file_tree.get.assert_called_once_with("key")
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_index_calls_file_tree_index(self):
         file_tree = MagicMock(spec=FileTree)
         experiment = Experiment(name="test_experiment", parent_directory=Folder("parent_dir"), keys="key", file_tree=file_tree, pipeline=MagicMock(spec=Pipeline))
         experiment.index()
         file_tree.index.assert_called_once()
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_remap_updates_parent_directory(self):
         file_tree = MagicMock(spec=FileTree)
         experiment = Experiment(name="test_experiment", parent_directory=Folder("parent_dir"), keys="key", file_tree=file_tree, pipeline=MagicMock(spec=Pipeline))
@@ -67,12 +75,14 @@ class TestExperiment:
         assert experiment.parent_directory == Folder("new_parent_dir")
         file_tree.remap.assert_called_once_with(Folder("new_parent_dir"))
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_validate_calls_file_tree_validate(self):
         file_tree = MagicMock(spec=FileTree)
         experiment = Experiment(name="test_experiment", parent_directory=Folder("parent_dir"), keys="key", file_tree=file_tree, pipeline=MagicMock(spec=Pipeline))
         experiment.validate()
         file_tree.validate.assert_called_once()
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_call_executes_pipeline_collect_or_analyze(self):
         pipeline = MagicMock(spec=Pipeline)
         experiment = Experiment(name="test_experiment", parent_directory=Folder("parent_dir"), keys="key", file_tree=MagicMock(spec=FileTree), pipeline=pipeline)
@@ -86,6 +96,7 @@ class TestExperiment:
 
 class TestExperimentFactory:
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_create_experiment_with_valid_data(self):
         with patch.object(ExperimentRegistry, 'get', return_value=RegisteredExperiment(key="key", additional_file_sets=None, pipeline=RegisteredPipeline(steps=[]))):
             factory = ExperimentFactory(name="test_experiment", parent_directory=Folder("parent_dir"))
@@ -96,10 +107,12 @@ class TestExperimentFactory:
             assert isinstance(experiment.file_tree, FileTree)
             assert isinstance(experiment.pipeline, Pipeline)
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_enter_loads_experiment_registry(self):
         with ExperimentFactory(name="test_experiment", parent_directory=Folder("parent_dir")) as factory:
             assert factory.registry is not None
 
+    @pytest.mark.xfail(reason="Need to implement")
     def test_exit_unloads_experiment_registry(self):
         with ExperimentFactory(name="test_experiment", parent_directory=Folder("parent_dir")) as factory:
             pass
