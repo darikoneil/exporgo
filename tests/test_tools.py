@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 import pytest
 
 # noinspection PyProtectedMember
-from exporgo._tools import (check_if_string_set, conditional_dispatch, convert,
-                            serialize_function, unique_generator)
+from exporgo.tools import (check_if_string_set, conditional_dispatch, convert,
+                           serialize_function, unique_generator)
 
 
 def test_convert():

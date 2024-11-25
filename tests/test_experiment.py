@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+# noinspection PyUnresolvedReferences
 import pytest
 
 from exporgo.experiment import (Experiment, ExperimentFactory,

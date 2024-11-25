@@ -11,7 +11,7 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 
 # noinspection PyProtectedMember
-from ._tools import convert
+from .tools import convert
 from .types import File, Folder
 
 """

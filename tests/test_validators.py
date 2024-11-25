@@ -4,8 +4,8 @@ import pytest
 
 from exporgo import __current_version__
 # noinspection PyProtectedMember
-from exporgo._validators import (validate_extension, validate_filename,
-                                 validate_version)
+from exporgo.validators import (validate_extension, validate_filename,
+                                validate_version)
 from exporgo.exceptions import (InvalidExtensionWarning, InvalidFilenameError,
                                 UpdateVersionWarning,
                                 VersionBackwardCompatibilityError,

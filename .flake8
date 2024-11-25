@@ -16,7 +16,7 @@ ignore =
     W503,
     W605,
     TRY003
-htmldir = reports/linting
+htmldir = linting
 unused-arguments-ignore-stub-functions = True
 unused-arguments-ignore-dunder = True
 unused-arguments-ignore-variadic-names = True
@@ -38,4 +38,5 @@ exclude =
     conda-meta,
     Scripts,
     Tools,
-    reports
+    coverage,
+    linting

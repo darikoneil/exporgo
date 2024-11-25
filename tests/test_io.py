@@ -5,8 +5,8 @@ import pytest
 from joblib import parallel_config
 
 # noinspection PyProtectedMember
-from exporgo._io import (import_callable_from_file, import_function_from_file,
-                         select_directory, select_file, verbose_copy)
+from exporgo.io import (import_callable_from_file, import_function_from_file,
+                        select_directory, select_file, verbose_copy)
 
 
 # noinspection PyUnusedLocal

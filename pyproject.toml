@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "exporgo"
-version = "0.0.9"
+version = "0.1.0"
 description = "Experiment organizer"
 readme = "README.md"
 requires-python = ">=3.10, <=4.0"
@@ -120,7 +120,7 @@ addopts = [
     "-vv",
     "--diff-width=120",
     "--disable-warnings",
-    "--html=./reports/testing/report.html",
+    "--html=./tests/testing-report.html",
 ]
 tests = "tests"
 console_output_style = "progress"
@@ -158,4 +158,4 @@ pretty_print = true
 
 [tool.coverage.html]
 show_contexts = true
-directory = "reports\\coverage"
+directory = "coverage"

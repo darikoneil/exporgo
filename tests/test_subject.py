@@ -4,7 +4,7 @@ import pytest
 from joblib import parallel_config
 
 # noinspection PyUnresolvedReferences,PyProtectedMember
-from exporgo._io import verbose_copy
+from exporgo.io import verbose_copy
 from exporgo.exceptions import MissingFilesError
 from exporgo.subject import Subject
 from exporgo.types import Priority

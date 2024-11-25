@@ -12,11 +12,11 @@ from pydantic import BaseModel, field_serializer, field_validator
 
 from ._color import TERMINAL_FORMATTER
 from ._logging import get_timestamp
-from ._tools import check_if_string_set, conditional_dispatch, convert
+from .tools import check_if_string_set, conditional_dispatch, convert
 # noinspection PyProtectedMember
-from ._validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
-                          validate_method_with_pydantic, validate_priority,
-                          validate_status)
+from .validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
+                         validate_method_with_pydantic, validate_priority,
+                         validate_status)
 from .exceptions import (DispatchError, DuplicateRegistrationError,
                          ExperimentNotRegisteredError)
 from .files import FileSet, FileTree
@@ -343,8 +343,6 @@ class Experiment:
             self.pipeline.collect()
         elif self.status == Status.ANALYZE:
             self.pipeline.analyze()
-
-    # TODO: Experiment needs a __str__ method
 
 
 """

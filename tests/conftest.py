@@ -49,6 +49,15 @@ def destination(request, tmp_path):
     return destination
 
 
+@pytest.fixture(scope="function")
+def path_steps(request, tmp_path):
+    """
+    Create dummy files for testing
+    """
+
+    return tmp_path.joinpath("registered_steps.json")
+
+
 # Simple class that blocks printing
 class BlockPrinting:
     """

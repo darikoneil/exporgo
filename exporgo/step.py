@@ -12,16 +12,16 @@ from pydantic import BaseModel, field_serializer, field_validator
 
 from ._color import TERMINAL_FORMATTER
 # noinspection PyProtectedMember
-from ._tools import serialize_function
-from ._validators import (MODEL_CONFIG, validate_category,
-                          validate_dumping_with_pydantic,
-                          validate_method_with_pydantic, validate_status)
+from .tools import serialize_function
+from .validators import (MODEL_CONFIG, validate_category,
+                         validate_dumping_with_pydantic,
+                         validate_method_with_pydantic, validate_status)
 from .exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
 
 if TYPE_CHECKING:
     from .subject import Subject
 
-from ._io import import_function_from_file
+from .io import import_function_from_file
 from .types import Category, CollectionType, File, Status
 
 """
@@ -33,7 +33,7 @@ from .types import Category, CollectionType, File, Status
 
 class ValidStep(BaseModel):
     key: str
-    call: str | Path | Callable
+    call: File | Callable
     file_sets: Optional[str | list[str] | tuple[str, ...]] = None
     category: Category = Category.ANALYZE
     status: Status = Status.SOURCE
@@ -41,7 +41,7 @@ class ValidStep(BaseModel):
 
     @field_serializer("call", check_fields=True)
     @classmethod
-    def serialize_call(cls, v: str | Path | Callable) -> str | dict:
+    def serialize_call(cls, v: File | Callable) -> str | dict:
         if isinstance(v, Callable):
             return serialize_function(v)
         else:
@@ -50,12 +50,12 @@ class ValidStep(BaseModel):
     @field_serializer("category", check_fields=True)
     @classmethod
     def serialize_category(cls, v: Category) -> str:
-        return f"({v.name}, {v.value})"
+        return v.__serialize__()
 
     @field_serializer("status", check_fields=True)
     @classmethod
     def serialize_status(cls, v: Status) -> str:
-        return f"({v.name}, {v.value})"
+        return v.__serialize__()
 
     @field_validator("call", mode="before", check_fields=True)
     @classmethod
@@ -87,7 +87,7 @@ class Step:
 
     def __init__(self,
                  key: str,
-                 call: str | Path | Callable,
+                 call: File | Callable,
                  file_sets: str | list[str] | tuple[str, ...],
                  category: Category,
                  status: Status = Status.SOURCE):
@@ -100,6 +100,7 @@ class Step:
     @property
     def call(self) -> str | Path | Callable:
         return self._call
+    # TODO: Implement file-based (scripts, jupyter notebooks, etc.) calls
 
     @property
     def category(self) -> Category:
@@ -141,8 +142,19 @@ class Step:
     def __call__(self, subject: File or "Subject"):
         if isinstance(self._call, Callable):
             return self._call(subject)
-        else:
+        elif isinstance(self._call, File):
             raise NotImplementedError("File-based calls are not yet supported")
+        else:
+            raise ValueError("Invalid call type")
+
+    def __eq__(self, other):
+        return self.key == other.key
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(self.__repr__())
 
 
 """
@@ -184,6 +196,15 @@ class RegisteredStep(BaseModel, extra="ignore"):
     @classmethod
     def validate_category(cls, v: Any) -> Category:
         return validate_category(v)
+
+    def __eq__(self, other):
+        return self.key == other.key
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(self.__repr__())
 
 
 class StepRegistry:
@@ -281,7 +302,12 @@ class StepRegistry:
     @register.register
     @classmethod
     def _(cls, step: Step) -> None:
-        cls.register(step)
+        cls.register(RegisteredStep(**{
+            "key": step.key,
+            "call": step.call,
+            "file_sets": step.file_sets,
+            "category": step.category,
+        }))
 
     @classmethod
     def _load_registry(cls) -> None:

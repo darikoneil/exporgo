@@ -9,7 +9,7 @@ from typing import Any, Callable
 from pydantic import ConfigDict
 
 from . import __current_version__
-from ._tools import parameterize
+from .tools import parameterize
 from .exceptions import (EnumNameValueMismatchError, InvalidExtensionWarning,
                          InvalidFilenameError, UpdateVersionWarning,
                          VersionBackwardCompatibilityError,
@@ -213,6 +213,7 @@ def validate_category(v: Any) -> Category:
     except AssertionError as exc:
         raise EnumNameValueMismatchError(Category, name, value) from exc
     return category
+# TODO: Can maybe be refactored into a single class method of the _ExporgoIntEnum class
 
 
 # noinspection PyUnboundLocalVariable

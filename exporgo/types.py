@@ -24,8 +24,16 @@ class _AutoStrEnum(str, Enum):
     def _generate_next_value_(name: str, start: int, count: int, last_values: list) -> str:  # noqa: U100
         return name
 
+class _ExporgoIntEnum(IntEnum):
+    """
+    IntEnum that can be serialized (and todo: validated)
+    """
 
-class Category(IntEnum):
+    def __serialize__(self) -> str:
+        return f"({self.name}, {self.value})"
+
+
+class Category(_ExporgoIntEnum):
     PREPARE = 0
     ANALYZE = 1
     SUMMARIZE = 2
@@ -37,7 +45,7 @@ class FileFormats(_AutoStrEnum):
     TOML = auto()
 
 
-class Priority(IntEnum):
+class Priority(_ExporgoIntEnum):
     IDLE = 0
     LOW = 1
     BELOW_NORMAL = 2
@@ -47,7 +55,7 @@ class Priority(IntEnum):
     CRITICAL = 6
 
 
-class Status(IntEnum):
+class Status(_ExporgoIntEnum):
     ERROR = -2
     EMPTY = -1
     SOURCE = 0
