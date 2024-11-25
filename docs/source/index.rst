@@ -1,20 +1,10 @@
-.. exporgo documentation master file, created by
-   sphinx-quickstart on Thu Oct 14 2021.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.\\
-
-Welcome to exporgo's documentation!
-===================================
+Exporgo
+=======
+Exporgo is a framework for automating your experimental analysis so you can spend your time experimenting or going (home).
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :maxdepth: 1
+   :caption: CONTENTS
+   :hidden:
 
-   exporgo.subject
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   Subject <exporgo.subject>
