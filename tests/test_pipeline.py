@@ -7,6 +7,7 @@ import pytest
 from exporgo.files import FileTree
 from exporgo.pipeline import (Pipeline, PipelineFactory, RegisteredPipeline,
                               ValidPipeline)
+# noinspection PyProtectedMember
 from exporgo.registry import generic_function_call
 from exporgo.step import RegisteredStep, Step, StepRegistry
 from exporgo.types import Category, Status
@@ -58,52 +59,53 @@ class TestValidPipeline:
             for idx, step in enumerate(validated_steps):
                 assert self.test_steps[idx] == step
 
+        def test_validate_step(self):
+            validated_steps = ValidPipeline.validate_steps(self.test_steps[0].__serialize__(self.test_steps[0]))
+            assert self.test_steps[0] == validated_steps
+
 
 class TestPipeline:
 
-    test_steps = [Step(key="test_key0",
-                        call=generic_function_call,
-                        file_sets="files0",
-                        category=Category.ANALYZE,
-                        status=Status.SOURCE),
-                    Step(key="test_key1",
-                        call=generic_function_call,
-                        file_sets=("files0", "files1"),
-                        category=Category.ANALYZE,
-                        status=Status.SOURCE),
-                    Step(key="test_key2",
-                        call=generic_function_call,
-                        file_sets="files2",
-                        category=Category.ANALYZE,
-                        status=Status.SOURCE),
-                    Step(key="test_key3",
-                        call=generic_function_call,
-                        file_sets="files3",
-                        category=Category.ANALYZE,
-                        status=Status.SOURCE),
-                    Step(key="test_key4",
-                        call=generic_function_call,
-                        file_sets="files4",
-                        category=Category.ANALYZE,
-                        status=Status.SOURCE),
-                    Step(key="test_key5",
-                        call=generic_function_call,
-                        file_sets="files5",
-                        category=Category.ANALYZE,
-                        status=Status.SOURCE)]
+    @pytest.fixture(scope="function", autouse=True)
+    def setup_sources(self, source, path_assets):
+        self.base_sources = MappingProxyType({"files0": None,
+                                              "files1": path_assets,
+                                              "files2": (source, path_assets),
+                                              "files3": [source, path_assets],
+                                              "files4": {source, path_assets},
+                                              "files5": (source_ for source_ in (source, path_assets))})
+        self.test_steps = [Step(key="test_key0",
+                           call=generic_function_call,
+                           file_sets="files0",
+                           category=Category.ANALYZE,
+                           status=Status.SOURCE),
+                      Step(key="test_key1",
+                           call=generic_function_call,
+                           file_sets=("files0", "files1"),
+                           category=Category.ANALYZE,
+                           status=Status.SOURCE),
+                      Step(key="test_key2",
+                           call=generic_function_call,
+                           file_sets="files2",
+                           category=Category.ANALYZE,
+                           status=Status.SOURCE),
+                      Step(key="test_key3",
+                           call=generic_function_call,
+                           file_sets="files3",
+                           category=Category.ANALYZE,
+                           status=Status.SOURCE),
+                      Step(key="test_key4",
+                           call=generic_function_call,
+                           file_sets="files4",
+                           category=Category.ANALYZE,
+                           status=Status.SOURCE),
+                      Step(key="test_key5",
+                           call=generic_function_call,
+                           file_sets="files5",
+                           category=Category.ANALYZE,
+                           status=Status.SOURCE)]
 
-    base_status = Status.SOURCE
-    base_sources = MappingProxyType({"files0": None,
-                                     "files1": Path.cwd().parent.joinpath("exporgo").parent.joinpath("exporgo").joinpath("schemas"),
-                                     "files2": (Path.cwd().parent.joinpath("exporgo").joinpath("registry"),
-                                                Path.cwd().parent.joinpath("exporgo").joinpath("schemas")),
-                                     "files3": [Path.cwd().parent.joinpath("exporgo").joinpath("schemas"),
-                                                Path.cwd().parent.joinpath("exporgo").joinpath("registry")],
-                                     "files4": {Path.cwd().parent.joinpath("exporgo").joinpath("registry"),
-                                                Path.cwd().parent.joinpath("exporgo").joinpath("schemas")},
-                                     "files5": (path_ for path_ in (Path.cwd().parent.joinpath("exporgo").joinpath("schemas"),
-                                                                    Path.cwd().parent.joinpath("exporgo").joinpath("registry")))})
-    additional_source_path = Path.cwd().parent.joinpath("exporgo").joinpath("registry")
+        self.base_status = Status.SOURCE
 
     @pytest.fixture(scope="function", autouse=True)
     def create_file_tree(self, destination):
@@ -121,8 +123,8 @@ class TestPipeline:
         pipeline = Pipeline(steps=self.test_steps,
                             status=self.base_status,
                             sources=self.base_sources)
-        pipeline.add_source("files0", self.additional_source_path)
-        assert pipeline.sources["files0"] == self.additional_source_path
+        pipeline.add_source("files0", self.base_sources.get("files1"))
+        assert pipeline.sources["files0"] == self.base_sources.get("files1")
 
     def test_status_returns_minimum_step_status(self):
         pipeline = Pipeline(steps=self.test_steps,
@@ -144,19 +146,18 @@ class TestPipeline:
             assert self.file_tree.num_folders > 0
             for fileset in pipeline.file_sets:
                 assert len(self.file_tree.get(fileset).files) > 0
-                assert len(self.file_tree.get(fileset).folders) >= 0
 
-    @pytest.mark.xfail(reason="Need to implement")
     def test_deserialize_creates_pipeline_instance(self):
+        sources = {"files": self.base_sources.get("files1")}
         pipeline_data = {
-            "steps": [Step(key="test_key", call="path/to/file", file_sets="files", category=Category.ANALYZE, status=Status.SOURCE)],
-            "status": Status.SOURCE,
-            "sources": dict({"files": None})
+            "steps": [step.__serialize__(step) for step in self.test_steps],
+            "status": self.base_status.__serialize__(),
+            "sources": sources
         }
         pipeline = Pipeline.__deserialize__(**pipeline_data)
-        assert pipeline.steps == pipeline_data["steps"]
-        assert pipeline.status == pipeline_data["status"]
-        assert pipeline.sources == pipeline_data["sources"]
+        assert pipeline.steps == self.test_steps
+        assert pipeline.status == self.base_status
+        assert pipeline.sources == MappingProxyType(sources)
 
 
     def test_serialize_returns_pipeline_data(self):
@@ -200,37 +201,63 @@ class TestRegisteredPipeline:
                 assert self.test_steps[idx] == step[idx]
 
 
-@pytest.mark.xfail(reason="Need to implement")
+# noinspection PyUnresolvedReferences
 class TestPipelineFactory:
 
-    @pytest.mark.xfail(reason="Need to implement")
-    def test_create_pipeline_from_registered_steps(self):
-        registered_steps = [RegisteredStep(key="test_key", call="path/to/file", file_sets="files", category=Category.ANALYZE)]
-        factory = PipelineFactory(steps=registered_steps)
+    @pytest.fixture(scope="function", autouse=True)
+    def setup_class(self, path_steps):
+        StepRegistry._StepRegistry__path = path_steps
+        StepRegistry._StepRegistry__registry = {
+            "step_0": RegisteredStep(key="step_0",
+                                        call=generic_function_call,
+                                        file_sets="files0",
+                                        category=Category.ANALYZE),
+            "step_1": RegisteredStep(key="step_1",
+                                        call=generic_function_call,
+                                        file_sets=("files0", "files1"),
+                                        category=Category.ANALYZE)
+        }
+
+    def test_create_pipeline_from_registered_step(self):
+        factory = PipelineFactory(steps=None)
+        factory._registry = StepRegistry()
+        factory.add_step(RegisteredStep(key="step_0",
+                                        call=generic_function_call,
+                                        file_sets="files0",
+                                        category=Category.ANALYZE))
         pipeline = factory.create()
         assert isinstance(pipeline, Pipeline)
-        assert pipeline.steps[0].key == "test_key"
+        assert pipeline.steps[0].key == "step_0"
 
-    @pytest.mark.xfail(reason="Need to implement")
-    def test_build_converts_registered_steps_to_steps(self):
-        registered_steps = [RegisteredStep(key="test_key", call="path/to/file", file_sets="files", category=Category.ANALYZE)]
-        factory = PipelineFactory(steps=registered_steps)
-        factory._build()
-        assert isinstance(factory.steps[0], Step)
-        assert factory.steps[0].key == "test_key"
+    def test_create_pipeline_from_step(self):
+        factory = PipelineFactory(steps=Step(**vars(StepRegistry.get("step_0"))))
+        factory._registry = StepRegistry()
+        pipeline = factory.create()
+        assert isinstance(pipeline, Pipeline)
+        assert pipeline.steps[0].key == "step_0"
 
-    @pytest.mark.xfail(reason="Need to implement")
+    def test_create_pipeline_from_key(self):
+        factory = PipelineFactory(steps=None)
+        factory._registry = StepRegistry()
+        factory.add_step("step_0")
+        pipeline = factory.create()
+        assert isinstance(pipeline, Pipeline)
+        assert pipeline.steps[0].key == "step_0"
+
+    def test_create_pipeline_from_collection(self):
+            factory = PipelineFactory(steps=None)
+            factory._registry = StepRegistry()
+            factory.add_step("step_0")
+            factory.add_step("step_1")
+
+            pipeline = factory.create()
+            assert isinstance(pipeline, Pipeline)
+            assert pipeline.steps[0].key == "step_0"
+            assert pipeline.steps[1].key == "step_1"
+
     def test_enter_loads_step_registry(self):
-        registered_steps = [RegisteredStep(key="test_key", call="path/to/file", file_sets="files", category=Category.ANALYZE)]
-        factory = PipelineFactory(steps=registered_steps)
-        with factory as f:
-            assert f._registry is not None
-
-    @pytest.mark.xfail(reason="Need to implement")
-    def test_exit_unloads_step_registry(self):
-        registered_steps = [RegisteredStep(key="test_key", call="path/to/file", file_sets="files", category=Category.ANALYZE)]
-        factory = PipelineFactory(steps=registered_steps)
-        # noinspection PyUnusedLocal
-        with factory as f:
-            pass
-        assert factory._registry is None
+        with patch.object(StepRegistry, '_load_registry', MagicMock(StepRegistry._load_registry)):
+            # noinspection PyUnusedLocal
+            with PipelineFactory(steps=None) as f:
+                ...
+            assert StepRegistry._load_registry.called

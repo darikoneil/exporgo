@@ -10,7 +10,7 @@ PATH_EXPERIMENTS = _REGISTRY_PATH.joinpath("registered_experiments.json")
 PATH_STEPS = _REGISTRY_PATH.joinpath("registered_steps.json")
 
 
-def generic_function_call(*args, **kwargs) -> None:  # pragma: no cover
+def generic_function_call(*args, **kwargs) -> None:
     """
     Generic function call for testing purposes only. Why am I here? Because it will be found by the test suite if it is
     with other testing assets.

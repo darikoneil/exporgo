@@ -1,4 +1,5 @@
 import json
+from contextlib import suppress
 from functools import singledispatchmethod
 from pathlib import Path
 from textwrap import indent
@@ -20,14 +21,14 @@ from .tools import check_if_string_set, conditional_dispatch, convert
 from .types import CollectionType, Folder, Priority, Status
 # noinspection PyProtectedMember
 from .validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
-                         validate_method_with_pydantic, validate_priority,
-                         validate_status)
+                         validate_method_with_pydantic)
 
 __all__ = [
     "Experiment",
     "ExperimentFactory",
     "ExperimentRegistry",
     "RegisteredExperiment",
+    "ValidExperiment",
 ]
 
 
@@ -67,12 +68,12 @@ class ValidExperiment(BaseModel):
     @field_serializer("priority")
     @classmethod
     def serialize_priority(cls, v: Priority) -> str:
-        return f"({v.name}, {v.value})"
+        return Priority.__serialize__(v)
 
     @field_serializer("status")
     @classmethod
     def serialize_status(cls, v: Status) -> str:
-        return f"({v.name}, {v.value})"
+        return Status.__serialize__(v)
 
     @field_validator("file_tree", mode="before", check_fields=True)
     @classmethod
@@ -80,7 +81,7 @@ class ValidExperiment(BaseModel):
         if isinstance(v, dict):
             return FileTree.__deserialize__(v)
         else:
-            return v
+            return v  # pragma: no cover
 
     @field_validator("pipeline", mode="before", check_fields=True)
     @classmethod
@@ -88,18 +89,22 @@ class ValidExperiment(BaseModel):
         if isinstance(v, dict):
             return Pipeline.__deserialize__(v)
         else:
-            return v
+            return v  # pragma: no cover
 
     # noinspection PyUnboundLocalVariable
     @field_validator("priority", mode="before", check_fields=True)
     @classmethod
     def validate_priority(cls, v: Any) -> Priority:
-        return validate_priority(v)
+        with suppress(ValueError):
+            return Priority(v)
+        return Priority.__deserialize__(v)
 
     @field_validator("status", mode="before", check_fields=True)
     @classmethod
     def validate_status(cls, v: Any) -> Status | Any:
-        return validate_status(v)
+        with suppress(ValueError):
+            return Status(v)
+        return Status.__deserialize__(v)
 
 
 """
@@ -159,7 +164,7 @@ class Experiment:
         if not self.meta:
             string_to_print += "\t\t\tNo Metadata Defined\n"
         else:
-            for key, value in self.experiment.meta.items():
+            for key, value in self.meta.items():
                 string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key}: ", "ORANGE")
                 string_to_print += f"{value}\n"
         string_to_print += TERMINAL_FORMATTER("\t\tFile Tree: \n", "GREEN")
@@ -167,28 +172,6 @@ class Experiment:
             string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key.capitalize()}: ", "ORANGE")
             string_to_print += f"{len(file_set.files)} Files\n"
         return string_to_print
-
-    @property
-    def parent_directory(self) -> Path:
-        """
-        Parent directory of the experiment
-
-        :Return type: :class:`Path <pathlib.Path>`
-
-        :meta read-only-properties:
-        """
-        return self._parent_directory
-
-    @property
-    def experiment_directory(self) -> Path:
-        """
-        Directory containing the experiment
-
-        :Return type: :class:`Path <pathlib.Path>`
-
-        :meta read-only-properties:
-        """
-        return self.parent_directory.joinpath(self.name)
 
     @property
     def created(self) -> str:
@@ -200,6 +183,17 @@ class Experiment:
         :meta read-only-properties:
         """
         return self._created
+
+    @property
+    def experiment_directory(self) -> Path:
+        """
+        Directory containing the experiment
+
+        :Return type: :class:`Path <pathlib.Path>`
+
+        :meta read-only-properties:
+        """
+        return self.parent_directory.joinpath(self.name)
 
     @property
     def keys(self) -> tuple[str, ...]:
@@ -215,6 +209,17 @@ class Experiment:
         :meta read-only-properties:
         """
         return self._name
+
+    @property
+    def parent_directory(self) -> Path:
+        """
+        Parent directory of the experiment
+
+        :Return type: :class:`Path <pathlib.Path>`
+
+        :meta read-only-properties:
+        """
+        return self._parent_directory
 
     @property
     def sources(self) -> MappingProxyType[str, Folder | CollectionType | None]:
@@ -259,7 +264,7 @@ class Experiment:
 
     @conditional_dispatch
     def add_sources(self, *args) -> None:
-        raise DispatchError(self.add_sources.__name__, args)
+        raise DispatchError(self.add_sources.__name__, args)  # pragma: no cover
 
     # noinspection PyUnresolvedReferences
     @add_sources.register(lambda *args: len(args) == 2)
@@ -272,7 +277,7 @@ class Experiment:
         self.pipeline.add_source(file_set, source)
 
     def analyze(self) -> None:
-        self.pipeline.analyze()
+        self.pipeline.analyze(self.file_tree)
 
     def collect(self) -> None:
         # noinspection PyTypeChecker
@@ -338,11 +343,22 @@ class Experiment:
                 f"{self.meta=})")
 
     def __call__(self):
-        if self.status == Status.COLLECT:
-            # noinspection PyArgumentList
-            self.pipeline.collect()
+        if self.status == Status.SOURCE or self.status == Status.COLLECT:
+            self.collect()
         elif self.status == Status.ANALYZE:
-            self.pipeline.analyze()
+            self.analyze()
+
+    def __eq__(self, other: Any) -> bool:  # pragma: no cover
+        try:
+            return self.name == other.name
+        except AttributeError:
+            return False
+
+    def __ne__(self, other: Any) -> bool:  # pragma: no cover
+        return not self.__eq__(other)
+
+    def __hash__(self):  # pragma: no cover
+        return hash(self.__repr__())
 
 
 """
@@ -365,6 +381,18 @@ class RegisteredExperiment(BaseModel):
     @property
     def file_sets(self) -> set[str]:
         return check_if_string_set(self.additional_file_sets) | self.pipeline.file_sets
+
+    def __eq__(self, other: Any) -> bool:
+        try:
+            return self.key == other.key
+        except AttributeError:
+            return False
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(self.__repr__())
 
 
 class ExperimentRegistry:
@@ -457,8 +485,8 @@ class ExperimentRegistry:
     # noinspection PyNestedDecorators
     @register.register
     @classmethod
-    def _(cls, name: str, **kwargs) -> None:
-        cls.register(RegisteredExperiment(name=name, **kwargs))
+    def _(cls, key: str, **kwargs) -> None:
+        cls.register(RegisteredExperiment(key=key, **kwargs))
 
     # noinspection DuplicatedCode
     @classmethod
@@ -509,7 +537,7 @@ class ExperimentFactory:
         self.experiment_directory = parent_directory.joinpath(name)
         self.experiment_directory.mkdir(parents=True, exist_ok=True)
         self.priority = priority
-        self.registry = None
+        self.__registry = None
         self.meta = {**meta, **kwargs} if meta else kwargs
 
     @staticmethod
@@ -524,7 +552,10 @@ class ExperimentFactory:
             return pipeline_factory.create()
 
     def create(self, keys: str | list[str] | tuple[str, ...]) -> Experiment:
-        experiment_ = self.registry.get(keys)
+        if not isinstance(keys, str):
+            raise NotImplementedError("Only single key experiments are supported at this time.")
+
+        experiment_ = self.__registry.get(keys)
         file_tree = self._make_file_tree(self.experiment_directory, experiment_.file_sets)
         pipeline = self._make_pipeline(experiment_.pipeline)
         return Experiment(self.name,
@@ -536,8 +567,8 @@ class ExperimentFactory:
                           self.meta)
 
     def __enter__(self):
-        with ExperimentRegistry() as self.registry:
+        with ExperimentRegistry() as self.__registry:
             return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: ANN206, ANN001
-        self.registry = None
+        self.__registry = None

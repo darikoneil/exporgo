@@ -1,7 +1,6 @@
 import inspect
 import string
 import warnings
-from contextlib import suppress
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable
@@ -9,13 +8,12 @@ from typing import Any, Callable
 from pydantic import ConfigDict
 
 from . import __current_version__
-from .exceptions import (EnumNameValueMismatchError, InvalidExtensionWarning,
-                         InvalidFilenameError, UpdateVersionWarning,
+from .exceptions import (InvalidExtensionWarning, InvalidFilenameError,
+                         UpdateVersionWarning,
                          VersionBackwardCompatibilityError,
                          VersionBackwardCompatibilityWarning,
                          VersionForwardCompatibilityWarning)
 from .tools import parameterize
-from .types import Category, Priority, Status
 
 """
 Some functions useful for validation & a conserved config for all Pydantic BaseModels. Most of these functions are
@@ -28,11 +26,8 @@ __all__ = [
     "validate_extension",
     "validate_filename",
     "validate_version",
-    "validate_priority",
-    "validate_status",
     "validate_dumping_with_pydantic",
     "validate_method_with_pydantic",
-    "validate_category",
     "MODEL_CONFIG",
 ]
 
@@ -47,7 +42,16 @@ __all__ = [
 @parameterize
 def validate_extension(function: Callable, parameter: str, required_extension: str) -> Callable:
     """
-    .. note:: This decorator will convert the extension of the file to the required extension if it is not already,
+    Decorator for validating the extension of a file.
+
+    :param function: The function to be decorated.
+
+    :param parameter: The parameter to be validated.
+
+    :param required_extension: The required extension for the file.
+
+    .. note::
+        This decorator will convert the extension of the file to the required extension if it is not already,
         rather than raising a fatal error.
     """
     @wraps(function)
@@ -76,9 +80,14 @@ def validate_filename(function: Callable, parameter: str) -> Callable:
     Decorator for validating filenames adhere to best practices for naming files. Specifically, filenames should only
     contain ascii letters, digits, periods, spaces, and underscores.
 
-    raises:: :class:`InvalidFilenameError <exceptions.InvalidFilenameError>`
+    :param function: The function to be decorated.
 
-    .. note:: See `here <https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file>1_ for more information
+    :param parameter: The parameter to be validated.
+
+    raises:: :class:`InvalidFilenameError <exporgo.exceptions.InvalidFilenameError>`
+
+    .. note::
+        See `here <https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file>1_ for more information
         on file naming best practices for naming files.
     """
     @wraps(function)
@@ -109,7 +118,8 @@ def validate_dumping_with_pydantic(function: Callable, model: Any) -> Callable:
 
     :returns: The decorated function.
 
-    .. warning :: This decorator is only intended for use with class methods that accept an instance of the class as
+    .. warning::
+        This decorator is only intended for use with class methods that accept an instance of the class as
         the first argument.
 
     """
@@ -144,7 +154,8 @@ def validate_method_with_pydantic(function: Callable, model: Any) -> Callable:
 
     :returns: The decorated function.
 
-    .. warning :: This decorator is only intended for use with class methods
+    .. warning::
+        This decorator is only intended for use with class methods
     """
 
     # noinspection PyUnusedLocal
@@ -176,7 +187,6 @@ def validate_method_with_pydantic(function: Callable, model: Any) -> Callable:
             func_get = lambda key: bound_args.arguments.get(key)  # noqa: E731
             container = bound_args.arguments
             has_cls = False
-        # TODO: Read up on this, I don't know why I have to do this
         # Collect the parameters from the bound arguments that are in the Pydantic model
         params = {key: func_get(key) for key in model.model_fields.keys()
                   if key in container}
@@ -196,58 +206,6 @@ def validate_method_with_pydantic(function: Callable, model: Any) -> Callable:
 // Validation Functions
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
-
-
-# noinspection PyUnboundLocalVariable
-def validate_category(v: Any) -> Category:
-    with suppress(ValueError):
-        return Category(v)
-    if isinstance(v, str):
-        name, value = v[1:-1].split(", ")
-        value = int(value)
-    elif isinstance(v, tuple):
-        name, value = v
-    category = Category(value)
-    try:
-        assert category.name == name
-    except AssertionError as exc:
-        raise EnumNameValueMismatchError(Category, name, value) from exc
-    return category
-# TODO: Can maybe be refactored into a single class method of the _ExporgoIntEnum class
-
-
-# noinspection PyUnboundLocalVariable
-def validate_priority(v: Any) -> Priority:
-    with suppress(ValueError):
-        return Priority(v)
-    if isinstance(v, str):
-        name, value = v[1:-1].split(", ")
-        value = int(value)
-    elif isinstance(v, tuple):
-        name, value = v
-    priority = Priority(value)
-    try:
-        assert priority.name == name
-    except AssertionError as exc:
-        raise EnumNameValueMismatchError(Priority, name, value) from exc
-    return priority
-
-
-# noinspection PyUnboundLocalVariable
-def validate_status(v: Any) -> Status:
-    with suppress(ValueError):
-        return Status(v)
-    if isinstance(v, str):
-        name, value = v[1:-1].split(", ")
-        value = int(value)
-    elif isinstance(v, tuple):
-        name, value = v
-    status = Status(value)
-    try:
-        assert status.name == name
-    except AssertionError as exc:
-        raise EnumNameValueMismatchError(Status, name, value) from exc
-    return status
 
 
 def validate_version(version: str) -> None:
@@ -285,7 +243,7 @@ def validate_version(version: str) -> None:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
 
-
+#: ConfigDict: The configuration for all Pydantic BaseModels
 MODEL_CONFIG = ConfigDict(extra="forbid",
                           revalidate_instances="always",
                           validate_assignment=True,

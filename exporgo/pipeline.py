@@ -1,3 +1,4 @@
+from contextlib import suppress
 from functools import singledispatchmethod
 from os import PathLike
 from pathlib import Path
@@ -13,7 +14,7 @@ from .step import RegisteredStep, Step, StepRegistry
 from .tools import check_if_string_set, unique_generator
 from .types import CollectionType, Folder, Status
 from .validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
-                         validate_method_with_pydantic, validate_status)
+                         validate_method_with_pydantic)
 
 __all__ = [
     "Pipeline",
@@ -43,14 +44,14 @@ class ValidPipeline(BaseModel):
 
     @singledispatchmethod
     @classmethod
-    def _inner_serialize_source(cls, source):
+    def _inner_serialize_source(cls, source: Folder | CollectionType | None) -> str:
         return str(source)
 
     @_inner_serialize_source.register(str)
     @_inner_serialize_source.register(Path)
     @_inner_serialize_source.register(PathLike)
     @classmethod
-    def _(cls, source: Folder):
+    def _(cls, source: Folder) -> str:
         return str(source)
 
     @_inner_serialize_source.register(list)
@@ -58,13 +59,13 @@ class ValidPipeline(BaseModel):
     @_inner_serialize_source.register(set)
     @_inner_serialize_source.register(GeneratorType)
     @classmethod
-    def _(cls, source):
+    def _(cls, source: CollectionType) -> list[str]:
         return [cls._inner_serialize_source(s) for s in source]
 
     # noinspection PyUnusedLocal
     @_inner_serialize_source.register(type(None))
     @classmethod
-    def _(cls, source: NoneType):
+    def _(cls, source: NoneType) -> None:  # noqa: U100
         return None
 
     @field_serializer("status")
@@ -91,12 +92,14 @@ class ValidPipeline(BaseModel):
         elif isinstance(v, MappingProxyType):
             return v
         else:
-            return v
+            return v  # pragma: no cover
 
     @field_validator("status", mode="before", check_fields=True)
     @classmethod
     def validate_status(cls, v: Any) -> Status | Any:
-        return validate_status(v)
+        with suppress(ValueError):
+            return Status(v)
+        return Status.__deserialize__(v)
 
     @field_validator("steps", mode="before", check_fields=True)
     @classmethod
@@ -112,7 +115,7 @@ class ValidPipeline(BaseModel):
         elif isinstance(v, dict):
             return Step.__deserialize__(**v)
         else:
-            return v
+            return v  # pragma: no cover
         # TODO: FIX ME, I don't always return a Step or Sequence[Step]
 
 
@@ -126,7 +129,7 @@ class ValidPipeline(BaseModel):
 class Pipeline:
     def __init__(self,
                  steps: Step | CollectionType,
-                 status: Status,
+                 status: Status = Status.EMPTY,
                  sources: Optional[Mapping[str, Folder | CollectionType | None]] = None) -> None:
         self.steps = steps
         self._status = status
@@ -150,9 +153,11 @@ class Pipeline:
                    file_set: str,
                    source: Folder | CollectionType | None) -> None:
         self._sources[file_set] = source
+        # TODO: Source -> Collect needs implemented
 
-    def analyze(self) -> None:
-        ...
+    def analyze(self, file_tree: FileTree) -> None:
+        for step in self.steps:
+            step(file_tree)
 
     def collect(self, file_tree: FileTree) -> None:
         for step in self.steps:
@@ -249,7 +254,7 @@ class RegisteredPipeline(BaseModel):
                         steps.append(registry.get(step))
             return steps
         else:
-            return v
+            return v  # pragma: no cover
 
 
 """
@@ -260,18 +265,41 @@ class RegisteredPipeline(BaseModel):
 
 
 class PipelineFactory:
-    def __init__(self, steps: RegisteredStep | Sequence[RegisteredStep] | None) -> None:
-        self.steps = steps
+    def __init__(self, steps: str | Step | RegisteredStep | list | tuple | None) -> None:
+        self._steps = []
         self._registry = None
 
-    def create(self) -> Pipeline:
-        self._build()
-        return Pipeline(self.steps, Status.SOURCE)
+        if steps is not None:
+            self.add_step(steps)
 
-    def _build(self) -> None:
-        self.steps = [Step.__deserialize__(**vars(step)) for step in self.steps] \
-            if isinstance(self.steps, (list, tuple)) \
-            else Step.__deserialize__(**vars(self.steps))
+    def create(self) -> "Pipeline":
+        return Pipeline(self._steps, Status.SOURCE)
+
+    @singledispatchmethod
+    def add_step(self, step) -> None:
+        ...
+
+    @add_step.register(str)
+    def _(self, step: str) -> None:
+        with StepRegistry() as registry:
+            step = registry.get(step)
+        self.add_step(step)
+
+    @add_step.register(RegisteredStep)
+    def _(self, step: RegisteredStep) -> None:
+        self._steps.append(Step.__deserialize__(**vars(step)))
+
+    @add_step.register(Step)
+    def _(self, step: Step) -> None:
+        self._steps.append(step)
+
+    @add_step.register(list)
+    @add_step.register(tuple)
+    @add_step.register(set)
+    @add_step.register(GeneratorType)
+    def _(self, steps: list | tuple) -> None:
+        for step in steps:
+            self.add_step(step)
 
     def __enter__(self):
         with StepRegistry() as registry:

@@ -16,8 +16,6 @@ class InvalidFilenameError(ValueError):
 
     :param key: key of the argument
 
-    :param pos: position of the argument
-
     :param filename: filename that is invalid
     :type filename: :class:`str` or :class:`Path <pathlib.Path>`
     """
@@ -33,8 +31,6 @@ class InvalidExtensionWarning(UserWarning):
     Raised when an invalid file extension is used
 
     :param key: key of the argument
-
-    :param pos: position of the argument
 
     :param extension: extension that is invalid
 
@@ -140,37 +136,6 @@ class AnalysisNotRegisteredError(KeyError):
         super().__init__(f"{self.experiment} is not registered.")
 
 
-class InvalidExperimentTypeError(TypeError):
-    """
-    Raised when an experiment is not a subclass of :class:`Experiment`
-
-    :param experiment: experiment that is not a subclass of :class:`Experiment`
-    """
-    def __init__(self, experiment: Any):
-        self.experiment = experiment
-        super().__init__(f"{self.experiment} is not a subclass of Experiment")
-
-
-class NotPermittedTypeError(TypeError):
-    """
-    Raised when a type is not permitted
-
-    :param key: key of the argument
-
-    :param pos: position of the argument
-
-    :param permitted: permitted type/s
-    :type permitted: :class:`Any` or :class:`tuple`\[:class:`Any`\]
-    """
-    def __init__(self, key: str, pos: int, permitted: Any | tuple[Any, ...], arg: Any):
-        self.key = key
-        self.pos = pos
-        self.permitted = permitted
-        self.argument = arg
-        super().__init__(f"Argument {self.key} at position {self.pos} must be of type {self.permitted};"
-                         f"passed type: {type(self.argument)}")
-
-
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Version Errors and Warnings
@@ -274,7 +239,7 @@ class ImmutableInstanceWarning(RuntimeWarning):
 """
 
 
-class DispatchError(RuntimeError):
+class DispatchError(RuntimeError):  # pragma: no cover
     """
     Raised when a dispatch error occurs
     """

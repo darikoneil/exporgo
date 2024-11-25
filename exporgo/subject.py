@@ -1,3 +1,4 @@
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, Optional
 
@@ -13,11 +14,11 @@ from .io import select_directory, select_file
 from .tools import convert
 from .types import CollectionType, File, Folder, Modification, Priority, Status
 from .validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
-                         validate_method_with_pydantic, validate_priority,
-                         validate_status, validate_version)
+                         validate_method_with_pydantic, validate_version)
 
 __all__ = [
     "Subject",
+    "ValidSubject",
 ]
 
 
@@ -54,6 +55,7 @@ class ValidSubject(BaseModel):
     meta: dict[str, Any]
     #: The version of the subject.
     version: str
+
     model_config = MODEL_CONFIG
 
     @field_serializer("directory")
@@ -135,7 +137,9 @@ class ValidSubject(BaseModel):
 
         :return: The validated priority.
         """
-        return validate_priority(v)
+        with suppress(ValueError):
+            return Priority(v)
+        return Priority.__deserialize__(v)
 
     @field_validator("status", mode="before", check_fields=True)
     @classmethod
@@ -147,7 +151,9 @@ class ValidSubject(BaseModel):
 
         :return: The validated status.
         """
-        return validate_status(v)
+        with suppress(ValueError):
+            return Status(v)
+        return Status.__deserialize__(v)
 
     @field_validator("version", mode="after", check_fields=False)
     @classmethod
@@ -605,6 +611,6 @@ class Subject:
         """
         Destructor to end the logger when the Subject object is deleted.
         """
-        if "logger" in vars(self):
+        if "logger" in vars(self) and self.logger.running():
             self.logger.end()
             self.logger._IP = None

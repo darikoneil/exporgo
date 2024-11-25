@@ -1,14 +1,15 @@
 import inspect
 from pathlib import Path
 from typing import Callable, Generator
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from uuid import uuid1
 
 import pytest
 
 from exporgo.exceptions import (AnalysisNotRegisteredError,
                                 DuplicateRegistrationError)
-from exporgo.registry import PATH_STEPS, generic_function_call
+# noinspection PyProtectedMember
+from exporgo.registry import generic_function_call
 from exporgo.step import (Category, RegisteredStep, Status, Step, StepRegistry,
                           ValidStep)
 from exporgo.tools import serialize_function
@@ -176,10 +177,7 @@ def create_step_generator(steps) -> Generator["RegisteredStep", None, None]:
         yield step
 
 
-#@pytest.mark.xfail(reason="Implementation of tests incomplete")
 class TestStepRegistry:
-
-    real_registry_path = PATH_STEPS
 
     @pytest.fixture(scope="function", autouse=True)
     def setup_class(self, path_steps):
@@ -275,14 +273,16 @@ class TestStepRegistry:
         assert StepRegistry.get(key) == step
 
     def test_enter_loads_registry(self):
-        StepRegistry._load_registry = MagicMock(StepRegistry._load_registry)
-        # noinspection PyUnusedLocal
-        with StepRegistry() as registry:
-            ...
-        assert StepRegistry._load_registry.called
+        with patch.object(StepRegistry, '_load_registry', MagicMock(StepRegistry._load_registry)):
+            # noinspection PyUnusedLocal
+            with StepRegistry() as registry:
+                ...
+            # noinspection PyUnresolvedReferences
+            assert StepRegistry._load_registry.called
 
     def test_exit_saves_registry_on_new_registration(self):
-        StepRegistry._save_registry = MagicMock(StepRegistry._save_registry)
-        with StepRegistry() as registry:
-            registry.register(self.create_step("test_exit_saves_registry_on_new_registration"))
-        assert StepRegistry._save_registry.called
+        with patch.object(StepRegistry, '_save_registry', MagicMock(StepRegistry._save_registry)):
+            with StepRegistry() as registry:
+                registry.register(self.create_step("test_exit_saves_registry_on_new_registration"))
+            # noinspection PyUnresolvedReferences
+            assert StepRegistry._save_registry.called

@@ -167,7 +167,8 @@ def check_if_string_set(iterable: Iterable) -> set:
     Checks if an iterable is simply a string when constructing a set. This is useful for ensuring that we don't
     accidentally create a set of characters when we really wanted a set of strings.
     """
-    return {iterable, } if isinstance(iterable, str) else set(iterable)
+    return {iterable, } if isinstance(iterable, str) else set(iterable) \
+        if iterable else set()
 
 
 def serialize_function(call: Callable) -> dict:

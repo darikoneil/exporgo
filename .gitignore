@@ -243,3 +243,13 @@ fabric.properties
 /reports/
 /coverage.json
 /coverage.lcov
+/docs/source/_themes/
+
+# built docs
+/docs/build/
+
+# web interfaces for testing
+/coverage/
+/linting/
+/tests/*.html
+/tests/assets/

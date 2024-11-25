@@ -1,4 +1,5 @@
 import json
+from contextlib import suppress
 from functools import singledispatchmethod
 from pathlib import Path
 from textwrap import indent
@@ -14,15 +15,14 @@ from ._color import TERMINAL_FORMATTER
 from .exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
 # noinspection PyProtectedMember
 from .tools import serialize_function
-from .validators import (MODEL_CONFIG, validate_category,
-                         validate_dumping_with_pydantic,
-                         validate_method_with_pydantic, validate_status)
+from .validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
+                         validate_method_with_pydantic)
 
 if TYPE_CHECKING:
     from .subject import Subject
 
 from .io import import_function_from_file
-from .types import Category, CollectionType, File, Status
+from .types import Action, Category, CollectionType, File, Status
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +33,7 @@ from .types import Category, CollectionType, File, Status
 
 class ValidStep(BaseModel):
     key: str
-    call: File | Callable
+    call: Action
     file_sets: Optional[str | list[str] | tuple[str, ...]] = None
     category: Category = Category.ANALYZE
     status: Status = Status.SOURCE
@@ -63,17 +63,21 @@ class ValidStep(BaseModel):
         if isinstance(v, dict):
             return import_function_from_file(v["name"], v["file"])
         else:
-            return v
+            return v  # pragma: no cover
 
     @field_validator("category", mode="before", check_fields=True)
     @classmethod
     def validate_category(cls, v: Any) -> Category:
-        return validate_category(v)
+        with suppress(ValueError):
+            return Category(v)
+        return Category.__deserialize__(v)
 
     @field_validator("status", mode="before", check_fields=True)
     @classmethod
     def validate_status(cls, v: Any) -> Status:
-        return validate_status(v)
+        with suppress(ValueError):
+            return Status(v)
+        return Status.__deserialize__(v)
 
 
 """
@@ -87,7 +91,7 @@ class Step:
 
     def __init__(self,
                  key: str,
-                 call: File | Callable,
+                 call: Action,
                  file_sets: str | list[str] | tuple[str, ...],
                  category: Category,
                  status: Status = Status.SOURCE):
@@ -100,7 +104,7 @@ class Step:
     @property
     def call(self) -> str | Path | Callable:
         return self._call
-    # TODO: Implement file-based (scripts, jupyter notebooks, etc.) calls
+    # TODO: Implement file-based (scripts, jupyter notebooks, etc.) calls, make this just descriptive?
 
     @property
     def category(self) -> Category:
@@ -141,23 +145,24 @@ class Step:
 
     def __call__(self, subject: File or "Subject"):
         if isinstance(self._call, Callable):
-            return self._call(subject)
+            self._call(subject)
+            self.status = Status.SUCCESS  # TODO: Flesh this out
         elif isinstance(self._call, File):
             raise NotImplementedError("File-based calls are not yet supported")
         else:
             raise TypeError("Invalid call type")
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: Any) -> bool:  # pragma: no cover
         try:
             return self.key == other.key
         except AttributeError:
             return False
 
-    def __ne__(self, other: Any) -> bool:
+    def __ne__(self, other: Any) -> bool:  # pragma: no cover
         return not self.__eq__(other)
 
     def __hash__(self):
-        return hash(self.__repr__())
+        return hash(self.__repr__())    # pragma: no cover  # noqa: ANN201
 
 
 """
@@ -169,7 +174,7 @@ class Step:
 
 class RegisteredStep(BaseModel, extra="ignore"):
     key: str
-    call: str | Path | Callable
+    call: Action
     file_sets: str | list[str] | tuple[str, ...]
     category: Category = Category.ANALYZE
     model_config = MODEL_CONFIG
@@ -193,27 +198,29 @@ class RegisteredStep(BaseModel, extra="ignore"):
         if isinstance(v, dict):
             return import_function_from_file(v["name"], v["file"])
         else:
-            return v
+            return v  # pragma: no cover
 
     @field_validator("category", mode="before", check_fields=True)
     @classmethod
     def validate_category(cls, v: Any) -> Category:
-        return validate_category(v)
+        with suppress(ValueError):
+            return Category(v)
+        return Category.__deserialize__(v)
 
     def __serialize__(self) -> dict:
         return dict(self)
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: Any) -> bool:  # pragma: no cover
         try:
             return self.key == other.key
         except AttributeError:
             return False
 
-    def __ne__(self, other: Any) -> bool:
+    def __ne__(self, other: Any) -> bool:  # pragma: no cover
         return not self.__eq__(other)
 
     def __hash__(self):
-        return hash(self.__repr__())
+        return hash(self.__repr__())  # pragma: no cover  # noqa: ANN201
 
 
 class StepRegistry:
@@ -318,6 +325,7 @@ class StepRegistry:
             "category": step.category,
         }))
 
+    # noinspection DuplicatedCode
     @classmethod
     def _load_registry(cls) -> None:
         # noinspection DuplicatedCode

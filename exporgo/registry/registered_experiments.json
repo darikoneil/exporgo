@@ -1,37 +1,14 @@
 {
-    "Generic Experiment": {
-        "key": "Generic Experiment",
+    "generic_experiment": {
+        "key": "generic_experiment",
         "additional_file_sets": [
             "figures",
             "results"
         ],
         "pipeline": {
             "steps": [
-                "Generic Step"
-            ]
-        }
-    },
-    "Generic Experiment_2": {
-        "key": "Generic Experiment_2",
-        "additional_file_sets": [
-            "figures",
-            "results"
-        ],
-        "pipeline": {
-            "steps": [
-                "Generic Step"
-            ]
-        }
-    },
-    "BOOP": {
-        "key": "BOOP",
-        "additional_file_sets": [
-            "file_set_three",
-            "file_set_four"
-        ],
-        "pipeline": {
-            "steps": [
-                "STEP_ONE"
+                "generic_step_0",
+                "generic_step_1"
             ]
         }
     }
