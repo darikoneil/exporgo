@@ -1,0 +1,20 @@
+{
+    "generic_step_0": {
+        "key": "generic_step_0",
+        "call": {
+            "name": "generic_function_call",
+            "file": "C:\\Users\\Darik\\PycharmProjects\\exporgo\\exporgo\\registry\\__init__.py"
+        },
+        "file_sets": "files",
+        "category": "(ANALYZE, 1)"
+    },
+    "generic_step_1": {
+        "key": "generic_step_1",
+        "call": {
+            "name": "generic_function_call",
+            "file": "C:\\Users\\Darik\\PycharmProjects\\exporgo\\exporgo\\registry\\__init__.py"
+        },
+        "file_sets": "files",
+        "category": "(ANALYZE, 1)"
+    }
+}

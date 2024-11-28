@@ -16,17 +16,14 @@ class InvalidFilenameError(ValueError):
 
     :param key: key of the argument
 
-    :param pos: position of the argument
-
     :param filename: filename that is invalid
     :type filename: :class:`str` or :class:`Path <pathlib.Path>`
     """
-    def __init__(self, key: str, pos: int, filename: str | Path):
+    def __init__(self, key: str, filename: str | Path):
         self.key = key
         self.filename = filename
-        self.pos = pos
-        super().__init__(f"Argument {self.key} at position {self.pos} has invalid filename {self.filename}."
-                         f"Please use only alphanumeric characters and underscores.")
+        super().__init__(f"Argument {self.key} has invalid filename {self.filename}."
+                         f"Please use only alphanumeric characters, spaces, and underscores.")
 
 
 class InvalidExtensionWarning(UserWarning):
@@ -34,8 +31,6 @@ class InvalidExtensionWarning(UserWarning):
     Raised when an invalid file extension is used
 
     :param key: key of the argument
-
-    :param pos: position of the argument
 
     :param extension: extension that is invalid
 
@@ -47,16 +42,14 @@ class InvalidExtensionWarning(UserWarning):
     """
     def __init__(self,
                  key: str,
-                 pos: int,
                  extension: str,
                  permitted: str | tuple[str, ...],
                  coerced: Optional[str] = None):
         self.key = key
-        self.pos = pos
         self.extension = extension
         self.permitted = permitted
         self.coerced = coerced if coerced else permitted
-        super().__init__(f"Argument {self.key} at position {self.pos} has invalid file extension {self.extension}. "
+        super().__init__(f"Argument {self.key} has invalid file extension {self.extension}. "
                          f"Expected extension {self.permitted} and coerced to {self.permitted}.")
 
 
@@ -81,6 +74,22 @@ class MissingFilesError(FileNotFoundError):
 // Validation Errors and Warnings
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
+
+
+class EnumNameValueMismatchError(ValueError):
+    """
+    Raised when the name and value of a serialized enumeration do not match
+
+    :param name: name of the enumeration
+
+    :param value: value of the enumeration
+    """
+    def __init__(self, enum: Any, name: str, value: int):
+        self.name = name
+        self.value = value
+        # noinspection PyCallingNonCallable
+        super().__init__(f"Name {self.name} and value {self.value} of the enumeration do not match."
+                         f"Expected {enum.__name__}({self.name}, {enum(value)}).")
 
 
 class DuplicateExperimentError(ValueError):
@@ -115,35 +124,16 @@ class ExperimentNotRegisteredError(KeyError):
         super().__init__(f"{self.experiment} is not registered.")
 
 
-class InvalidExperimentTypeError(TypeError):
+class AnalysisNotRegisteredError(KeyError):
     """
-    Raised when an experiment is not a subclass of :class:`Experiment`
+    Raised when an experiment is not registered
 
-    :param experiment: experiment that is not a subclass of :class:`Experiment`
+    :param experiment: experiment that is not registered
     """
+
     def __init__(self, experiment: Any):
         self.experiment = experiment
-        super().__init__(f"{self.experiment} is not a subclass of Experiment")
-
-
-class NotPermittedTypeError(TypeError):
-    """
-    Raised when a type is not permitted
-
-    :param key: key of the argument
-
-    :param pos: position of the argument
-
-    :param permitted: permitted type/s
-    :type permitted: :class:`Any` or :class:`tuple`\[:class:`Any`\]
-    """
-    def __init__(self, key: str, pos: int, permitted: Any | tuple[Any, ...], arg: Any):
-        self.key = key
-        self.pos = pos
-        self.permitted = permitted
-        self.argument = arg
-        super().__init__(f"Argument {self.key} at position {self.pos} must be of type {self.permitted};"
-                         f"passed type: {type(self.argument)}")
+        super().__init__(f"{self.experiment} is not registered.")
 
 
 """
@@ -240,3 +230,19 @@ class ImmutableInstanceWarning(RuntimeWarning):
     def __init__(self, instance: object):
         self.instance = instance
         super().__init__(f"{self.instance.__class__.__name__} is immutable and cannot be modified")
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Runtime Errors and Warnings
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+class DispatchError(RuntimeError):  # pragma: no cover
+    """
+    Raised when a dispatch error occurs
+    """
+    def __init__(self, dispatcher: Any, args: Optional[Any] = None):
+        self.dispatcher = dispatcher
+        super().__init__(f"Dispatch error with {self.dispatcher} given {args}")

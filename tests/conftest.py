@@ -1,6 +1,7 @@
 import sys
 from itertools import product
 from os import devnull
+from pathlib import Path
 from shutil import rmtree
 
 import pytest
@@ -11,7 +12,7 @@ CONFIGURATION FOR TESTING
 
 
 @pytest.fixture(scope="function")
-def source(request, tmp_path):
+def source(request, tmp_path) -> Path:
     """
     Create dummy files for testing
     """
@@ -33,7 +34,7 @@ def source(request, tmp_path):
 
 
 @pytest.fixture(scope="function")
-def destination(request, tmp_path):
+def destination(request, tmp_path) -> Path:
     """
     Create dummy files for testing
     """
@@ -47,6 +48,45 @@ def destination(request, tmp_path):
     request.addfinalizer(cleanup)
 
     return destination
+
+
+@pytest.fixture(scope="session", autouse=True)
+def path_assets(request) -> Path:
+    """
+    Create dummy files for testing
+    """
+    return Path(request.config.rootpath).joinpath("tests").joinpath("assets")
+
+
+@pytest.fixture(scope="function")
+def path_steps(request, tmp_path) -> Path:
+    """
+    Create dummy files for testing
+    """
+
+    return tmp_path.joinpath("registered_steps.json")
+
+
+@pytest.fixture(scope="function")
+def path_experiments(request, tmp_path) -> Path:
+    """
+    Create dummy files for testing
+    """
+
+    return tmp_path.joinpath("registered_experiments.json")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def suppress_tqdm():
+    """
+    Suppress tqdm output
+    """
+    from functools import partialmethod
+
+    from tqdm import tqdm
+
+    # noinspection PyTypeChecker
+    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
 
 # Simple class that blocks printing

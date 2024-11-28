@@ -1,14 +1,18 @@
 from functools import partial
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from shutil import copy2
+from sys import modules
 from tkinter import Tk
 from tkinter.filedialog import askdirectory, askopenfilename
-from typing import Optional
+from typing import Callable, Optional
 
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
-from ._validators import convert_permitted_types_to_required
+# noinspection PyProtectedMember
+from .tools import convert
+from .types import File, Folder
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,10 +70,10 @@ def select_directory(**kwargs) -> Path:
 """
 
 
-@convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=0, key="source")
-@convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=1, key="destination")
-def verbose_copy(source: str | Path,
-                 destination: str | Path,
+@convert(parameter="source", permitted=(Folder,), required=Path)
+@convert(parameter="destination", permitted=(Folder,), required=Path)
+def verbose_copy(source: Folder,
+                 destination: Folder,
                  feedback: Optional[str] = None) -> bool:
     """
     Copy a file from source to destination. If verbose is True, print feedback.
@@ -110,6 +114,38 @@ def verbose_copy(source: str | Path,
     files = [file for file in source.rglob("*") if file.is_file()]
     copier = partial(_copy, source, destination)
     message = f"Copying {feedback} files" if feedback else "Copying files"
-    return all(Parallel(n_jobs=-1, backend="loky")(delayed(copier)(file) for file in tqdm(files,
-                                                                                          total=len(files),
-                                                                                          desc=message)))
+    return all(Parallel(n_jobs=-1, backend="threading")(delayed(copier)(file) for file in tqdm(files,
+                                                                                               total=len(files),
+                                                                                               desc=message)))
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Importing
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+@convert(parameter="path", permitted=(File,), required=Path)
+def import_callable_from_file(name: str, module: str, path: File) -> Callable:
+    spec = spec_from_file_location(module, path)
+    module_ = module_from_spec(spec)
+    modules[module] = module_
+    spec.loader.exec_module(module_)
+    return getattr(module_, name)
+
+
+def import_function_from_file(name: str, file: Path) -> Callable:
+    """
+    Import a function from a file
+
+    :param name: name of the function
+
+    :param file: path to the file
+
+    :return: function
+    """
+    spec = spec_from_file_location(name, file)
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return getattr(module, name)

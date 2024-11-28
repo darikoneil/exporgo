@@ -1,0 +1,15 @@
+{
+    "generic_experiment": {
+        "key": "generic_experiment",
+        "additional_file_sets": [
+            "figures",
+            "results"
+        ],
+        "pipeline": {
+            "steps": [
+                "generic_step_0",
+                "generic_step_1"
+            ]
+        }
+    }
+}

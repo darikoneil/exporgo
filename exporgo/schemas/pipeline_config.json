@@ -1,0 +1,78 @@
+{
+    "$defs": {
+        "Category": {
+            "enum": [
+                0,
+                1,
+                2
+            ],
+            "title": "Category",
+            "type": "integer"
+        },
+        "StepConfig": {
+            "additionalProperties": false,
+            "properties": {
+                "key": {
+                    "default": null,
+                    "title": "Unique key for the analysis type in the registry",
+                    "type": "string"
+                },
+                "call": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "format": "path",
+                            "type": "string"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Analyzer for the experiment"
+                },
+                "file_sets": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Collection of file sets for organizing experiment"
+                },
+                "category": {
+                    "$ref": "#/$defs/Category",
+                    "default": 1,
+                    "title": "Category of the analysis"
+                }
+            },
+            "title": "StepConfig",
+            "type": "object"
+        }
+    },
+    "additionalProperties": false,
+    "properties": {
+        "steps": {
+            "anyOf": [
+                {
+                    "$ref": "#/$defs/StepConfig"
+                },
+                {
+                    "items": {
+                        "$ref": "#/$defs/StepConfig"
+                    },
+                    "type": "array"
+                }
+            ],
+            "default": null,
+            "title": "Sequence of steps in the pipeline"
+        }
+    },
+    "title": "PipelineConfig",
+    "type": "object"
+}

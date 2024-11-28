@@ -1,218 +1,574 @@
-from abc import abstractmethod
+import json
+from contextlib import suppress
 from functools import singledispatchmethod
 from pathlib import Path
-from typing import Callable, Iterable, Optional
+from textwrap import indent
+from types import GeneratorType, MappingProxyType
+from typing import Any, Generator, Optional, Sequence
 
-from ._io import select_directory, verbose_copy
+from portalocker import Lock
+from portalocker.constants import LOCK_EX
+from portalocker.exceptions import BaseLockException
+from pydantic import BaseModel, field_serializer, field_validator
+
+from ._color import TERMINAL_FORMATTER
 from ._logging import get_timestamp
-from ._validators import convert_permitted_types_to_required
-from .exceptions import (DuplicateRegistrationError,
-                         ExperimentNotRegisteredError,
-                         InvalidExperimentTypeError)
+from .exceptions import (DispatchError, DuplicateRegistrationError,
+                         ExperimentNotRegisteredError)
 from .files import FileSet, FileTree
+from .pipeline import Pipeline, PipelineFactory, RegisteredPipeline
+from .tools import check_if_string_set, conditional_dispatch, convert
+from .types import CollectionType, Folder, Priority, Status
+# noinspection PyProtectedMember
+from .validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
+                         validate_method_with_pydantic)
+
+__all__ = [
+    "Experiment",
+    "ExperimentFactory",
+    "ExperimentRegistry",
+    "RegisteredExperiment",
+    "ValidExperiment",
+]
+
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Implementation for Constructing Mix-in Experimental Classes
+// Experiment Model for Serialization & Validation
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
 
 
-#: TODO: Consider changing from mix-in classes to protocol pattern where collect_data and analyze_data are a chain.
+class ValidExperiment(BaseModel):
+    name: str
+    parent_directory: Path
+    keys: str | Sequence[str]
+    file_tree: FileTree
+    pipeline: Pipeline
+    priority: Priority
+    meta: dict
+    status: Optional[Status]
+    model_config = MODEL_CONFIG
 
-#: TODO: Add flags to the Experiment class to indicate if the experiment has been collected or analyzed.
+    @field_serializer("file_tree")
+    @classmethod
+    def serialize_file_tree(cls, v: FileTree) -> dict:
+        return v.__serialize__()
+
+    @field_serializer("parent_directory")
+    @classmethod
+    def serialize_parent_directory(cls, v: Path) -> str:
+        return str(v)
+
+    @field_serializer("pipeline")
+    @classmethod
+    def serialize_pipeline(cls, v: Pipeline) -> dict:
+        return v.__serialize__(v)
+
+    @field_serializer("priority")
+    @classmethod
+    def serialize_priority(cls, v: Priority) -> str:
+        return Priority.__serialize__(v)
+
+    @field_serializer("status")
+    @classmethod
+    def serialize_status(cls, v: Status) -> str:
+        return Status.__serialize__(v)
+
+    @field_validator("file_tree", mode="before", check_fields=True)
+    @classmethod
+    def validate_file_tree(cls, v: dict) -> FileTree | Any:
+        if isinstance(v, dict):
+            return FileTree.__deserialize__(v)
+        else:
+            return v  # pragma: no cover
+
+    @field_validator("pipeline", mode="before", check_fields=True)
+    @classmethod
+    def validate_pipeline(cls, v: Any) -> Pipeline | Any:
+        if isinstance(v, dict):
+            return Pipeline.__deserialize__(v)
+        else:
+            return v  # pragma: no cover
+
+    # noinspection PyUnboundLocalVariable
+    @field_validator("priority", mode="before", check_fields=True)
+    @classmethod
+    def validate_priority(cls, v: Any) -> Priority:
+        with suppress(ValueError):
+            return Priority(v)
+        return Priority.__deserialize__(v)
+
+    @field_validator("status", mode="before", check_fields=True)
+    @classmethod
+    def validate_status(cls, v: Any) -> Status | Any:
+        with suppress(ValueError):
+            return Status(v)
+        return Status.__deserialize__(v)
 
 
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Experiment Class for Managing File Collection, Access, and Analysis
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+# noinspection PyUnresolvedReferences
 class Experiment:
 
-    @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=2, key="base_directory")
-    def __init__(self, name: str, base_directory: str | Path, **kwargs):
-        #: str: name of the experiment
+    def __init__(self,
+                 name: str,
+                 parent_directory: Folder,
+                 keys: str | CollectionType,
+                 file_tree: FileTree,
+                 pipeline: Pipeline,
+                 priority: Priority = Priority.NORMAL,
+                 meta: Optional[dict] = None,
+                 **kwargs):
+        #: :class:`str`\: name of the experiment
         self._name = name
 
-        #: Path: base directory of mouse
-        self._base_directory = base_directory
+        #: :class:`Folder <exporgo.types.Folder>`\: base directory of subject
+        self._parent_directory = parent_directory
 
-        #: Iterable[str | "Experiment"]: iterable of mix-ins in string or object form
-        self._mix_ins = kwargs.pop("mix_ins", [])
+        #: :class:`tuple`: experiment registry keys
+        self._keys = (keys, ) if isinstance(keys, str) else keys
 
-        #: "FileTree": file tree experimental folders and files
-        self.file_tree = FileTree(self._name, base_directory, index=kwargs.pop("index", True))
+        #: :class:`FileTree <exporgo.files.FileTree>`\: file tree for the experiment
+        self.file_tree = file_tree
 
-        #: str: instance date
+        #: :class:`Pipeline <exporgo.pipeline.Pipeline>`\: pipeline for the experiment
+        self.pipeline = pipeline
+
+        #: :class:`Priority <exporgo.types.Priority>`\: priority of the experiment
+        self.priority = priority
+
+        #: :class:`dict`\: meta data
+        self.meta = {**meta, **kwargs} if meta else kwargs
+
+        #: :class:`str`\: timestamp of creation
         self._created = get_timestamp()
 
-        #: dict: meta data
-        self.meta = kwargs
-
-        self._generate_file_tree()
-
-    @property
-    def base_directory(self) -> Path:
-        return self._base_directory
+    def __str__(self) -> str:
+        string_to_print = TERMINAL_FORMATTER(f"\t{self.name}: \n", "BLUE")
+        string_to_print += TERMINAL_FORMATTER("\t\tPriority: ", "GREEN")
+        string_to_print += f"{self.priority.name}, {self.priority.value}\n"
+        string_to_print += TERMINAL_FORMATTER("\t\tStatus: ", "GREEN")
+        string_to_print += f"{self.status.name}, {self.status.value}\n"
+        string_to_print += TERMINAL_FORMATTER("\t\tCreated: ", "GREEN")
+        string_to_print += f"{self.created}\n"
+        string_to_print += TERMINAL_FORMATTER("\t\tKeys: ", "GREEN")
+        string_to_print += "".join([key + ", " for key in self.keys])[:-2]
+        string_to_print += TERMINAL_FORMATTER("\n\t\tMeta: \n", "GREEN")
+        if not self.meta:
+            string_to_print += "\t\t\tNo Metadata Defined\n"
+        else:
+            for key, value in self.meta.items():
+                string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key}: ", "ORANGE")
+                string_to_print += f"{value}\n"
+        string_to_print += TERMINAL_FORMATTER("\t\tFile Tree: \n", "GREEN")
+        for key, file_set in self.file_tree.items():
+            string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key.capitalize()}: ", "ORANGE")
+            string_to_print += f"{len(file_set.files)} Files\n"
+        return string_to_print
 
     @property
     def created(self) -> str:
+        """
+        The timestamp associated with the creation of the experiment.
+
+        :Return type: :class:`str`
+
+        :meta read-only-properties:
+        """
         return self._created
 
     @property
-    def mix_ins(self) -> Iterable:
-        return self._mix_ins
+    def experiment_directory(self) -> Path:
+        """
+        Directory containing the experiment
+
+        :Return type: :class:`Path <pathlib.Path>`
+
+        :meta read-only-properties:
+        """
+        return self.parent_directory.joinpath(self.name)
+
+    @property
+    def keys(self) -> tuple[str, ...]:
+        return self._keys
 
     @property
     def name(self) -> str:
+        """
+        The name of the experiment
+
+        :Return type: :class:`str`
+
+        :meta read-only-properties:
+        """
         return self._name
 
-    @staticmethod
-    def __name__() -> str:
-        return "Experiment"
+    @property
+    def parent_directory(self) -> Path:
+        """
+        Parent directory of the experiment
 
-    def get(self, *args, **kwargs) -> "FileSet":
-        return self.file_tree.get(*args, **kwargs)
+        :Return type: :class:`Path <pathlib.Path>`
+
+        :meta read-only-properties:
+        """
+        return self._parent_directory
+
+    @property
+    def sources(self) -> MappingProxyType[str, Folder | CollectionType | None]:
+        return self.pipeline.sources
+
+    @property
+    def status(self) -> Status:
+        """
+        Current status of the experiment
+
+        :Return type: :class:`Status <exporgo.types.Status>`
+
+        :meta read-only-properties:
+        """
+        return self.pipeline.status
+
+    # noinspection PyUnusedLocal
+    @classmethod
+    @validate_method_with_pydantic(ValidExperiment)
+    def __deserialize__(cls,
+                        name: str,
+                        parent_directory: Path,
+                        keys: dict,
+                        file_tree: FileTree,
+                        pipeline: Pipeline,
+                        priority: Priority,
+                        status: Status,
+                        meta: dict,
+                        **kwargs) -> "Experiment":
+        # status is not used
+        return Experiment(name, parent_directory, keys, file_tree, pipeline, priority, meta, **kwargs)
+
+    @classmethod
+    @validate_dumping_with_pydantic(ValidExperiment)
+    def __serialize__(cls, self: "Experiment") -> dict:
+        # noinspection PyTypeChecker
+        return dict(self)  # technically the dict constructor is not necessary, but it's here for clarity.
+
+    @parent_directory.setter
+    def parent_directory(self, parent_directory: Folder) -> None:
+        self.remap(parent_directory)
+
+    @conditional_dispatch
+    def add_sources(self, *args) -> None:
+        raise DispatchError(self.add_sources.__name__, args)  # pragma: no cover
+
+    # noinspection PyUnresolvedReferences
+    @add_sources.register(lambda *args: len(args) == 2)
+    def _(self, sources: dict[str, Folder | CollectionType | None]) -> None:  # noqa: CCE001
+        for file_set, source in sources.items():
+            self.pipeline.add_source(file_set, source)
+
+    @add_sources.register(lambda *args: len(args) == 3)
+    def _(self, file_set: str, source: Folder | CollectionType | None) -> None:  # noqa: CCE001
+        self.pipeline.add_source(file_set, source)
+
+    def analyze(self) -> None:
+        self.pipeline.analyze(self.file_tree)
+
+    def collect(self) -> None:
+        # noinspection PyTypeChecker
+        self.pipeline.collect(self.file_tree)
+
+    def find(self, identifier: str) -> Generator[Path, None, None]:
+        """
+        Find all files that match some identifier
+
+        :param identifier: identifier to match
+
+        :returns: generator of paths
+        """
+        return self.file_tree.find(identifier)
+
+    def get(self, key: str) -> FileSet:
+        """
+        Get the file set associated with the key
+
+        :param key: key associated with the file set
+
+        :returns: a file set
+        :rtype: :class:`FileSet <exporgo.files.FileSet>`
+        """
+        # noinspection PyUnresolvedReferences
+        return self.file_tree.get(key)
 
     def index(self) -> None:
+        """
+        Index the files and folders in the experiment's directory
+        """
+        # noinspection PyArgumentList
         self.file_tree.index()
 
-    @convert_permitted_types_to_required(permitted=(str, Path), required=Path, pos=1, key="base_directory")
-    def remap(self, base_directory: str | Path) -> None:
-        self._base_directory = base_directory
-        self.file_tree.remap(base_directory)
+    @convert(parameter="parent_directory", permitted=(Folder,), required=Path)
+    def remap(self, parent_directory: Folder) -> None:
+        """
+        Remap the experiment to a new parent directory
+
+        :param parent_directory: new parent directory
+
+        :type parent_directory: :class:`Folder <exporgo.types.Folder>`
+        """
+        self._parent_directory = parent_directory
+        # noinspection PyUnresolvedReferences
+        self.file_tree.remap(parent_directory)
 
     def validate(self) -> None:
+        """
+        Validate the experiment's file tree
+        """
+        # noinspection PyUnresolvedReferences
         self.file_tree.validate()
 
-    @abstractmethod
-    def collect_data(self) -> None:
-        ...
+    def __repr__(self):
+        return (f"Experiment("
+                f"{self.name=}, "
+                f"{self.parent_directory=}, "
+                f"{self.keys=}, "
+                f"{self.file_tree=}, "
+                f"{self.pipeline=}, "
+                f"{self.priority=},"
+                f"{self.meta=})")
 
-    @abstractmethod
-    def analyze_data(self) -> None:
-        ...
+    def __call__(self):
+        if self.status == Status.SOURCE or self.status == Status.COLLECT:
+            self.collect()
+        elif self.status == Status.ANALYZE:
+            self.analyze()
 
-    @abstractmethod
-    def generate_class_files(self) -> None:
-        ...
+    def __eq__(self, other: Any) -> bool:  # pragma: no cover
+        try:
+            return self.name == other.name
+        except AttributeError:
+            return False
 
-    def _generate_file_tree(self) -> None:
-        self.file_tree.add_file_set("results")
-        self.file_tree.add_file_set("figures")
-        self.generate_class_files()
-        self.file_tree.build()
+    def __ne__(self, other: Any) -> bool:  # pragma: no cover
+        return not self.__eq__(other)
 
-    def __to_dict__(self):
-        return {
-            "name": self._name,
-            "base_directory": str(self._base_directory),
-            "mix_ins": [mix_in.__name__ for mix_in in self._mix_ins],
-            "file_tree": self.file_tree.__to_dict__(),
-            "instance_date": self._created
-        }
+    def __hash__(self):  # pragma: no cover
+        return hash(self.__repr__())
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Configuration for Registering Experiments and Registry Class
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+class RegisteredExperiment(BaseModel):
+    """
+    Recipe for defining an experiment
+    """
+    key: str
+    additional_file_sets: str | Sequence[str] | None
+    pipeline: RegisteredPipeline
+    # sequence does not permit str / bytes, so this works to indicate the list or tuple
+    model_config = MODEL_CONFIG
+
+    @property
+    def file_sets(self) -> set[str]:
+        return check_if_string_set(self.additional_file_sets) | self.pipeline.file_sets
+
+    def __eq__(self, other: Any) -> bool:
+        try:
+            return self.key == other.key
+        except AttributeError:
+            return False
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(self.__repr__())
 
 
 class ExperimentRegistry:
-    #: dict: registry of experiment mix-ins
+    """
+    Registry for storing experiment configurations
+    """
     __registry = {}
+    __path = Path(__file__).parent.joinpath("registry").joinpath("registered_experiments.json")
+    __new_registration = False
 
-    @staticmethod
-    def type_check(experiment: "Experiment") -> None:
-        # noinspection PyTypeChecker
-        if not issubclass(experiment, Experiment):
-            raise InvalidExperimentTypeError(experiment)
+    # noinspection DuplicatedCode
+    @classmethod
+    def _save_registry(cls) -> None:
+        """
+        Save the registry to a JSON file
+        """
+        try:
+            with Lock(cls.__path, "w", flags=LOCK_EX) as file:
+                # noinspection PyTypeChecker
+                file.write("{\n")
+                for idx, key_experiment in enumerate(cls.__registry.items()):
+                    key, experiment = key_experiment
+                    str_experiment = indent(json.dumps(key)
+                                            + f": {experiment.model_dump_json(exclude_defaults=True, indent=4)}",
+                                            " " * 4)
+                    str_experiment += ",\n" if idx < len(cls.__registry) - 1 else "\n"
+                    file.write(str_experiment)
+                file.write("}\n")
+        except FileNotFoundError:
+            cls.__path.touch(exist_ok=False)
+            cls._save_registry()
+        except (IOError, BaseLockException) as exc:
+            print(TERMINAL_FORMATTER(f"\nError saving registry: {exc}\n\n", "announcement"))
 
     @classmethod
-    def register(cls, alias: Optional[str] = None) -> type["Experiment"]:  #: noqa: ANN206
-
-        def register_experiment(experiment):  # noqa: ANN206, ANN001, ANN201
-            nonlocal alias
-
-            cls.type_check(experiment)
-
-            alias = alias if alias is not None else experiment.__name__
-
-            if alias in cls.__registry:
-                raise DuplicateRegistrationError(alias)
-            else:
-                cls.__registry[alias] = experiment
-                return experiment
-
-        # noinspection PyTypeChecker
-        return register_experiment
+    def has(cls, key: str) -> bool:
+        """
+        Check if an experiment configuration is registered
+        """
+        return key in cls.__registry
 
     @classmethod
-    def has(cls, name: str) -> bool:
-        return name in cls.__registry
+    def get(cls, key: str) -> "RegisteredExperiment":
+        """
+        Get an experiment configuration
+        """
+        if not cls.has(key):
+            raise ExperimentNotRegisteredError(key)
+        return cls.__registry[key]
 
     @classmethod
-    def get(cls, name: str, approximate: bool = False) -> Callable:
-        if approximate:
-            experiment = next((experiment for key, experiment in cls.__registry.items() if name in key), None)
-        else:
-            experiment = cls.__registry.get(name)
-        if experiment is None:
-            raise ExperimentNotRegisteredError(name)
-        return experiment
+    def pop(cls, key: str) -> "RegisteredExperiment":
+        """
+        Remove an experiment configuration
+        """
+        if not cls.has(key):
+            raise ExperimentNotRegisteredError(key)
+        config = cls.__registry.pop(key)
+        cls._save_registry()
+        return config
+
+    # noinspection PyNestedDecorators
+    @singledispatchmethod
+    @classmethod
+    def register(cls, experiment: "RegisteredExperiment") -> None:
+        """
+        Register an experiment configuration
+        """
+        if experiment.key in cls.__registry:
+            raise DuplicateRegistrationError(experiment.key)
+        cls.__registry[experiment.key] = experiment
+        cls.__new_registration = True
+
+    # noinspection PyNestedDecorators
+    @register.register
+    @classmethod
+    def _(cls, experiment: dict) -> None:
+        cls.register(RegisteredExperiment.model_validate(experiment))
+
+    # noinspection PyNestedDecorators
+    @register.register(list)
+    @register.register(tuple)
+    @register.register(set)
+    @register.register(GeneratorType)
+    @classmethod
+    def _(cls, experiment: CollectionType) -> None:
+        for config in experiment:
+            cls.register(config)
+
+    # noinspection PyNestedDecorators
+    @register.register
+    @classmethod
+    def _(cls, key: str, **kwargs) -> None:
+        cls.register(RegisteredExperiment(key=key, **kwargs))
+
+    # noinspection DuplicatedCode
+    @classmethod
+    def _load_registry(cls) -> None:
+        """
+        Load the registry from a JSON file
+        """
+        try:
+            with Lock(cls.__path, "r", timeout=10) as file:
+                cls.__registry = {key: RegisteredExperiment.model_validate(config)
+                                  for key, config in json.load(file).items()}
+        except FileNotFoundError:
+            cls.__path.touch(exist_ok=False)
+            cls._save_registry()
+        except (IOError, json.JSONDecodeError) as exc:
+            print(TERMINAL_FORMATTER(f"\nError loading registry: {exc}\n\n", "announcement"))
+
+    @classmethod
+    def __enter__(cls) -> "ExperimentRegistry":
+        cls._load_registry()
+        return cls()
+
+    @classmethod
+    def __exit__(cls, exc_type, exc_val, exc_tb):  # noqa: ANN206, ANN001
+        if cls.__new_registration:
+            cls._save_registry()
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Experiment Factory
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
 
 
 class ExperimentFactory:
-    def __init__(self, name: str, base_directory: Path = None):
-        #: str: name of experiment
-        self._name = name
 
-        #: Path: base directory of mouse
-        self.base_directory = base_directory
+    @convert(parameter="parent_directory", permitted=(Folder,), required=Path)
+    def __init__(self,
+                 name: str,
+                 parent_directory: Folder,
+                 priority: Optional[Priority] = Priority.NORMAL,
+                 meta: Optional[dict] = None,
+                 **kwargs
+                 ):
+        self.name = name
+        self.parent_directory = parent_directory
+        self.experiment_directory = parent_directory.joinpath(name)
+        self.experiment_directory.mkdir(parents=True, exist_ok=True)
+        self.priority = priority
+        self.__registry = None
+        self.meta = {**meta, **kwargs} if meta else kwargs
 
-        #: Iterable[str | "Experiment"]: iterable of mix-ins in string or object form
-        self._mix_ins = []
+    @staticmethod
+    def _make_file_tree(experiment_directory: Path,
+                        file_sets: str | list[str] | tuple[str, ...]
+                        ) -> FileTree:
+        return FileTree(experiment_directory, file_sets, populate=True)
 
-    def object_constructor(self) -> type["Experiment"]:
-        params = dict(self.__dict__)
-        params.pop("base_directory")
-        # noinspection PyTypeChecker
-        return type(self._name, tuple(self._mix_ins), params)
+    @staticmethod
+    def _make_pipeline(pipeline: RegisteredPipeline) -> Pipeline:
+        with PipelineFactory(pipeline.steps) as pipeline_factory:
+            return pipeline_factory.create()
 
-    def instance_constructor(self, **kwargs) -> "Experiment":
-        experiment_object = self.object_constructor()
-        return experiment_object(name=self._name, base_directory=self.base_directory, mix_ins=self._mix_ins, **kwargs)
+    def create(self, keys: str | list[str] | tuple[str, ...]) -> Experiment:
+        if not isinstance(keys, str):
+            raise NotImplementedError("Only single key experiments are supported at this time.")
 
-    @singledispatchmethod
-    def add_mix_ins(self, mix_in: Experiment) -> None:
-        self._mix_ins.append(mix_in)
+        experiment_ = self.__registry.get(keys)
+        file_tree = self._make_file_tree(self.experiment_directory, experiment_.file_sets)
+        pipeline = self._make_pipeline(experiment_.pipeline)
+        return Experiment(self.name,
+                          self.parent_directory,
+                          keys,
+                          file_tree,
+                          pipeline,
+                          self.priority,
+                          self.meta)
 
-    @add_mix_ins.register
-    def _ (self, mix_in: str) -> None:
-        if not ExperimentRegistry.has(mix_in):
-            raise ExperimentNotRegisteredError(mix_in)
-        mix_in = ExperimentRegistry.get(mix_in)
-        self._mix_ins.append(mix_in)
+    def __enter__(self):
+        with ExperimentRegistry() as self.__registry:
+            return self
 
-    @add_mix_ins.register(list)
-    @add_mix_ins.register(tuple)
-    def _(self, mix_ins: tuple | list) -> None:
-        for mix_in in mix_ins:
-            self.add_mix_ins(mix_in)
-
-
-"""
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Implementation for a Generic Experiment
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-"""
-
-
-@ExperimentRegistry.register()
-class GenericExperiment(Experiment):
-    def __init__(self, name: str, base_directory: Path, **kwargs):
-        super().__init__(name, base_directory, **kwargs)
-
-    def collect_data(self) -> None:
-        data_directory = select_directory(title="Select the directory containing the data")
-        verbose_copy(data_directory, self.file_tree.get("data")(None), feedback="data")
-        self.file_tree.get("data").index()
-        super().collect_data()
-
-    def analyze_data(self) -> None:
-        raise NotImplementedError("Generic experiments do not have an implementation for the analyze_data method")
-
-    def generate_class_files(self) -> None:
-        self.file_tree.add_file_set("data")
-        super().generate_class_files()
+    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: ANN206, ANN001
+        self.__registry = None

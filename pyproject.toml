@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "exporgo"
-version = "0.0.3"
+version = "0.1.0"
 description = "Experiment organizer"
 readme = "README.md"
 requires-python = ">=3.10, <=4.0"
@@ -39,8 +39,8 @@ dependencies = [
     "ipykernel",
     "ipython",
     "joblib",
+    "portalocker",
     "pydantic",
-    "pyyaml",
     "tqdm",
 ]
 
@@ -49,6 +49,13 @@ documentation = "https://github.com/darikoneil/exporgo"
 repository = "https://github.com/darikoneil/exporgo"
 
 [project.optional-dependencies]
+toml = [
+    "toml",
+    "tomli-w"
+]
+yaml = [
+    "pyyaml"
+]
 testing = [
     "pytest",
     "pytest-sugar",
@@ -57,7 +64,6 @@ testing = [
     "pytest-html"
 ]
 development = [
-    "boltons",
     "build",
     "coverage[toml]",
     "coveralls",
@@ -73,7 +79,6 @@ development = [
     "flake8-eradicate",
     "flake8-isort",
     "tryceratops",
-    "icecream",
     "toml",
     "twine"
 ]
@@ -81,8 +86,16 @@ documentation = [
     "sphinx",
     "sphinx-rtd-theme",
     "sphinx-autodoc-typehints",
+    #"nbsphinx",
+    #"sphinx-copybutton",
+    #"sphinx-gallery",
+    "autoclasstoc",
+    "autodoc_pydantic",
+
 ]
 all = [
+    "exporgo[toml]",
+    "exporgo[yaml]",
     "exporgo[testing]",
     "exporgo[development]",
     "exporgo[documentation]",
@@ -90,7 +103,14 @@ all = [
 [tool.setuptools]
 packages = [
     "exporgo",
+    "exporgo.registry",
+    "exporgo.schemas",
     ]
+include-package-data = true
+
+[tool.setuptools.package-data]
+'exporgo.registry' = ['*.json']
+'exporgo.schemas' = ['*.json']
 
 [tool.pytest.ini_options]
 addopts = [
@@ -100,7 +120,7 @@ addopts = [
     "-vv",
     "--diff-width=120",
     "--disable-warnings",
-    "--html=./reports/pytest-report.html",
+    "--html=./tests/testing-report.html",
 ]
 tests = "tests"
 console_output_style = "progress"
@@ -138,3 +158,4 @@ pretty_print = true
 
 [tool.coverage.html]
 show_contexts = true
+directory = "coverage"
