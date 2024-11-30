@@ -138,11 +138,11 @@ class TestSubject:
         assert "Mock Experiment" in self.test_subject.experiments
         assert "Mock Experiment" in self.test_subject.contains
 
-    def test_subject_save_load(self, source):
+    def test_subject_save_load(self, simple_source):
         # dependent on test_subject_create_experiment :/
         self.test_subject.create_experiment("Mock Experiment", "generic_experiment")
         with parallel_config(n_jobs=1):
-            verbose_copy(source, self.test_subject.get("Mock Experiment").get("files").directory)
+            verbose_copy(simple_source, self.test_subject.get("Mock Experiment").get("files").directory)
         self.test_subject.get("Mock Experiment").index()
         self.test_subject.save()
         self.test_subject.logger.end()
@@ -155,10 +155,10 @@ class TestSubject:
             else:
                 assert getattr(subject_copy, key) == attr
 
-    def test_subject_failed_validation(self, source):
+    def test_subject_failed_validation(self, simple_source):
         self.test_subject.create_experiment("Mock Experiment", "generic_experiment")
         with parallel_config(n_jobs=1):
-            verbose_copy(source, self.test_subject.get("Mock Experiment").get("files").directory)
+            verbose_copy(simple_source, self.test_subject.get("Mock Experiment").get("files").directory)
         self.test_subject.get("Mock Experiment").index()
         list(self.test_subject.get("Mock Experiment").get("files").files.values())[0].unlink()
         with pytest.raises(MissingFilesError):

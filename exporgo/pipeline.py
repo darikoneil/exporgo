@@ -157,7 +157,15 @@ class Pipeline:
 
     def analyze(self, file_tree: FileTree) -> None:
         for step in self.steps:
-            step(file_tree)
+            try:
+                step(file_tree)
+            except Exception as exc:
+                step.status = Status.ERROR
+                raise Exception(f"Error in step {step.key}") from exc
+            else:
+                step.status = Status.SUCCESS.value
+            finally:
+                file_tree.index()
 
     def collect(self, file_tree: FileTree) -> None:
         for step in self.steps:

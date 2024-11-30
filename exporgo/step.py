@@ -146,7 +146,6 @@ class Step:
     def __call__(self, subject: File or "Subject"):
         if isinstance(self._call, Callable):
             self._call(subject)
-            self.status = Status.SUCCESS  # TODO: Flesh this out
         elif isinstance(self._call, File):
             raise NotImplementedError("File-based calls are not yet supported")
         else:
