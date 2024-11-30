@@ -188,7 +188,7 @@ class TestIntegratedExperiment:
             print(experiment)
 
     @pytest.mark.xfail(reason="Needs implemented")
-    def test_experiment_calls_pipeline_source_to_collect(self, tmp_path, source):
+    def test_experiment_calls_pipeline_source_to_collect(self, tmp_path, simple_source):
         # noinspection DuplicatedCode
         experiment = Experiment(name=self.name,
                                 parent_directory=tmp_path,
@@ -200,10 +200,10 @@ class TestIntegratedExperiment:
                                                               category=Category.ANALYZE), ]),
                                 priority=self.priority)
         assert experiment.status == Status.SOURCE
-        experiment.add_sources({"files": source})
+        experiment.add_sources({"files": simple_source})
         assert experiment.pipeline.status == Status.COLLECT
 
-    def test_experiment_pipeline_collect_to_analyze(self, tmp_path, source):
+    def test_experiment_pipeline_collect_to_analyze(self, tmp_path, simple_source):
         # noinspection DuplicatedCode
         experiment = Experiment(name=self.name,
                                 parent_directory=tmp_path,
@@ -214,7 +214,7 @@ class TestIntegratedExperiment:
                                                               file_sets="files",
                                                               category=Category.ANALYZE), ]),
                                 priority=self.priority)
-        experiment.add_sources({"files": source})
+        experiment.add_sources({"files": simple_source})
         for step in experiment.pipeline.steps:
             step.status = Status.COLLECT
         assert experiment.status == Status.COLLECT
@@ -222,7 +222,7 @@ class TestIntegratedExperiment:
         assert experiment.file_tree.num_files > 0
         assert experiment.pipeline.status == Status.ANALYZE
 
-    def test_experiment_pipeline_analyze_to_success(self, tmp_path, source):
+    def test_experiment_pipeline_analyze_to_success(self, tmp_path, simple_source):
         # noinspection DuplicatedCode
         experiment = Experiment(name=self.name,
                                 parent_directory=tmp_path,
@@ -233,7 +233,7 @@ class TestIntegratedExperiment:
                                                               file_sets="files",
                                                               category=Category.ANALYZE), ]),
                                 priority=self.priority)
-        experiment.add_sources({"files": source})
+        experiment.add_sources({"files": simple_source})
         for step in experiment.pipeline.steps:
             step.status = Status.ANALYZE
         assert experiment.status == Status.ANALYZE

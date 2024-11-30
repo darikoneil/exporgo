@@ -67,13 +67,13 @@ class TestValidPipeline:
 class TestPipeline:
 
     @pytest.fixture(scope="function", autouse=True)
-    def setup_sources(self, source, path_assets):
+    def setup_sources(self, simple_source, path_assets):
         self.base_sources = MappingProxyType({"files0": None,
                                               "files1": path_assets,
-                                              "files2": (source, path_assets),
-                                              "files3": [source, path_assets],
-                                              "files4": {source, path_assets},
-                                              "files5": (source_ for source_ in (source, path_assets))})
+                                              "files2": (simple_source, path_assets),
+                                              "files3": [simple_source, path_assets],
+                                              "files4": {simple_source, path_assets},
+                                              "files5": (source_ for source_ in (simple_source, path_assets))})
         self.test_steps = [Step(key="test_key0",
                            call=generic_function_call,
                            file_sets="files0",
@@ -133,11 +133,11 @@ class TestPipeline:
         pipeline.steps[1].status = Status.ANALYZE
         assert pipeline.status == Status.SOURCE
 
-    def test_collect_all_file_sets(self, source):
+    def test_collect_all_file_sets(self, simple_source):
         pipeline = Pipeline(steps=self.test_steps,
                             status=self.base_status,
                             sources=self.base_sources)
-        with patch("exporgo.pipeline.select_directory", return_value=source):
+        with patch("exporgo.pipeline.select_directory", return_value=simple_source):
             pipeline.collect(self.file_tree)
             for step in pipeline.steps:
                 assert step.status == Status.ANALYZE

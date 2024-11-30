@@ -46,11 +46,11 @@ def test_directory_selection_raises_file_not_found_error(mock_tk, mock_askdirect
     mock_tk.return_value.destroy.assert_called_once()
 
 
-def test_verbose_copy(source, destination):
+def test_verbose_copy(simple_source, destination):
     with parallel_config(n_jobs=1):
-        verbose_copy(source, destination)
+        verbose_copy(simple_source, destination)
 
-    source_files = list(source.rglob("*"))
+    source_files = list(simple_source.rglob("*"))
     destination_files = list(destination.rglob("*"))
     assert len(source_files) == len(destination_files)
 
