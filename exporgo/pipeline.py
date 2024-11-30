@@ -161,7 +161,7 @@ class Pipeline:
                 step(file_tree)
             except Exception as exc:
                 step.status = Status.ERROR
-                raise Exception(f"Error in step {step.key}") from exc
+                raise Exception(f"Error in step {step.key}") from exc  # noqa: TRY002
             else:
                 step.status = Status.SUCCESS.value
             finally:

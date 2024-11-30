@@ -126,7 +126,6 @@ class TestSubject:
             print(self.test_subject)
         with BlockPrinting():
             self.test_subject.meta = {}
-            print(self.test_subject)
 
     def test_subject_indirect_get_experiment(self):
         self.test_subject.experiments["Mock Experiment"] = MagicMock(spec=Experiment)
@@ -137,6 +136,8 @@ class TestSubject:
         self.test_subject.create_experiment("Mock Experiment", "generic_experiment")
         assert "Mock Experiment" in self.test_subject.experiments
         assert "Mock Experiment" in self.test_subject.contains
+        with BlockPrinting():
+            print(self.test_subject)
 
     def test_subject_save_load(self, simple_source):
         # dependent on test_subject_create_experiment :/
