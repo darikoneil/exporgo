@@ -57,7 +57,15 @@ class SourceTestAttributes:
 """
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
+def entry_point(request) -> str:
+    """
+    Get the entry point
+    """
+    return "exporgo"
+
+
+@pytest.fixture(scope="session")
 def simple_source_attributes(request) -> SourceTestAttributes:
     """
     Create dummy files for testing

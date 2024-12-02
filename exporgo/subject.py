@@ -286,7 +286,7 @@ class Subject:
                 string_to_print += f"{value}\n"
 
         string_to_print += TERMINAL_FORMATTER("Experiments:\n", "emphasis")
-        if len(self.contains) == 0:
+        if len(tuple(self.experiments.keys())) == 0:
             string_to_print += "\tNo experiments defined\n"
         else:
             for experiment in self.experiments.values():
@@ -323,17 +323,6 @@ class Subject:
         :meta read-only-properties:
         """
         return self._created
-
-    @property
-    def contains(self) -> tuple[str, ...]:
-        """
-        The names of the experiments associated with the subject.
-
-
-        :Return type: :class:`tuple` [:class:`str`\, ...]
-        :meta read-only-properties:
-        """
-        return tuple(self.experiments.keys())
 
     @property
     def file(self) -> Path:
@@ -505,7 +494,7 @@ class Subject:
         :type kwargs: :class:`Any <typing.Any>`
 
         """
-        if name in self.contains:
+        if name in tuple(self.experiments.keys()):
             raise DuplicateExperimentError(name)
         priority = priority if priority else self.priority
         with ExperimentFactory(name, self.directory, priority, meta, **kwargs) as factory:
@@ -567,7 +556,7 @@ class Subject:
             f"{self.directory=}, "
             f"{self.study=}, "
             f"{self.meta=}): "
-            f"{self.contains=}, "
+            f"{tuple(self.experiments.keys())}, "
             f"{self.exporgo_file=}, "
             f"{self.modifications=}, "
             f"{self._created=}"
@@ -591,7 +580,7 @@ class Subject:
 
         :returns: The attribute or experiment.
         """
-        if item in self.contains:
+        if item in tuple(self.experiments.keys()):
             return self.experiments.get(item)
         else:
             return super().__getattribute__(item)

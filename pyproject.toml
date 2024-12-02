@@ -44,6 +44,9 @@ dependencies = [
     "tqdm",
 ]
 
+[project.scripts]
+exporgo = "exporgo.__main__:main"
+
 [project.urls]
 documentation = "https://github.com/darikoneil/exporgo"
 repository = "https://github.com/darikoneil/exporgo"

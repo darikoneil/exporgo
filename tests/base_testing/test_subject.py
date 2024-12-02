@@ -135,7 +135,6 @@ class TestSubject:
     def test_subject_create_experiment(self):
         self.test_subject.create_experiment("Mock Experiment", "generic_experiment")
         assert "Mock Experiment" in self.test_subject.experiments
-        assert "Mock Experiment" in self.test_subject.contains
         with BlockPrinting():
             print(self.test_subject)
 

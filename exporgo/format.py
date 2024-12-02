@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
 from os import getlogin
+
+from pydantic import BaseModel, Field
 
 
 class RegistrationInfo(BaseModel):

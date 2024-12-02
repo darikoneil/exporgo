@@ -210,6 +210,16 @@ class VersionBackwardCompatibilityError(ValueError):
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 """
 
+class FileLockError(PermissionError):
+    """
+    Raised when a file is locked by another process
+
+    :param file: file that is locked
+    """
+    def __init__(self, file: Path):
+        self.file = file
+        super().__init__(f"File {self.file} is locked by another process.")
+
 
 class SingletonError(RuntimeError):
     """
