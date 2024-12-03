@@ -3,6 +3,7 @@ from time import sleep, time
 from ..exceptions import FileLockError
 from ..organization.subject import Subject
 from ..types import File
+from .lock_manager import LockManager
 
 
 class ExporgoManager:
@@ -12,9 +13,6 @@ class ExporgoManager:
     retry_interval = 30 # 30 seconds
 
     def __init__(self, file: File):
-
-        #: temporary attr
-        self._file_manager_running = False
 
         #: subject's organization file
         self.file = file
@@ -27,19 +25,15 @@ class ExporgoManager:
 
     @property
     def file_manager_running(self):
-        return self._file_manager_running
+        return LockManager.is_running()
 
-    @property
-    def other_files_locked(self) -> bool:
-        return False # temp
+    @staticmethod
+    def start_file_manager() -> None:
+        LockManager.start()
 
-    #@staticmethod, temporary static method
-    def start_file_manager(self) -> None:
-        self._file_manager_running = True
-
-    #@staticmethod, temporary static method
-    def stop_file_manager(self) -> None:
-        self._file_manager_running = False
+    @staticmethod
+    def stop_file_manager() -> None:
+        LockManager.stop()
 
     @staticmethod
     def load_subject(file: File) -> "Subject":
@@ -48,7 +42,11 @@ class ExporgoManager:
     # noinspection PyUnusedLocal
     @staticmethod
     def request_lock(file: File) -> bool:
-        return True # dummy
+        return LockManager.request_lock(file)
+
+    @staticmethod
+    def release_lock(file: File) -> None:
+        LockManager.release_lock(file)
 
     @classmethod
     def lock_file(cls, file: File) -> bool:
@@ -67,7 +65,6 @@ class ExporgoManager:
         self.subject.index()
         self.subject.save()
         self.subject = None
-        if not self.other_files_locked:
+        self.release_lock(self.file)
+        if LockManager.idle():
             self.stop_file_manager()
-        return False
-

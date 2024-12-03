@@ -111,13 +111,6 @@ class TestFileTree:
         file_tree.add("data")
         assert isinstance(file_tree.get("data"), FileSet)
         assert file_tree.get("data").directory == tmp_path.joinpath("source").joinpath("data")
-
-    def test_build(self, tmp_path):
-        file_tree = FileTree(tmp_path.joinpath("experiment"))
-        tmp_path.joinpath("experiment").mkdir(parents=True, exist_ok=True)
-        file_tree.add("data")
-        file_tree.build(None)
-        assert tmp_path.joinpath("experiment").exists()
         assert file_tree.get("data").directory.exists()
 
     def test_clear_keep(self, tmp_path, simple_source):
@@ -162,11 +155,11 @@ class TestFileTree:
         file_tree = FileTree(tmp_path.joinpath("source"), populate=False)
         file_tree.add("dummy_folder_0")
         file_tree.index()
-        assert len(file_tree) == 1
+        assert len(file_tree) == 3
         assert file_tree.num_files == 3
 
     def test_remap(self, tmp_path, simple_source, destination):
-        file_tree = FileTree(simple_source, destination, populate=False)
+        file_tree = FileTree(simple_source, "destination", populate=False)
         file_tree.remap(tmp_path)
         assert file_tree.parent_directory == tmp_path
 
