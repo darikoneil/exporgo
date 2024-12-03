@@ -22,7 +22,7 @@ from tests.conftest import BlockPrinting
 
 class TestValidExperiment:
 
-    test_source_folder = Path.cwd().parent.joinpath("exporgo").joinpath("sources")
+    test_source_folder = None
 
     name = "fake_experiment"
     keys = "generic_experiment"
@@ -34,7 +34,8 @@ class TestValidExperiment:
     parent_directory = None
 
     @pytest.fixture(scope="function", autouse=True)
-    def setup_valid_experiment(self, tmp_path):
+    def setup_valid_experiment(self, tmp_path, simple_source):
+        self.test_source_folder = simple_source
         self.file_tree = MagicMock(spec=FileTree)
         self.parent_directory = tmp_path
         self.pipeline = MagicMock(spec=Pipeline)
@@ -59,8 +60,8 @@ class TestValidExperiment:
         serialized_status = ValidExperiment.serialize_status(self.status)
         assert serialized_status == Status.__serialize__(self.status)
 
-    def test_validate_file_tree(self):
-        _ = ValidExperiment.validate_file_tree(FileTree(Path.cwd(), "files").__serialize__())
+    def test_validate_file_tree(self, tmp_path):
+        _ = ValidExperiment.validate_file_tree(FileTree(tmp_path, "files").__serialize__())
         assert self.file_tree.validate.called_once
 
     def test_validate_pipeline(self):
