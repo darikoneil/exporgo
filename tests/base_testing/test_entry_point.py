@@ -20,6 +20,7 @@ class TestEntryPoint:
         self.test_file = test_subject.directory.joinpath("organization.yaml")
         self.input_arguments = "python -m " + entry_point + " " + str(self.test_file)
 
+    # noinspection PyUnusedLocal
     def test_entry_point_process(self) -> None:
         self.test_file.exists()
         process = subprocess.Popen(self.input_arguments,
