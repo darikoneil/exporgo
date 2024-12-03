@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 from pydantic import ConfigDict
 
-from . import __current_version__
+from ._version import __current_version__
 from .exceptions import (InvalidExtensionWarning, InvalidFilenameError,
                          UpdateVersionWarning,
                          VersionBackwardCompatibilityError,

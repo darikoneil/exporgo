@@ -1,10 +1,12 @@
 from contextlib import suppress
 
+from exporgo.organization.experiment import (ExperimentRegistry,
+                                             RegisteredExperiment)
+from exporgo.organization.pipeline import RegisteredPipeline
+from exporgo.organization.step import RegisteredStep, StepRegistry
+
 from .exceptions import DuplicateRegistrationError
-from .experiment import ExperimentRegistry, RegisteredExperiment
-from .pipeline import RegisteredPipeline
 from .registry import generic_function_call
-from .step import RegisteredStep, StepRegistry
 from .types import Category
 
 

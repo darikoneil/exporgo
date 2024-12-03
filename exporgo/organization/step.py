@@ -11,18 +11,19 @@ from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
 from pydantic import BaseModel, field_serializer, field_validator
 
-from ._color import TERMINAL_FORMATTER
-from .exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
+from exporgo._color import TERMINAL_FORMATTER
+from exporgo.exceptions import (AnalysisNotRegisteredError,
+                                DuplicateRegistrationError)
 # noinspection PyProtectedMember
-from .tools import serialize_function
-from .validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
-                         validate_method_with_pydantic)
+from exporgo.tools import serialize_function
+from exporgo.validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
+                                validate_method_with_pydantic)
 
 if TYPE_CHECKING:
     from .subject import Subject
 
-from .io import import_function_from_file
-from .types import Action, Category, CollectionType, File, Status
+from ..io import import_function_from_file
+from ..types import Action, Category, CollectionType, File, Status
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

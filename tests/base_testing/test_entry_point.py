@@ -1,6 +1,8 @@
-from exporgo.subject import Subject
-import pytest
 import subprocess
+
+import pytest
+
+from exporgo.organization.subject import Subject
 
 
 class TestEntryPoint:

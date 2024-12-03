@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
 
-from .experiment import RegisteredExperiment
-from .pipeline import RegisteredPipeline
-from .step import RegisteredStep
+from .organization.experiment import RegisteredExperiment
+from .organization.pipeline import RegisteredPipeline
+from .organization.step import RegisteredStep
 
 __all__ = [
     "update_schema",

@@ -5,16 +5,17 @@ from typing import Any, Optional
 import yaml
 from pydantic import BaseModel, field_serializer, field_validator
 
-from . import __current_version__
-from ._color import TERMINAL_FORMATTER
-from ._logging import IPythonLogger, ModificationLogger, get_timestamp
-from .exceptions import DuplicateExperimentError, MissingFilesError
+from .._color import TERMINAL_FORMATTER
+from .._logging import IPythonLogger, ModificationLogger, get_timestamp
+from .._version import __current_version__
+from ..exceptions import DuplicateExperimentError, MissingFilesError
+from ..io import select_directory, select_file
+from ..tools import convert
+from ..types import (CollectionType, File, Folder, Modification, Priority,
+                     Status)
+from ..validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
+                          validate_method_with_pydantic, validate_version)
 from .experiment import Experiment, ExperimentFactory
-from .io import select_directory, select_file
-from .tools import convert
-from .types import CollectionType, File, Folder, Modification, Priority, Status
-from .validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
-                         validate_method_with_pydantic, validate_version)
 
 __all__ = [
     "Subject",

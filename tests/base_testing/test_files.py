@@ -1,7 +1,7 @@
 import pytest
 
 from exporgo.exceptions import MissingFilesError
-from exporgo.files import DictWithDuplicates, FileSet, FileTree
+from exporgo.organization.files import DictWithDuplicates, FileSet, FileTree
 
 
 class TestDictWithDuplicates:

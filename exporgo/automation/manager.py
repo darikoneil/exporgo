@@ -1,7 +1,8 @@
-from time import time, sleep
-from exporgo.exceptions import FileLockError
-from exporgo.subject import Subject
-from exporgo.types import File
+from time import sleep, time
+
+from ..exceptions import FileLockError
+from ..organization.subject import Subject
+from ..types import File
 
 
 class ExporgoManager:
@@ -9,6 +10,7 @@ class ExporgoManager:
     timeout_duration = 60 * 15 # 15 minutes
 
     retry_interval = 30 # 30 seconds
+
     def __init__(self, file: File):
 
         #: temporary attr

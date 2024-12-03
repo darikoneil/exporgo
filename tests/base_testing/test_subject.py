@@ -9,12 +9,12 @@ from exporgo._logging import IPythonLogger
 # noinspection PyProtectedMember
 from exporgo._version import __current_version__
 from exporgo.exceptions import MissingFilesError
-from exporgo.experiment import Experiment, ExperimentRegistry
 # noinspection PyUnresolvedReferences,PyProtectedMember
 from exporgo.io import verbose_copy
+from exporgo.organization.experiment import Experiment, ExperimentRegistry
+from exporgo.organization.step import StepRegistry
+from exporgo.organization.subject import Subject, ValidSubject
 from exporgo.registry import PATH_EXPERIMENTS, PATH_STEPS
-from exporgo.step import StepRegistry
-from exporgo.subject import Subject, ValidSubject
 from exporgo.types import Priority, Status
 from tests.conftest import BlockPrinting
 
@@ -111,7 +111,7 @@ class TestSubject:
         assert self.test_subject.version == __current_version__
 
     def test_subject_initialization_without_directory(self):
-        with (patch("exporgo.subject.select_directory", return_value=self.test_base_directory)
+        with (patch("exporgo.organization.subject.select_directory", return_value=self.test_base_directory)
               as mock_select_directory):
             subject = Subject(name=self.test_name,
                               study=self.test_study,

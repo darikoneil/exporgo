@@ -7,14 +7,15 @@ import pytest
 
 from exporgo.exceptions import (DuplicateRegistrationError,
                                 ExperimentNotRegisteredError)
-from exporgo.experiment import (Experiment, ExperimentFactory,
-                                ExperimentRegistry, RegisteredExperiment,
-                                ValidExperiment)
-from exporgo.files import FileTree
-from exporgo.pipeline import Pipeline, RegisteredPipeline
+from exporgo.organization.experiment import (Experiment, ExperimentFactory,
+                                             ExperimentRegistry,
+                                             RegisteredExperiment,
+                                             ValidExperiment)
+from exporgo.organization.files import FileTree
+from exporgo.organization.pipeline import Pipeline, RegisteredPipeline
+from exporgo.organization.step import RegisteredStep, Step, StepRegistry
 # noinspection PyProtectedMember
 from exporgo.registry import generic_function_call
-from exporgo.step import RegisteredStep, Step, StepRegistry
 from exporgo.types import Category, Priority, Status
 from tests.conftest import BlockPrinting
 
@@ -68,12 +69,12 @@ class TestValidExperiment:
         assert self.pipeline.__deserialize__.called_once
 
     def test_validate_priority(self):
-        with patch("exporgo.experiment.Priority.__deserialize__", return_value=Priority.NORMAL) as mock_validate_priority:
+        with patch("exporgo.organization.experiment.Priority.__deserialize__", return_value=Priority.NORMAL) as mock_validate_priority:
             _ = ValidExperiment.validate_priority(Priority.NORMAL.__serialize__())
             mock_validate_priority.assert_called_once_with(Priority.NORMAL.__serialize__())
 
     def test_validate_status(self):
-        with patch("exporgo.experiment.Status.__deserialize__", return_value=Status.SOURCE) as mock_validate_status:
+        with patch("exporgo.organization.experiment.Status.__deserialize__", return_value=Status.SOURCE) as mock_validate_status:
             _ = ValidExperiment.validate_status(Status.SOURCE.__serialize__())
             mock_validate_status.assert_called_once_with(Status.SOURCE.__serialize__())
 
@@ -153,7 +154,7 @@ class TestIntegratedExperiment:
     priority = Priority.NORMAL
 
     def test_experiment_created(self, tmp_path):
-        with patch("exporgo.experiment.get_timestamp", return_value="Timestamp") as get_timestamp_:
+        with patch("exporgo.organization.experiment.get_timestamp", return_value="Timestamp") as get_timestamp_:
             # noinspection DuplicatedCode
             experiment = Experiment(name=self.name,
                                     parent_directory=tmp_path,

@@ -2,9 +2,10 @@ import csv
 
 import pytest
 
-from exporgo.experiment import ExperimentRegistry, RegisteredExperiment
-from exporgo.step import RegisteredStep, StepRegistry
-from exporgo.subject import Subject
+from exporgo.organization.experiment import (ExperimentRegistry,
+                                             RegisteredExperiment)
+from exporgo.organization.step import RegisteredStep, StepRegistry
+from exporgo.organization.subject import Subject
 from exporgo.types import Category, Priority, Status
 from tests.behavior_driven_testing.actions import (analyze_function, load_data,
                                                    prepare_function,

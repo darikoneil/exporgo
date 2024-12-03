@@ -1,17 +1,18 @@
-from exporgo.manager import ExporgoManager
-from exporgo.types import File
 import argparse
 from pathlib import Path
 
+from .automation.manager import ExporgoManager
+from .types import File
 
-def execute_exporgo(file: File):
+
+def execute_exporgo(file: File) -> None:
     with ExporgoManager(file) as manager:
         print(f"ENTERED {file}")
         for experiment_key, experiment in manager.subject.experiments.items():
-            print(experiment_key, experiment) # temporary
+            print(experiment_key, experiment)  # temporary
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Execute Exporgo with the specified file.")
     parser.add_argument("file", type=str, help="The path to the subject's organization file.")
 

@@ -2,7 +2,7 @@ import csv
 from pathlib import Path
 from typing import Iterable
 
-from exporgo.files import FileTree
+from exporgo.organization.files import FileTree
 from tests.conftest import RAW_FILENAME, RESULTS_FILENAME
 
 

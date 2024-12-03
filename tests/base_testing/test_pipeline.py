@@ -4,12 +4,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from exporgo.files import FileTree
-from exporgo.pipeline import (Pipeline, PipelineFactory, RegisteredPipeline,
-                              ValidPipeline)
+from exporgo.organization.files import FileTree
+from exporgo.organization.pipeline import (Pipeline, PipelineFactory,
+                                           RegisteredPipeline, ValidPipeline)
+from exporgo.organization.step import RegisteredStep, Step, StepRegistry
 # noinspection PyProtectedMember
 from exporgo.registry import generic_function_call
-from exporgo.step import RegisteredStep, Step, StepRegistry
 from exporgo.types import Category, Status
 
 
@@ -137,7 +137,7 @@ class TestPipeline:
         pipeline = Pipeline(steps=self.test_steps,
                             status=self.base_status,
                             sources=self.base_sources)
-        with patch("exporgo.pipeline.select_directory", return_value=simple_source):
+        with patch("exporgo.organization.pipeline.select_directory", return_value=simple_source):
             pipeline.collect(self.file_tree)
             for step in pipeline.steps:
                 assert step.status == Status.ANALYZE

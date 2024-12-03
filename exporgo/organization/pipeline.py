@@ -7,14 +7,14 @@ from typing import Any, Generator, Mapping, Optional, Sequence
 
 from pydantic import BaseModel, field_serializer, field_validator
 
+from ..io import select_directory, verbose_copy
+from ..tools import check_if_string_set, unique_generator
+from ..types import CollectionType, Folder, Status
+from ..validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
+                          validate_method_with_pydantic)
 from .files import FileTree
-from .io import select_directory, verbose_copy
 # noinspection PyUnresolvedReferences
 from .step import RegisteredStep, Step, StepRegistry
-from .tools import check_if_string_set, unique_generator
-from .types import CollectionType, Folder, Status
-from .validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
-                         validate_method_with_pydantic)
 
 __all__ = [
     "Pipeline",

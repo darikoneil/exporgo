@@ -8,10 +8,10 @@ import pytest
 
 from exporgo.exceptions import (AnalysisNotRegisteredError,
                                 DuplicateRegistrationError)
+from exporgo.organization.step import (Category, RegisteredStep, Status, Step,
+                                       StepRegistry, ValidStep)
 # noinspection PyProtectedMember
 from exporgo.registry import generic_function_call
-from exporgo.step import (Category, RegisteredStep, Status, Step, StepRegistry,
-                          ValidStep)
 from exporgo.tools import serialize_function
 
 
