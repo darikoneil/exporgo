@@ -3,7 +3,7 @@ from time import sleep, time
 from ..exceptions import FileLockError
 from ..organization.subject import Subject
 from ..types import File
-from .lock_manager import LockManager
+from .lock import LockManager
 
 
 class ExporgoManager:

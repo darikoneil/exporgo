@@ -1,6 +1,3 @@
-"""
-Lock Manager Stub
-"""
 from ..tools import convert
 from ..types import File
 

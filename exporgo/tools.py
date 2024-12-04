@@ -4,6 +4,10 @@ from functools import update_wrapper, wraps
 from inspect import getsourcefile
 from types import MappingProxyType
 from typing import Any, Callable, Generator, Iterable, Optional
+from xml.dom.minidom import parseString
+from xml.etree.ElementTree import Element, tostring
+
+from .types import File
 
 __all__ = [
     "parameterize",
@@ -139,6 +143,39 @@ def conditional_dispatch(func: Callable) -> Callable:
     wrapper.registry = MappingProxyType(registry)
     update_wrapper(wrapper, func)
     return wrapper
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// XML Tools
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+def pretty_xml(root: Element) -> str:
+    """
+    Pretty print an XML element
+
+    :param root: XML element
+
+    :return: pretty printed XML
+    """
+    xml_string = parseString(tostring(root)).toprettyxml(indent=" " * 2)
+    xml_string = xml_string.replace('<?xml version="1.0" ?>',
+                                    "<?xml version='1.0' encoding='UTF-16'?>")
+    return xml_string
+
+
+def write_xml(file: File, root: Element) -> None:
+    """
+    Write an XML element to a file
+
+    :param file: File path
+
+    :param root: XML element
+    """
+    with open(file, "w", encoding="UTF-16") as file:
+        file.write(pretty_xml(root))
 
 
 """
