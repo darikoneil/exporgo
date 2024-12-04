@@ -54,7 +54,7 @@ class RegistrationInfo(BaseModel):
     name: str = Field(default="Exporgo Task", serialization_alias="URI")
 
 
-class Privileges(BaseModel):
+class Principals(BaseModel):
     #: The user ID of the principal
     user_id: str = Field(default_factory=getlogin, serialization_alias="UserID")
 
