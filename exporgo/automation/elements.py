@@ -86,3 +86,12 @@ class Exec(BaseModel):
     @classmethod
     def serialize_working_directory(cls, value: Folder) -> str:
         return str(value)
+
+
+class LogonTrigger(BaseModel):
+    enabled: bool = Field(default=True, serialization_alias="Enabled")
+
+    @field_serializer("enabled", when_used="always")
+    @classmethod
+    def serialize_enabled(cls, value: bool) -> str:
+        return str(value).lower()
