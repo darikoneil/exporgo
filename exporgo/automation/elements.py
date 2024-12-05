@@ -1,8 +1,10 @@
 from datetime import datetime
 from enum import IntEnum
 from os import getlogin
-
+from pathlib import Path
 from pydantic import BaseModel, Field, field_serializer
+from ..types import Folder
+
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,7 +56,7 @@ class RegistrationInfo(BaseModel):
     name: str = Field(default="Exporgo Task", serialization_alias="URI")
 
 
-class Principals(BaseModel):
+class Principal(BaseModel):
     #: The user ID of the principal
     user_id: str = Field(default_factory=getlogin, serialization_alias="UserID")
 
@@ -65,9 +67,22 @@ class Principals(BaseModel):
     run_level: RunLevel = Field(default=RunLevel.HighestAvailable, serialization_alias="RunLevel")
 
     @field_serializer("logon_type", when_used="always")
-    def serialize_logon_type(self, value):
-        return {"LogonType": value.name}
+    @classmethod
+    def serialize_logon_type(cls, value: LogonType) -> str:
+        return value.name
 
     @field_serializer("run_level", when_used="always")
-    def serialize_run_level(self, value):
-        return {"RunLevel": value.name}
+    @classmethod
+    def serialize_run_level(cls, value: RunLevel) -> str:
+        return value.name
+
+
+class Exec(BaseModel):
+    command: str = Field(default="cmd.exe", serialization_alias="Command")
+    arguments: str = Field(default="/c echo Hello World", serialization_alias="Arguments")
+    working_directory: Folder = Field(default_factory=Path.cwd, serialization_alias="WorkingDirectory")
+
+    @field_serializer("working_directory", when_used="always")
+    @classmethod
+    def serialize_working_directory(cls, value: Folder) -> str:
+        return str(value)
