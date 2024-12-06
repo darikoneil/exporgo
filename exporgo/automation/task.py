@@ -1,7 +1,7 @@
 # noinspection PyPep8Naming
 from xml.etree.ElementTree import Element, SubElement
 from pydantic import BaseModel, field_serializer, Field
-from .elements import LogonTrigger, Trigger, RegistrationInfo, Principal, Exec
+from .elements import LogonTrigger, Trigger, RegistrationInfo, Principal, Exec, Settings
 from typing import Sequence
 
 """
@@ -30,11 +30,14 @@ class Task(BaseModel):
 
     registration_info: RegistrationInfo = Field(None, serialization_alias="RegistrationInfo")
 
-    principal: Principal = Field(None, serialization_alias="Principals")
+    triggers: Trigger | Sequence[Trigger] = Field(None, serialization_alias="Triggers")
+
+    principal: Principal = Field(default_factory=Principal, serialization_alias="Principals")
+
+    settings: Settings = Field(default_factory=Settings, serialization_alias="Settings")
 
     actions: Exec = Field(None, serialization_alias="Actions")
 
-    triggers: Trigger | Sequence[Trigger] = Field(None, serialization_alias="Triggers")
 
     @classmethod
     def field_to_xml(cls, field, value, root):

@@ -3,7 +3,8 @@ from enum import IntEnum
 from pathlib import Path
 from pydantic import BaseModel, Field, field_serializer
 from ..types import Folder
-from ..tools import get_full_windows_user
+from ..tools import get_full_windows_user, get_windows_user_security_identifier
+
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,13 +63,13 @@ class RegistrationInfo(BaseModel):
 
 class Principal(BaseModel):
     #: The user ID of the principal
-    user_id: str = Field(default_factory=get_full_windows_user, serialization_alias="UserID")
+    user_id: str = Field(default_factory=get_windows_user_security_identifier, serialization_alias="UserId")
 
     #: The logon type of the principal
     logon_type: LogonType = Field(default=LogonType.InteractiveToken, serialization_alias="LogonType")
 
     #: The run level of the principal
-    run_level: RunLevel = Field(default=RunLevel.HighestAvailable, serialization_alias="RunLevel")
+    run_level: RunLevel = Field(default=RunLevel.LeastPrivilege, serialization_alias="RunLevel")
 
     @field_serializer("logon_type", when_used="always")
     @classmethod
@@ -102,7 +103,7 @@ class IdleSettings(BaseModel):
 
     restart_on_idle: bool = Field(default=False, serialization_alias="RestartOnIdle")
 
-    @field_serializer("stop_on_idle_end", "restart_one_idle", when_used="always")
+    @field_serializer("stop_on_idle_end", "restart_on_idle", when_used="always")
     @classmethod
     def serialize_stop_on_idle_end(cls, value: bool) -> str:
         return str(value).lower()

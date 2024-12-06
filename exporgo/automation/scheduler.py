@@ -7,7 +7,7 @@ class Scheduler:
         self.config = config
         self._tmp = Path.cwd().joinpath("tmp")
         self._tmp.mkdir()
-        self.file = self._tmp.joinpath("task.xml")
+        self.file= None
         self.task = ""
 
     def create(self):
@@ -22,10 +22,8 @@ class Scheduler:
         return result.stdout, result.stderr
 
     def _serialize_task(self):
-        with open(self.file, "w", encoding="UTF-16") as file:
-            file.write(self.task)
+        ...
 
     # noinspection PyMethodMayBeStatic
     def _create_task(self):
-        xml = ""
-        return xml
+        ...

@@ -6,7 +6,8 @@ from types import MappingProxyType
 from typing import Any, Callable, Generator, Iterable, Optional
 from xml.dom.minidom import parseString
 from xml.etree.ElementTree import Element, tostring
-from os import getenv
+from os import getenv, getlogin
+import subprocess
 from .types import File
 
 __all__ = [
@@ -232,3 +233,16 @@ def get_full_windows_user() -> str:
     :return: full user
     """
     return getenv('userdomain') + "\\" + getenv('username')
+
+
+def get_windows_user_security_identifier() -> str:
+    """
+    Get the user security identifier  by opening up a command terminal and running the following command:
+    wmic useraccount where name='<username>' get sid
+
+    :return: user security identifier
+    """
+    command = f"wmic useraccount where name='{getlogin()}' get sid"
+    out = subprocess.Popen(command, stdout=subprocess.PIPE)
+    out = out.communicate()[0].decode().replace("\r", "")
+    return out.split("\n")[1].strip()
