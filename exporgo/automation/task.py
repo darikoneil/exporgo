@@ -13,6 +13,15 @@ from typing import Sequence
 
 # noinspection HttpUrlsUsage
 class Task(BaseModel):
+    """
+    :cvar version: str: version of windows task schema
+    :cvar xmlns: str: windows task schema xlmns
+    :cvar registration_info: RegistrationInfo: registration information for the task
+    :cvar principal: Principal: principal information for the task
+    :cvar actions: Exec: actions to be performed by the task
+    :cvar triggers: Trigger | Sequence[Trigger]: triggers for the task
+
+    """
     #: str: version of windows task schema
     version: str = Field("1.2")
 
@@ -55,8 +64,6 @@ class Task(BaseModel):
         for field, serialized in fields.items():
             self.field_to_xml(field, serialized, root)
         return root
-
-
 
     @field_serializer("actions", when_used="always")
     @classmethod
