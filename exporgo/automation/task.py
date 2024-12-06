@@ -1,8 +1,8 @@
 # noinspection PyPep8Naming
-from xml.etree import ElementTree as ET
-
+from xml.etree.ElementTree import Element, SubElement
 from pydantic import BaseModel, field_serializer, Field
-from .elements import LogonTrigger, RegistrationInfo, Principal, Exec
+from .elements import LogonTrigger, Trigger, RegistrationInfo, Principal, Exec
+from typing import Sequence
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -14,7 +14,7 @@ from .elements import LogonTrigger, RegistrationInfo, Principal, Exec
 # noinspection HttpUrlsUsage
 class Task(BaseModel):
     #: str: version of windows task schema
-    version: str = Field("1.1")
+    version: str = Field("1.2")
 
     #: str: windows task schema xlmns
     xmlns: str = Field("http://schemas.microsoft.com/windows/2004/02/mit/task")
@@ -25,7 +25,38 @@ class Task(BaseModel):
 
     actions: Exec = Field(None, serialization_alias="Actions")
 
-    triggers: LogonTrigger = Field(None, serialization_alias="Triggers")
+    triggers: Trigger | Sequence[Trigger] = Field(None, serialization_alias="Triggers")
+
+    @classmethod
+    def field_to_xml(cls, field, value, root):
+        if isinstance(value, dict):
+            primary_element = SubElement(root, field)
+
+            # ------------------------------------------
+            # ugh, this is annoying
+            if field=="Actions":
+                primary_element.attrib["Context"] = "Author"
+            elif field=="Principal":
+                primary_element.attrib["id"] = "Author"
+            # ------------------------------------------
+
+            for key, value in value.items():
+                cls.field_to_xml(key, value, primary_element)
+        else:
+            SubElement(root, field).text = str(value)
+
+    def model_dump_xml(self) -> Element:
+        # Don't worry too much about the attributes being out of order, but I am ordered the sub-elements in the order
+        # they appear in the reference documentation.
+        fields = self.model_dump(by_alias=True)
+        _ = fields.pop("version")
+        _ = fields.pop("xmlns")
+        root = Element("Task", version=self.version, xmlns=self.xmlns)
+        for field, serialized in fields.items():
+            self.field_to_xml(field, serialized, root)
+        return root
+
+
 
     @field_serializer("actions", when_used="always")
     @classmethod
@@ -46,23 +77,3 @@ class Task(BaseModel):
     @classmethod
     def serialize_triggers(cls, triggers: LogonTrigger) -> dict:
         return {"LogonTrigger": triggers.model_dump(by_alias=True)}
-
-    @classmethod
-    def __to_xml__(cls, task: "Task") -> ET.Element:
-        serialized_task = task.model_dump(by_alias=True)
-        version = serialized_task.pop("version")
-        xmlns = serialized_task.pop("xmlns")
-        root = ET.Element("Task", version=version, xmlns=xmlns)
-        reg = ET.SubElement(root, "RegistrationInfo")
-        for key, value in serialized_task.pop("RegistrationInfo").items():
-            ET.SubElement(reg, key).text = value
-        for key, value in serialized_task.items():
-            sub0 = ET.SubElement(root, key)
-            for inner_key, inner_value in value.items():
-                if isinstance(inner_value, dict):
-                    sub1 = ET.SubElement(sub0, inner_key)
-                    for k, v in inner_value.items():
-                        ET.SubElement(sub1, k).text = v
-                else:
-                    ET.SubElement(root, inner_key).text = inner_value
-        return root

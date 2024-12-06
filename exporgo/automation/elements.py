@@ -1,10 +1,9 @@
 from datetime import datetime
 from enum import IntEnum
-from os import getlogin
 from pathlib import Path
 from pydantic import BaseModel, Field, field_serializer
 from ..types import Folder
-
+from ..tools import get_full_windows_user
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -22,7 +21,7 @@ class LogonType(IntEnum):
     NONE = 0
     PASSWORD = 1
     S4U = 2
-    INTERACTIVE_TOKEN = 3
+    InteractiveToken = 3
     GROUP = 4
     SERVICE_ACCOUNT = 5
     INTERACTIVE_TOKEN_OR_PASSWORD = 6
@@ -47,7 +46,7 @@ class RegistrationInfo(BaseModel):
     date: str = Field(default_factory=lambda: str(datetime.now().isoformat()), serialization_alias="Date")
 
     #: The author of the task
-    author: str = Field(default_factory=getlogin, serialization_alias="Author")
+    author: str = Field(default_factory=get_full_windows_user, serialization_alias="Author")
 
     #: The description of the task
     description: str = Field(default="Task to Execute", serialization_alias="Description")
@@ -55,13 +54,18 @@ class RegistrationInfo(BaseModel):
     #: The name of the task
     name: str = Field(default="Exporgo Task", serialization_alias="URI")
 
+    @field_serializer("name", when_used="always")
+    @classmethod
+    def serialize_name(cls, value: str) -> str:
+        return "\\" + value
+
 
 class Principal(BaseModel):
     #: The user ID of the principal
-    user_id: str = Field(default_factory=getlogin, serialization_alias="UserID")
+    user_id: str = Field(default_factory=get_full_windows_user, serialization_alias="UserID")
 
     #: The logon type of the principal
-    logon_type: LogonType = Field(default=LogonType.INTERACTIVE_TOKEN, serialization_alias="LogonType")
+    logon_type: LogonType = Field(default=LogonType.InteractiveToken, serialization_alias="LogonType")
 
     #: The run level of the principal
     run_level: RunLevel = Field(default=RunLevel.HighestAvailable, serialization_alias="RunLevel")
@@ -88,7 +92,11 @@ class Exec(BaseModel):
         return str(value)
 
 
-class LogonTrigger(BaseModel):
+class Trigger(BaseModel):
+    ...
+
+
+class LogonTrigger(Trigger):
     enabled: bool = Field(default=True, serialization_alias="Enabled")
 
     @field_serializer("enabled", when_used="always")

@@ -6,7 +6,7 @@ from types import MappingProxyType
 from typing import Any, Callable, Generator, Iterable, Optional
 from xml.dom.minidom import parseString
 from xml.etree.ElementTree import Element, tostring
-
+from os import getenv
 from .types import File
 
 __all__ = [
@@ -16,6 +16,9 @@ __all__ = [
     "check_if_string_set",
     "convert",
     "serialize_function",
+    "pretty_xml",
+    "write_xml",
+    "get_full_windows_user"
 ]
 
 """
@@ -220,3 +223,12 @@ def serialize_function(call: Callable) -> dict:
         "name": call.__name__,
         "file": getsourcefile(call)
     }
+
+
+def get_full_windows_user() -> str:
+    """
+    Get the full user
+
+    :return: full user
+    """
+    return getenv('userdomain') + "\\" + getenv('username')
