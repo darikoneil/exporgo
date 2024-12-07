@@ -29,6 +29,21 @@ class LogonType(IntEnum):
     INTERACTIVE_TOKEN_OR_PASSWORD = 6
 
 
+class TriggerType(IntEnum):
+    EVENT = 0
+    TIME = 1
+    DAILY = 2
+    WEEKLY = 3
+    MONTHLY = 4
+    MONTHLYDOW = 5
+    IDLE = 6
+    REGISTRATION = 7
+    BOOT = 8
+    LOGON = 9
+    SESSION_STATE_CHANGE = 10
+    CUSTOM = 11
+
+
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Valid Elements for Windows Task Scheduler (Triggers in Next Section)
@@ -190,3 +205,6 @@ class LogonTrigger(Trigger):
     @classmethod
     def serialize_enabled(cls, value: bool) -> str:
         return str(value).lower()
+
+
+# task instance ignore new!

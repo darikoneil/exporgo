@@ -20,7 +20,8 @@ __all__ = [
     "serialize_function",
     "pretty_xml",
     "write_xml",
-    "get_full_windows_user"
+    "get_full_windows_user",
+    "get_windows_user_security_identifier"
 ]
 
 """
