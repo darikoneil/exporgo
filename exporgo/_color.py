@@ -41,6 +41,10 @@ class _TerminalFormatter:
 
     @property
     def announcement(self) -> str:
+        """
+        :Getter: Red font style for critical announcements
+        :Getter Type: :class:`str`
+        """
         return self.BOLD + self.RED + self.UNDERLINE
 
     @staticmethod
