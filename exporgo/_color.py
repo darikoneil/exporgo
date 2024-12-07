@@ -1,5 +1,5 @@
-from operator import eq
 from dataclasses import dataclass
+from operator import eq
 
 __all__ = ["TERMINAL_FORMATTER"]
 

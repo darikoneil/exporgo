@@ -23,7 +23,7 @@ class LogonType(IntEnum):
     NONE = 0
     PASSWORD = 1
     S4U = 2
-    InteractiveToken = 3
+    InteractiveToken = 3  # noqa: CCE001
     GROUP = 4
     SERVICE_ACCOUNT = 5
     INTERACTIVE_TOKEN_OR_PASSWORD = 6
@@ -167,7 +167,6 @@ class Settings(BaseModel):
                       "run_only_if_idle",
                       "wake_to_run",
                       when_used="always")
-
     @classmethod
     def serialize_bool(cls, value: bool) -> str:
         return str(value).lower()
@@ -181,7 +180,7 @@ class Settings(BaseModel):
 
 
 class Trigger(BaseModel):
-    ...
+    ...  # noqa: CCE002
 
 
 class LogonTrigger(Trigger):

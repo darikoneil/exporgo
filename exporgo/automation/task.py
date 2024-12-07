@@ -1,5 +1,5 @@
 # noinspection PyPep8Naming
-from typing import Sequence
+from typing import Any, Sequence
 from xml.etree.ElementTree import Element, SubElement
 
 from pydantic import BaseModel, Field, field_serializer
@@ -41,35 +41,23 @@ class Task(BaseModel):
 
     actions: Exec = Field(None, serialization_alias="Actions")
 
-
     @classmethod
-    def field_to_xml(cls, field, value, root):
+    def field_to_xml(cls, field: str, value: Any, root: Element) -> None:
         if isinstance(value, dict):
             primary_element = SubElement(root, field)
 
             # ------------------------------------------
             # ugh, this is annoying
-            if field=="Actions":
+            if field == "Actions":
                 primary_element.attrib["Context"] = "Author"
-            elif field=="Principal":
+            elif field == "Principal":
                 primary_element.attrib["id"] = "Author"
             # ------------------------------------------
 
-            for key, value in value.items():
-                cls.field_to_xml(key, value, primary_element)
+            for key, value_ in value.items():
+                cls.field_to_xml(key, value_, primary_element)
         else:
             SubElement(root, field).text = str(value)
-
-    def model_dump_xml(self) -> Element:
-        # Don't worry too much about the attributes being out of order, but I am ordered the sub-elements in the order
-        # they appear in the reference documentation.
-        fields = self.model_dump(by_alias=True)
-        _ = fields.pop("version")
-        _ = fields.pop("xmlns")
-        root = Element("Task", version=self.version, xmlns=self.xmlns)
-        for field, serialized in fields.items():
-            self.field_to_xml(field, serialized, root)
-        return root
 
     @field_serializer("actions", when_used="always")
     @classmethod
@@ -90,3 +78,14 @@ class Task(BaseModel):
     @classmethod
     def serialize_triggers(cls, triggers: LogonTrigger) -> dict:
         return {"LogonTrigger": triggers.model_dump(by_alias=True)}
+
+    def model_dump_xml(self) -> Element:
+        # Don't worry too much about the attributes being out of order, but I am ordered the sub-elements in the order
+        # they appear in the reference documentation.
+        fields = self.model_dump(by_alias=True)
+        _ = fields.pop("version")
+        _ = fields.pop("xmlns")
+        root = Element("Task", version=self.version, xmlns=self.xmlns)
+        for field, serialized in fields.items():
+            self.field_to_xml(field, serialized, root)
+        return root

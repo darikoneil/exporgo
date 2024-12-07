@@ -8,9 +8,9 @@ from .lock import LockManager
 
 class ExporgoManager:
 
-    timeout_duration = 60 * 15 # 15 minutes
+    timeout_duration = 60 * 15  # 15 minutes
 
-    retry_interval = 30 # 30 seconds
+    retry_interval = 30  # 30 seconds
 
     def __init__(self, file: File):
 
@@ -24,7 +24,7 @@ class ExporgoManager:
             self.start_file_manager()
 
     @property
-    def file_manager_running(self):
+    def file_manager_running(self) -> bool:
         return LockManager.is_running()
 
     @staticmethod
@@ -61,7 +61,7 @@ class ExporgoManager:
         self.subject = self.load_subject(self.file)
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: ANN001
         self.subject.index()
         self.subject.save()
         self.subject = None

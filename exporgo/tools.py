@@ -245,5 +245,6 @@ def get_windows_user_security_identifier() -> str:
     """
     command = f"wmic useraccount where name='{getlogin()}' get sid"
     out = subprocess.Popen(command, stdout=subprocess.PIPE)
-    out = out.communicate()[0].decode().replace("\r", "")
-    return out.split("\n")[1].strip()
+    sid = out.communicate()[0].decode().replace("\r", "")
+    out.terminate()
+    return sid.split("\n")[1].strip()
