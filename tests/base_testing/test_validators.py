@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from exporgo import __current_version__
+# noinspection PyProtectedMember
+from exporgo._version import __current_version__
 from exporgo.exceptions import (InvalidExtensionWarning, InvalidFilenameError,
                                 UpdateVersionWarning,
                                 VersionBackwardCompatibilityError,

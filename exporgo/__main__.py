@@ -5,6 +5,8 @@ from .automation.manager import ExporgoManager
 from .types import File
 
 
+# TODO: Finish implementing the main function
+
 def execute_exporgo(file: File) -> None:
     with ExporgoManager(file) as manager:
         print(f"ENTERED {file}")

@@ -1,10 +1,11 @@
 from datetime import datetime
 from enum import IntEnum
 from pathlib import Path
-from pydantic import BaseModel, Field, field_serializer
-from ..types import Folder
-from ..tools import get_full_windows_user, get_windows_user_security_identifier
 
+from pydantic import BaseModel, Field, field_serializer
+
+from ..tools import get_full_windows_user, get_windows_user_security_identifier
+from ..types import Folder
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

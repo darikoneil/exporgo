@@ -1,8 +1,11 @@
 # noinspection PyPep8Naming
-from xml.etree.ElementTree import Element, SubElement
-from pydantic import BaseModel, field_serializer, Field
-from .elements import LogonTrigger, Trigger, RegistrationInfo, Principal, Exec, Settings
 from typing import Sequence
+from xml.etree.ElementTree import Element, SubElement
+
+from pydantic import BaseModel, Field, field_serializer
+
+from .elements import (Exec, LogonTrigger, Principal, RegistrationInfo,
+                       Settings, Trigger)
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////

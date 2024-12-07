@@ -222,27 +222,6 @@ class FileLockError(PermissionError):
         super().__init__(f"File {self.file} is locked by another process.")
 
 
-class SingletonError(RuntimeError):
-    """
-    Raised when attempting to create a second instance of a singleton
-    """
-
-    def __init__(self, singleton: object):
-        self.singleton = singleton
-        name = self.singleton.__name__ if hasattr(self.singleton, "__name__") \
-            else type(self.singleton).__name__
-        super().__init__(f"{name} is a singleton and cannot be instantiated more than once")
-
-
-class ImmutableInstanceWarning(RuntimeWarning):
-    """
-    Raised when attempting to set an attribute on an immutable instance
-    """
-    def __init__(self, instance: object):
-        self.instance = instance
-        super().__init__(f"{self.instance.__class__.__name__} is immutable and cannot be modified")
-
-
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Runtime Errors and Warnings

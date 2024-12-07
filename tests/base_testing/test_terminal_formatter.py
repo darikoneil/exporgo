@@ -1,8 +1,5 @@
-import pytest
-
 # noinspection PyProtectedMember
-from exporgo._color import TERMINAL_FORMATTER, _TerminalFormatter
-from exporgo.exceptions import ImmutableInstanceWarning, SingletonError
+from exporgo._color import TERMINAL_FORMATTER
 
 
 def test_terminal_scheme():
@@ -23,13 +20,3 @@ def test_terminal_scheme():
     # check msg still delivered if failed style request
     new_msg = TERMINAL_FORMATTER("42!", "Adams")
     assert("42!" in new_msg)
-
-    # check immutable
-    with pytest.warns(ImmutableInstanceWarning):
-        TERMINAL_FORMATTER.BLUE = "new_type"
-
-    # finally check singleton status
-    with pytest.raises(SingletonError):
-        _ = _TerminalFormatter()
-
-

@@ -1,13 +1,14 @@
 import inspect
+import subprocess
 from contextlib import suppress
 from functools import update_wrapper, wraps
 from inspect import getsourcefile
+from os import getenv, getlogin
 from types import MappingProxyType
 from typing import Any, Callable, Generator, Iterable, Optional
 from xml.dom.minidom import parseString
 from xml.etree.ElementTree import Element, tostring
-from os import getenv, getlogin
-import subprocess
+
 from .types import File
 
 __all__ = [
