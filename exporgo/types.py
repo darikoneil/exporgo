@@ -20,7 +20,6 @@ class _ExporgoIntEnum(IntEnum):
 
     @classmethod
     def __deserialize__(cls, value: str) -> "_ExporgoIntEnum":
-
         if isinstance(value, str):
             name, value = value[1:-1].split(", ")
             value = int(value)
@@ -44,6 +43,7 @@ class Category(_ExporgoIntEnum):
     """
     Category enumeration declaring when a step is to be executed within a pipeline.
     """
+
     #: Prepares data for subsequent analysis.
     PREPARE = 0
 
@@ -58,6 +58,7 @@ class FileFormat(_ExporgoIntEnum):
     """
     File formats enumeration for setting the file format of the exporgo organization file.
     """
+
     #: YAML file format (default)
     YAML = 0
 
@@ -72,6 +73,7 @@ class Priority(_ExporgoIntEnum):
     """
     Priority enumeration for setting the priority of a step within a pipeline.
     """
+
     #: Analysis suggested by reviewer #2... The absolute lowest priority. Only executed when there literally is nothing
     #: else to do and even then, it's utterly pointless...
     IDLE = 0
@@ -99,6 +101,7 @@ class Status(_ExporgoIntEnum):
     """
     Status enumeration for setting the status of a step within a pipeline.
     """
+
     #: Error encountered during execution
     ERROR = -2
 

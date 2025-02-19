@@ -10,9 +10,13 @@ from pydantic import BaseModel, field_serializer, field_validator
 from ..io import select_directory, verbose_copy
 from ..tools import check_if_string_set, unique_generator
 from ..types import CollectionType, Folder, Status
-from ..validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
-                          validate_method_with_pydantic)
+from ..validators import (
+    MODEL_CONFIG,
+    validate_dumping_with_pydantic,
+    validate_method_with_pydantic,
+)
 from .files import FileTree
+
 # noinspection PyUnresolvedReferences
 from .step import RegisteredStep, Step, StepRegistry
 
@@ -39,8 +43,13 @@ class ValidPipeline(BaseModel):
 
     @field_serializer("sources", check_fields=True)
     @classmethod
-    def serialize_sources(cls, v: MappingProxyType[str, Folder | CollectionType | None]) -> dict | None:
-        return {file_set: cls._inner_serialize_source(source) for file_set, source in v.items()}
+    def serialize_sources(
+        cls, v: MappingProxyType[str, Folder | CollectionType | None]
+    ) -> dict | None:
+        return {
+            file_set: cls._inner_serialize_source(source)
+            for file_set, source in v.items()
+        }
 
     @singledispatchmethod
     @classmethod
@@ -85,8 +94,9 @@ class ValidPipeline(BaseModel):
 
     @field_validator("sources", mode="before", check_fields=True)
     @classmethod
-    def validate_sources(cls, v: Any) \
-            -> MappingProxyType[str, Folder | CollectionType | None]:
+    def validate_sources(
+        cls, v: Any
+    ) -> MappingProxyType[str, Folder | CollectionType | None]:
         if isinstance(v, dict):
             return MappingProxyType(v)
         elif isinstance(v, MappingProxyType):
@@ -127,19 +137,27 @@ class ValidPipeline(BaseModel):
 
 
 class Pipeline:
-    def __init__(self,
-                 steps: Step | CollectionType,
-                 status: Status = Status.EMPTY,
-                 sources: Optional[Mapping[str, Folder | CollectionType | None]] = None) -> None:
+    def __init__(
+        self,
+        steps: Step | CollectionType,
+        status: Status = Status.EMPTY,
+        sources: Optional[Mapping[str, Folder | CollectionType | None]] = None,
+    ) -> None:
         self.steps = steps
         self._status = status
-        self._sources = dict(sources) if sources else dict.fromkeys(self.file_sets, None)
+        self._sources = (
+            dict(sources) if sources else dict.fromkeys(self.file_sets, None)
+        )
         # TODO: This will fail, I  will need to fix this
         self._collected = set()
 
     @property
     def file_sets(self) -> Generator[str, None, None]:
-        return unique_generator(file_set for step in self.steps for file_set in check_if_string_set(step.file_sets))
+        return unique_generator(
+            file_set
+            for step in self.steps
+            for file_set in check_if_string_set(step.file_sets)
+        )
 
     @property
     def sources(self) -> MappingProxyType[str, Folder | CollectionType | NoneType]:
@@ -147,11 +165,13 @@ class Pipeline:
 
     @property
     def status(self) -> Status:
-        return min(step.status for step in self.steps) if len(self.steps) > 0 else Status.EMPTY
+        return (
+            min(step.status for step in self.steps)
+            if len(self.steps) > 0
+            else Status.EMPTY
+        )
 
-    def add_source(self,
-                   file_set: str,
-                   source: Folder | CollectionType | None) -> None:
+    def add_source(self, file_set: str, source: Folder | CollectionType | None) -> None:
         self._sources[file_set] = source
         # TODO: Source -> Collect needs implemented
 
@@ -170,7 +190,13 @@ class Pipeline:
     def collect(self, file_tree: FileTree) -> None:
         for step in self.steps:
             if step.status == Status.SOURCE or Status.COLLECT:
-                for file_set_name in step.file_sets if not isinstance(step.file_sets, str) else [step.file_sets, ]:
+                for file_set_name in (
+                    step.file_sets
+                    if not isinstance(step.file_sets, str)
+                    else [
+                        step.file_sets,
+                    ]
+                ):
                     if file_set_name not in self._collected:
                         destination = file_tree.get(file_set_name)(target=None)
                         sources = self.sources.get(file_set_name)
@@ -205,10 +231,12 @@ class Pipeline:
 
     @classmethod
     @validate_method_with_pydantic(ValidPipeline)
-    def __deserialize__(cls,
-                        steps: Step | Sequence[Step] | None,
-                        status: Status,
-                        sources: MappingProxyType[str, Folder | CollectionType | None]) -> "Pipeline":
+    def __deserialize__(
+        cls,
+        steps: Step | Sequence[Step] | None,
+        status: Status,
+        sources: MappingProxyType[str, Folder | CollectionType | None],
+    ) -> "Pipeline":
         return Pipeline(steps, status, sources)
 
     @classmethod
@@ -234,13 +262,21 @@ class RegisteredPipeline(BaseModel):
         if isinstance(self.steps, RegisteredStep):
             return check_if_string_set(self.steps.file_sets)
         if isinstance(self.steps, (list, tuple)):
-            return {file_set for step in self.steps for file_set in check_if_string_set(step.file_sets)}
+            return {
+                file_set
+                for step in self.steps
+                for file_set in check_if_string_set(step.file_sets)
+            }
 
     @field_serializer("steps", check_fields=True)
     @classmethod
-    def serialize_steps(cls, v: RegisteredStep | Sequence[RegisteredStep] | None) -> list | Any:
+    def serialize_steps(
+        cls, v: RegisteredStep | Sequence[RegisteredStep] | None
+    ) -> list | Any:
         if isinstance(v, RegisteredStep):
-            return [v.key, ]
+            return [
+                v.key,
+            ]
         elif isinstance(v, (list | tuple)):
             return [step.key for step in v]
         else:
@@ -248,8 +284,7 @@ class RegisteredPipeline(BaseModel):
 
     @field_validator("steps", mode="before", check_fields=True)
     @classmethod
-    def validate_steps(cls, v: Any) \
-            -> RegisteredStep | Sequence[RegisteredStep] | None:
+    def validate_steps(cls, v: Any) -> RegisteredStep | Sequence[RegisteredStep] | None:
         if isinstance(v, RegisteredStep):
             return v
         elif isinstance(v, (list, tuple)):
@@ -273,7 +308,9 @@ class RegisteredPipeline(BaseModel):
 
 
 class PipelineFactory:
-    def __init__(self, steps: str | Step | RegisteredStep | list | tuple | None) -> None:
+    def __init__(
+        self, steps: str | Step | RegisteredStep | list | tuple | None
+    ) -> None:
         self._steps = []
         self._registry = None
 
@@ -284,8 +321,7 @@ class PipelineFactory:
         return Pipeline(self._steps, Status.SOURCE)
 
     @singledispatchmethod
-    def add_step(self, step) -> None:
-        ...
+    def add_step(self, step) -> None: ...
 
     @add_step.register(str)
     def _(self, step: str) -> None:

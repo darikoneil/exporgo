@@ -21,7 +21,7 @@ __all__ = [
     "pretty_xml",
     "write_xml",
     "get_full_windows_user",
-    "get_windows_user_security_identifier"
+    "get_windows_user_security_identifier",
 ]
 
 """
@@ -68,13 +68,13 @@ def parameterize(decorator: Callable) -> Callable:
 
 
 @parameterize
-def convert(function: Callable,
-            parameter: str,
-            permitted: tuple,
-            required: Any,
-            converter: Optional[Callable] = None,
-            ) -> Callable:
-
+def convert(
+    function: Callable,
+    parameter: str,
+    permitted: tuple,
+    required: Any,
+    converter: Optional[Callable] = None,
+) -> Callable:
     @wraps(function)
     def decorator(*args, **kwargs) -> Callable:
         sig = inspect.signature(function)
@@ -84,7 +84,9 @@ def convert(function: Callable,
         if isinstance(param, permitted):
             bound_args.arguments = {**bound_args.kwargs, **bound_args.arguments}
             bound_args.arguments.pop("kwargs", None)
-            bound_args.arguments[parameter] = converter(param) if converter else required(param)
+            bound_args.arguments[parameter] = (
+                converter(param) if converter else required(param)
+            )
         else:
             raise TypeError(f"{parameter} must be of type {permitted}")
         return function(**bound_args.arguments)
@@ -138,11 +140,10 @@ def conditional_dispatch(func: Callable) -> Callable:
 
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         if not args:
-            raise TypeError(f'{funcname} requires at least '
-                            '1 positional argument')
+            raise TypeError(f"{funcname} requires at least 1 positional argument")
         return dispatch(*args, **kwargs)(*args, **kwargs)
 
-    funcname = getattr(func, '__name__', 'conditional_dispatch function')
+    funcname = getattr(func, "__name__", "conditional_dispatch function")
     registry[_always_true] = func
     wrapper.register = register
     wrapper.dispatch = dispatch
@@ -167,8 +168,9 @@ def pretty_xml(root: Element) -> str:
     :return: pretty printed XML
     """
     xml_string = parseString(tostring(root)).toprettyxml(indent=" " * 2)
-    xml_string = xml_string.replace('<?xml version="1.0" ?>',
-                                    "<?xml version='1.0' encoding='UTF-16'?>")
+    xml_string = xml_string.replace(
+        '<?xml version="1.0" ?>', "<?xml version='1.0' encoding='UTF-16'?>"
+    )
     return xml_string
 
 
@@ -210,8 +212,15 @@ def check_if_string_set(iterable: Iterable) -> set:
     Checks if an iterable is simply a string when constructing a set. This is useful for ensuring that we don't
     accidentally create a set of characters when we really wanted a set of strings.
     """
-    return {iterable, } if isinstance(iterable, str) else set(iterable) \
-        if iterable else set()
+    return (
+        {
+            iterable,
+        }
+        if isinstance(iterable, str)
+        else set(iterable)
+        if iterable
+        else set()
+    )
 
 
 def serialize_function(call: Callable) -> dict:
@@ -222,10 +231,7 @@ def serialize_function(call: Callable) -> dict:
 
     :return: serialized function
     """
-    return {
-        "name": call.__name__,
-        "file": getsourcefile(call)
-    }
+    return {"name": call.__name__, "file": getsourcefile(call)}
 
 
 def get_full_windows_user() -> str:
@@ -234,7 +240,7 @@ def get_full_windows_user() -> str:
 
     :return: full user
     """
-    return getenv('userdomain') + "\\" + getenv('username')
+    return getenv("userdomain") + "\\" + getenv("username")
 
 
 def get_windows_user_security_identifier() -> str:

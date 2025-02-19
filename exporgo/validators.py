@@ -8,11 +8,14 @@ from typing import Any, Callable
 from pydantic import ConfigDict
 
 from ._version import __current_version__
-from .exceptions import (InvalidExtensionWarning, InvalidFilenameError,
-                         UpdateVersionWarning,
-                         VersionBackwardCompatibilityError,
-                         VersionBackwardCompatibilityWarning,
-                         VersionForwardCompatibilityWarning)
+from .exceptions import (
+    InvalidExtensionWarning,
+    InvalidFilenameError,
+    UpdateVersionWarning,
+    VersionBackwardCompatibilityError,
+    VersionBackwardCompatibilityWarning,
+    VersionForwardCompatibilityWarning,
+)
 from .tools import parameterize
 
 """
@@ -40,7 +43,9 @@ __all__ = [
 
 
 @parameterize
-def validate_extension(function: Callable, parameter: str, required_extension: str) -> Callable:
+def validate_extension(
+    function: Callable, parameter: str, required_extension: str
+) -> Callable:
     """
     Decorator for validating the extension of a file.
 
@@ -54,6 +59,7 @@ def validate_extension(function: Callable, parameter: str, required_extension: s
         This decorator will convert the extension of the file to the required extension if it is not already,
         rather than raising a fatal error.
     """
+
     @wraps(function)
     def decorator(*args, **kwargs) -> Callable:
         # noinspection DuplicatedCode
@@ -64,13 +70,18 @@ def validate_extension(function: Callable, parameter: str, required_extension: s
         bound_args.arguments.pop("kwargs", None)
         param = Path(bound_args.arguments.get(parameter))
         if param.suffix != required_extension:
-            warnings.warn(InvalidExtensionWarning(parameter,
-                                                  param.suffix,
-                                                  required_extension,
-                                                  coerced=required_extension),
-                          stacklevel=4)
+            warnings.warn(
+                InvalidExtensionWarning(
+                    parameter,
+                    param.suffix,
+                    required_extension,
+                    coerced=required_extension,
+                ),
+                stacklevel=4,
+            )
             bound_args.arguments[parameter] = param.with_suffix(required_extension)
         return function(**bound_args.arguments)
+
     return decorator
 
 
@@ -90,6 +101,7 @@ def validate_filename(function: Callable, parameter: str) -> Callable:
         See `here <https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file>1_ for more information
         on file naming best practices for naming files.
     """
+
     @wraps(function)
     def decorator(*args, **kwargs) -> Callable:
         # noinspection DuplicatedCode
@@ -100,10 +112,13 @@ def validate_filename(function: Callable, parameter: str) -> Callable:
         bound_args.arguments.pop("kwargs", None)
         param = bound_args.arguments.get(parameter)
         str_param = str(param).split("\\")[-1]
-        if not set(str_param) <= set(string.ascii_letters + string.digits + " " + "." + "_"):
+        if not set(str_param) <= set(
+            string.ascii_letters + string.digits + " " + "." + "_"
+        ):
             raise InvalidFilenameError(parameter, str_param)
         # noinspection PyArgumentList
         return function(*args, **kwargs)
+
     return decorator
 
 
@@ -188,8 +203,9 @@ def validate_method_with_pydantic(function: Callable, model: Any) -> Callable:
             container = bound_args.arguments
             has_cls = False
         # Collect the parameters from the bound arguments that are in the Pydantic model
-        params = {key: func_get(key) for key in model.model_fields.keys()
-                  if key in container}
+        params = {
+            key: func_get(key) for key in model.model_fields.keys() if key in container
+        }
         # Validate the parameters with the Pydantic model
         valid_args = model(**params)
         # Call the original function with the validated arguments (class and validated arguments)
@@ -244,9 +260,10 @@ def validate_version(version: str) -> None:
 """
 
 #: ConfigDict: The configuration for all Pydantic BaseModels
-MODEL_CONFIG = ConfigDict(extra="forbid",
-                          revalidate_instances="always",
-                          validate_assignment=True,
-                          validate_default=False,
-                          arbitrary_types_allowed=True,
-                          )
+MODEL_CONFIG = ConfigDict(
+    extra="forbid",
+    revalidate_instances="always",
+    validate_assignment=True,
+    validate_default=False,
+    arbitrary_types_allowed=True,
+)

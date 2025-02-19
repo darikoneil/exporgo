@@ -11,6 +11,7 @@ class _TerminalFormatter:
     modified. It is intended to be used as a singleton instance, and is not intended to be instantiated more than once.
     I mean, you can, but it's not going to do anything for you. It's just going to be a waste of memory.
     """
+
     YELLOW: str = "\u001b[38;5;11m"
     GREEN: str = "\033[38;2;64;204;139m"
     ORANGE: str = "\033[38;2;253;174;97m"

@@ -26,11 +26,12 @@ class FileTree:
     """
 
     @convert(parameter="directory", permitted=(Folder,), required=Path)
-    def __init__(self,
-                 directory: Folder,
-                 file_sets: Optional[str | CollectionType] = None,
-                 populate: bool = True):
-
+    def __init__(
+        self,
+        directory: Folder,
+        file_sets: Optional[str | CollectionType] = None,
+        populate: bool = True,
+    ):
         """
         A file tree that organizes experiment data, analyzed results, and figures. For implementation concerns it is not
         an extension of the built-in dictionary type, but it replicates most of its built-in methods.:
@@ -133,7 +134,9 @@ class FileTree:
 
         :rtype: :class:`Generator <typing.Generator>`\[:class:`Path`\, :class:`None`\, :class:`None`\]
         """
-        return (file for file_set in self.values() for file in file_set.find(identifier))
+        return (
+            file for file_set in self.values() for file in file_set.find(identifier)
+        )
 
     def items(self) -> Generator[tuple[str, "FileSet"], None, None]:
         """
@@ -143,7 +146,11 @@ class FileTree:
 
         :rtype: :class:`Generator <typing.Generator>`\[:class:`tuple`\[:class:`str`\, :class:`FileSet`\]\,
         """
-        return ((key, value) for key, value in vars(self).items() if isinstance(value, FileSet))
+        return (
+            (key, value)
+            for key, value in vars(self).items()
+            if isinstance(value, FileSet)
+        )
 
     def iter(self) -> Iterator[str]:
         """
@@ -196,8 +203,14 @@ class FileTree:
         """
         Populates the file tree with pre-existing or missing file sets in the directory
         """
-        for file_set in (file_set for file_set in self.tree_directory.glob("*") if file_set is not file_set.is_file()):
-            self.add(file_set.stem, index=True) if (file_set not in self.values()) else None
+        for file_set in (
+            file_set
+            for file_set in self.tree_directory.glob("*")
+            if file_set is not file_set.is_file()
+        ):
+            self.add(file_set.stem, index=True) if (
+                file_set not in self.values()
+            ) else None
 
     def index(self) -> None:
         """
@@ -242,7 +255,9 @@ class FileTree:
             :class:`None`\, :class:`None`\]
 
         """
-        return (value for _, value in self.items())    # items call guarantees filesets only
+        return (
+            value for _, value in self.items()
+        )  # items call guarantees filesets only
 
     @parent_directory.setter
     @convert(parameter="directory", permitted=(Folder,), required=Path)
@@ -261,8 +276,7 @@ class FileTree:
         raise DispatchError(f"Cannot add {key} to filetree")  # pragma: no cover
 
     @_add.register(type(None))
-    def _(self, key: NoneType, index: bool = True) -> None:
-        ...  # pragma: no cover
+    def _(self, key: NoneType, index: bool = True) -> None: ...  # pragma: no cover
 
     @_add.register(str)
     def _(self, key: str, index: bool = True) -> None:
@@ -285,7 +299,9 @@ class FileTree:
                 directory.mkdir(parents=True, exist_ok=False)
 
     @singledispatchmethod
-    def _delete(self, key: tuple[str] | list[str] | Generator[str, None, None] | Iterator[str]) -> None:
+    def _delete(
+        self, key: tuple[str] | list[str] | Generator[str, None, None] | Iterator[str]
+    ) -> None:
         """
         Deletes a fileset from the filetree
 
@@ -309,7 +325,9 @@ class FileTree:
     def __serialize__(self) -> dict:
         return {
             "directory": str(self.tree_directory),
-            "file_sets": {key: file_set.__to_dict__() for key, file_set in self.items()}
+            "file_sets": {
+                key: file_set.__to_dict__() for key, file_set in self.items()
+            },
         }
 
     def __call__(self, target: Optional[str] = None) -> Path | list[Path]:
@@ -323,7 +341,14 @@ class FileTree:
         """
         if not target:
             return self.tree_directory
-        elif len(files := [fileset(target) for fileset in self.values() if fileset(target)]) > 0:
+        elif (
+            len(
+                files := [
+                    fileset(target) for fileset in self.values() if fileset(target)
+                ]
+            )
+            > 0
+        ):
             return files
         else:
             raise FileNotFoundError(f"{target} not found in {self.tree_directory}")
@@ -355,10 +380,7 @@ class FileSet:
     """
 
     @convert(parameter="parent_directory", permitted=(Folder,), required=Path)
-    def __init__(self,
-                 name: str,
-                 parent_directory: Folder,
-                 index: bool = True):
+    def __init__(self, name: str, parent_directory: Folder, index: bool = True):
         """
         Organizing class for a set of files. Contents may be only files or a collection of folders and files.
         This class is useful in managing coherent sets of data like experimental sessions or a calendar day. It offers
@@ -384,7 +406,6 @@ class FileSet:
         self._folders = DictWithDuplicates()  # folders cache
 
         if index:
-
             self.index()
 
     @property
@@ -423,8 +444,12 @@ class FileSet:
     @classmethod
     def __from_dict__(cls, data: dict) -> "FileSet":
         file_set = FileSet(data.pop("name"), data.pop("directory"), index=False)
-        file_set._files = DictWithDuplicates({key: Path(value) for key, value in data.pop("files").items()})
-        file_set._folders = DictWithDuplicates({key: Path(value) for key, value in data.pop("folders").items()})
+        file_set._files = DictWithDuplicates(
+            {key: Path(value) for key, value in data.pop("files").items()}
+        )
+        file_set._folders = DictWithDuplicates(
+            {key: Path(value) for key, value in data.pop("folders").items()}
+        )
         return file_set
 
     def find(self, identifier: str) -> Generator[Path, None, None]:
@@ -445,8 +470,16 @@ class FileSet:
         self._files = DictWithDuplicates()
         self._folders = DictWithDuplicates()
         # noinspection PyUnresolvedReferences
-        self._files.update(((file.stem, file) for file in self.directory.rglob("*") if file.is_file()))
-        self._folders.update(((folder.stem, folder) for folder in self.directory.rglob("*") if not folder.is_file()))
+        self._files.update(
+            ((file.stem, file) for file in self.directory.rglob("*") if file.is_file())
+        )
+        self._folders.update(
+            (
+                (folder.stem, folder)
+                for folder in self.directory.rglob("*")
+                if not folder.is_file()
+            )
+        )
 
     @convert(parameter="parent_directory", permitted=(Folder,), required=Path)
     def remap(self, parent_directory: Folder) -> None:
@@ -465,7 +498,11 @@ class FileSet:
 
         :raises MissingFilesError: If any files or folders are missing
         """
-        missing = {name: location for name, location in self.files.items() if not location.exists()}
+        missing = {
+            name: location
+            for name, location in self.files.items()
+            if not location.exists()
+        }
         if missing:
             raise MissingFilesError(missing)
 
@@ -474,7 +511,7 @@ class FileSet:
             "name": self._name,
             "directory": str(self.directory),
             "files": {name: str(location) for name, location in self.files.items()},
-            "folders": {name: str(location) for name, location in self.folders.items()}
+            "folders": {name: str(location) for name, location in self.folders.items()},
         }
 
     def __call__(self, target: Optional[str] = None) -> Path:
@@ -493,7 +530,9 @@ class FileSet:
         """
         if not target:
             return self.directory
-        elif (location := (self.files.get(target) or self.folders.get(target))) is not None:
+        elif (
+            location := (self.files.get(target) or self.folders.get(target))
+        ) is not None:
             return location
         else:
             raise FileNotFoundError(f"{target} not found in {self.directory}")
@@ -515,7 +554,9 @@ class DictWithDuplicates(dict):
     rather than overwriting the existing key-value pair.
     """
 
-    def update(self, __m: Optional[Iterable | Generator[Iterable, None, None]] = None, **kwargs) -> None:
+    def update(
+        self, __m: Optional[Iterable | Generator[Iterable, None, None]] = None, **kwargs
+    ) -> None:
         """
         Updates the dictionary
         """

@@ -3,8 +3,13 @@ from pathlib import Path
 import pytest
 
 # noinspection PyProtectedMember
-from exporgo.tools import (check_if_string_set, conditional_dispatch, convert,
-                           serialize_function, unique_generator)
+from exporgo.tools import (
+    check_if_string_set,
+    conditional_dispatch,
+    convert,
+    serialize_function,
+    unique_generator,
+)
 
 
 def test_convert():
@@ -21,8 +26,8 @@ def test_convert():
     with pytest.raises(TypeError):
         valid_handle(0, None)
 
-class TestUniqueGenerator:
 
+class TestUniqueGenerator:
     def test_unique_elements(self):
         iterable = [1, 2, 2, 3, 4, 4, 5]
         result = list(unique_generator(iterable))
@@ -44,12 +49,12 @@ class TestUniqueGenerator:
         assert result == [7]
 
     def test_mixed_types(self):
-        iterable = [1, 'a', 1, 'b', 'a']
+        iterable = [1, "a", 1, "b", "a"]
         result = list(unique_generator(iterable))
-        assert result == [1, 'a', 'b']
+        assert result == [1, "a", "b"]
+
 
 class TestCheckIfStringSet:
-
     def test_string_input(self):
         result = check_if_string_set("hello")
         assert result == {"hello"}
@@ -73,7 +78,6 @@ class TestCheckIfStringSet:
 
 # noinspection PyUnresolvedReferences,PyUnusedLocal
 class TestConditionalDispatch:
-
     def test_dispatches_to_correct_function(self):
         @conditional_dispatch
         def func(x):

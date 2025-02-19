@@ -4,8 +4,7 @@ from xml.etree.ElementTree import Element, SubElement
 
 from pydantic import BaseModel, Field, field_serializer
 
-from .elements import (Exec, LogonTrigger, Principal, RegistrationInfo,
-                       Settings, Trigger)
+from .elements import Exec, LogonTrigger, Principal, RegistrationInfo, Settings, Trigger
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -25,17 +24,22 @@ class Task(BaseModel):
     :cvar triggers: Trigger | Sequence[Trigger]: triggers for the task
 
     """
+
     #: str: version of windows task schema
     version: str = Field("1.2")
 
     #: str: windows task schema xlmns
     xmlns: str = Field("http://schemas.microsoft.com/windows/2004/02/mit/task")
 
-    registration_info: RegistrationInfo = Field(None, serialization_alias="RegistrationInfo")
+    registration_info: RegistrationInfo = Field(
+        None, serialization_alias="RegistrationInfo"
+    )
 
     triggers: Trigger | Sequence[Trigger] = Field(None, serialization_alias="Triggers")
 
-    principal: Principal = Field(default_factory=Principal, serialization_alias="Principals")
+    principal: Principal = Field(
+        default_factory=Principal, serialization_alias="Principals"
+    )
 
     settings: Settings = Field(default_factory=Settings, serialization_alias="Settings")
 

@@ -6,9 +6,11 @@ from pydantic import ValidationError
 
 # noinspection PyProtectedMember
 from exporgo._logging import IPythonLogger
+
 # noinspection PyProtectedMember
 from exporgo._version import __current_version__
 from exporgo.exceptions import MissingFilesError
+
 # noinspection PyUnresolvedReferences,PyProtectedMember
 from exporgo.io import verbose_copy
 from exporgo.organization.experiment import Experiment, ExperimentRegistry
@@ -57,16 +59,22 @@ class TestValidSubject:
     def test_validate_experiments(self):
         experiment = MagicMock(spec=Experiment)
         self.test_experiments = {"Mock Experiment": experiment}
-        with pytest.raises(ValidationError): # we want to check for assertion, don't care about validation error
+        with pytest.raises(
+            ValidationError
+        ):  # we want to check for assertion, don't care about validation error
             ValidSubject.validate_experiments({"Mock Experiment": {"key": "value"}})
             assert experiment.__deserialize__.called
 
     def test_validate_priority(self):
-        validated_priority = ValidSubject.validate_priority(self.test_priority.__serialize__())
+        validated_priority = ValidSubject.validate_priority(
+            self.test_priority.__serialize__()
+        )
         assert validated_priority == self.test_priority
 
     def test_validate_status(self):
-        validated_status = ValidSubject.validate_status(self.test_status.__serialize__())
+        validated_status = ValidSubject.validate_status(
+            self.test_status.__serialize__()
+        )
         assert validated_status == self.test_status
 
     def test_validate_version(self):
@@ -95,31 +103,42 @@ class TestSubject:
     @pytest.fixture(scope="function", autouse=True)
     def setup_subject(self):
         self.mock_logger = MagicMock(spec=IPythonLogger)
-        self.test_subject = Subject(name=self.test_name,
-                                    directory=self.test_base_directory,
-                                    study=self.test_study,
-                                    meta=self.test_meta,
-                                    priority=self.test_priority,
-                                    extra=self.test_extra)
+        self.test_subject = Subject(
+            name=self.test_name,
+            directory=self.test_base_directory,
+            study=self.test_study,
+            meta=self.test_meta,
+            priority=self.test_priority,
+            extra=self.test_extra,
+        )
 
     def test_subject_valid_initialization(self):
         assert self.test_subject.name == self.test_name
         assert self.test_subject.directory == self.test_directory
         assert self.test_subject.study == self.test_study
-        assert self.test_subject.meta == {**self.test_meta, **{"extra": self.test_extra}}
+        assert self.test_subject.meta == {
+            **self.test_meta,
+            **{"extra": self.test_extra},
+        }
         assert self.test_subject.priority == self.test_priority
         assert self.test_subject.version == __current_version__
 
     def test_subject_initialization_without_directory(self):
-        with (patch("exporgo.organization.subject.select_directory", return_value=self.test_base_directory)
-              as mock_select_directory):
-            subject = Subject(name=self.test_name,
-                              study=self.test_study,
-                              meta=self.test_meta,
-                              priority=self.test_priority,
-                              extra=self.test_extra)
+        with patch(
+            "exporgo.organization.subject.select_directory",
+            return_value=self.test_base_directory,
+        ) as mock_select_directory:
+            subject = Subject(
+                name=self.test_name,
+                study=self.test_study,
+                meta=self.test_meta,
+                priority=self.test_priority,
+                extra=self.test_extra,
+            )
             assert mock_select_directory.called_once()
-            assert subject.directory == self.test_base_directory.joinpath(self.test_name)
+            assert subject.directory == self.test_base_directory.joinpath(
+                self.test_name
+            )
 
     def test_subject_print(self):
         with BlockPrinting():
@@ -129,8 +148,12 @@ class TestSubject:
 
     def test_subject_indirect_get_experiment(self):
         self.test_subject.experiments["Mock Experiment"] = MagicMock(spec=Experiment)
-        assert getattr(self.test_subject, "Mock Experiment") == self.test_subject.experiments.get("Mock Experiment")
-        assert self.test_subject.get("Mock Experiment") == self.test_subject.experiments.get("Mock Experiment")
+        assert getattr(
+            self.test_subject, "Mock Experiment"
+        ) == self.test_subject.experiments.get("Mock Experiment")
+        assert self.test_subject.get(
+            "Mock Experiment"
+        ) == self.test_subject.experiments.get("Mock Experiment")
 
     def test_subject_create_experiment(self):
         self.test_subject.create_experiment("Mock Experiment", "generic_experiment")
@@ -142,12 +165,17 @@ class TestSubject:
         # dependent on test_subject_create_experiment :/
         self.test_subject.create_experiment("Mock Experiment", "generic_experiment")
         with parallel_config(n_jobs=1):
-            verbose_copy(simple_source, self.test_subject.get("Mock Experiment").get("files").directory)
+            verbose_copy(
+                simple_source,
+                self.test_subject.get("Mock Experiment").get("files").directory,
+            )
         self.test_subject.get("Mock Experiment").index()
         self.test_subject.save()
         self.test_subject.logger.end()
 
-        subject_copy = Subject.load(self.test_subject.directory.joinpath("organization.yaml"))
+        subject_copy = Subject.load(
+            self.test_subject.directory.joinpath("organization.yaml")
+        )
         subject_copy.validate()
         for key, attr in vars(self.test_subject).items():
             if key in ["logger", "modifications", "_modifications"]:
@@ -158,8 +186,13 @@ class TestSubject:
     def test_subject_failed_validation(self, simple_source):
         self.test_subject.create_experiment("Mock Experiment", "generic_experiment")
         with parallel_config(n_jobs=1):
-            verbose_copy(simple_source, self.test_subject.get("Mock Experiment").get("files").directory)
+            verbose_copy(
+                simple_source,
+                self.test_subject.get("Mock Experiment").get("files").directory,
+            )
         self.test_subject.get("Mock Experiment").index()
-        list(self.test_subject.get("Mock Experiment").get("files").files.values())[0].unlink()
+        list(self.test_subject.get("Mock Experiment").get("files").files.values())[
+            0
+        ].unlink()
         with pytest.raises(MissingFilesError):
             self.test_subject.validate()

@@ -7,7 +7,7 @@ class LockManager:
     _running = False
 
     @classmethod
-    @convert(parameter="file", permitted=(File, ), required=str)
+    @convert(parameter="file", permitted=(File,), required=str)
     def request_lock(cls, file: File) -> bool:
         if file in cls.locked_files:
             return False
@@ -15,7 +15,7 @@ class LockManager:
         return True
 
     @classmethod
-    @convert(parameter="file", permitted=(File, ), required=str)
+    @convert(parameter="file", permitted=(File,), required=str)
     def release_lock(cls, file: File) -> None:
         cls.locked_files.remove(file)
 

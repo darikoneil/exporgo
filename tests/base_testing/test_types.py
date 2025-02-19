@@ -5,7 +5,6 @@ from exporgo.types import EnumNameValueMismatchError, _ExporgoIntEnum
 
 
 class TestExporgoIntEnum:
-
     def test_deserializes_valid_string(self):
         class TestEnum(_ExporgoIntEnum):
             TEST = 1

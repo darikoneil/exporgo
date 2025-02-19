@@ -15,8 +15,12 @@ def execute_exporgo(file: File) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Execute Exporgo with the specified file.")
-    parser.add_argument("file", type=str, help="The path to the subject's organization file.")
+    parser = argparse.ArgumentParser(
+        description="Execute Exporgo with the specified file."
+    )
+    parser.add_argument(
+        "file", type=str, help="The path to the subject's organization file."
+    )
 
     args = parser.parse_args()
     file = Path(args.file)

@@ -60,13 +60,20 @@ class TriggerType(IntEnum):
 
 class RegistrationInfo(BaseModel):
     #: The date the task was created
-    date: str = Field(default_factory=lambda: str(datetime.now().isoformat()), serialization_alias="Date")
+    date: str = Field(
+        default_factory=lambda: str(datetime.now().isoformat()),
+        serialization_alias="Date",
+    )
 
     #: The author of the task
-    author: str = Field(default_factory=get_full_windows_user, serialization_alias="Author")
+    author: str = Field(
+        default_factory=get_full_windows_user, serialization_alias="Author"
+    )
 
     #: The description of the task
-    description: str = Field(default="Task to Execute", serialization_alias="Description")
+    description: str = Field(
+        default="Task to Execute", serialization_alias="Description"
+    )
 
     #: The name of the task
     name: str = Field(default="Exporgo Task", serialization_alias="URI")
@@ -79,13 +86,20 @@ class RegistrationInfo(BaseModel):
 
 class Principal(BaseModel):
     #: The user ID of the principal
-    user_id: str = Field(default_factory=get_windows_user_security_identifier, serialization_alias="UserId")
+    user_id: str = Field(
+        default_factory=get_windows_user_security_identifier,
+        serialization_alias="UserId",
+    )
 
     #: The logon type of the principal
-    logon_type: LogonType = Field(default=LogonType.InteractiveToken, serialization_alias="LogonType")
+    logon_type: LogonType = Field(
+        default=LogonType.InteractiveToken, serialization_alias="LogonType"
+    )
 
     #: The run level of the principal
-    run_level: RunLevel = Field(default=RunLevel.LeastPrivilege, serialization_alias="RunLevel")
+    run_level: RunLevel = Field(
+        default=RunLevel.LeastPrivilege, serialization_alias="RunLevel"
+    )
 
     @field_serializer("logon_type", when_used="always")
     @classmethod
@@ -100,8 +114,12 @@ class Principal(BaseModel):
 
 class Exec(BaseModel):
     command: str = Field(default="cmd.exe", serialization_alias="Command")
-    arguments: str = Field(default="/c echo Hello World", serialization_alias="Arguments")
-    working_directory: Folder = Field(default_factory=Path.cwd, serialization_alias="WorkingDirectory")
+    arguments: str = Field(
+        default="/c echo Hello World", serialization_alias="Arguments"
+    )
+    working_directory: Folder = Field(
+        default_factory=Path.cwd, serialization_alias="WorkingDirectory"
+    )
 
     @field_serializer("working_directory", when_used="always")
     @classmethod
@@ -143,21 +161,38 @@ class Settings(BaseModel):
     :cvar execution_time_limit: str: time limit for the task to run
     :cvar priority: int: priority of the task
     """
-    multiple_instances_policy: str = Field(default="IgnoreNew", serialization_alias="MultipleInstancesPolicy")
 
-    disallow_start_if_on_batteries: bool = Field(default=False, serialization_alias="DisallowStartIfOnBatteries")
+    multiple_instances_policy: str = Field(
+        default="IgnoreNew", serialization_alias="MultipleInstancesPolicy"
+    )
 
-    stop_if_going_on_batteries: bool = Field(default=True, serialization_alias="StopIfGoingOnBatteries")
+    disallow_start_if_on_batteries: bool = Field(
+        default=False, serialization_alias="DisallowStartIfOnBatteries"
+    )
 
-    allow_hard_terminate: bool = Field(default=False, serialization_alias="AllowHardTerminate")
+    stop_if_going_on_batteries: bool = Field(
+        default=True, serialization_alias="StopIfGoingOnBatteries"
+    )
 
-    start_when_available: bool = Field(default=False, serialization_alias="StartWhenAvailable")
+    allow_hard_terminate: bool = Field(
+        default=False, serialization_alias="AllowHardTerminate"
+    )
 
-    run_only_if_network_available: bool = Field(default=False, serialization_alias="RunOnlyIfNetworkAvailable")
+    start_when_available: bool = Field(
+        default=False, serialization_alias="StartWhenAvailable"
+    )
 
-    idle_settings: IdleSettings = Field(default_factory=IdleSettings, serialization_alias="IdleSettings")
+    run_only_if_network_available: bool = Field(
+        default=False, serialization_alias="RunOnlyIfNetworkAvailable"
+    )
 
-    allow_start_on_demand: bool = Field(default=False, serialization_alias="AllowStartOnDemand")
+    idle_settings: IdleSettings = Field(
+        default_factory=IdleSettings, serialization_alias="IdleSettings"
+    )
+
+    allow_start_on_demand: bool = Field(
+        default=False, serialization_alias="AllowStartOnDemand"
+    )
 
     enabled: bool = Field(default=True, serialization_alias="Enabled")
 
@@ -167,21 +202,25 @@ class Settings(BaseModel):
 
     wake_to_run: bool = Field(default=False, serialization_alias="WakeToRun")
 
-    execution_time_limit: str = Field(default="PT0S", serialization_alias="ExecutionTimeLimit")
+    execution_time_limit: str = Field(
+        default="PT0S", serialization_alias="ExecutionTimeLimit"
+    )
 
     priority: int = Field(default=7, serialization_alias="Priority")
 
-    @field_serializer("disallow_start_if_on_batteries",
-                      "stop_if_going_on_batteries",
-                      "allow_hard_terminate",
-                      "start_when_available",
-                      "run_only_if_network_available",
-                      "allow_start_on_demand",
-                      "enabled",
-                      "hidden",
-                      "run_only_if_idle",
-                      "wake_to_run",
-                      when_used="always")
+    @field_serializer(
+        "disallow_start_if_on_batteries",
+        "stop_if_going_on_batteries",
+        "allow_hard_terminate",
+        "start_when_available",
+        "run_only_if_network_available",
+        "allow_start_on_demand",
+        "enabled",
+        "hidden",
+        "run_only_if_idle",
+        "wake_to_run",
+        when_used="always",
+    )
     @classmethod
     def serialize_bool(cls, value: bool) -> str:
         return str(value).lower()
@@ -194,8 +233,7 @@ class Settings(BaseModel):
 """
 
 
-class Trigger(BaseModel):
-    ...  # noqa: CCE002
+class Trigger(BaseModel): ...  # noqa: CCE002
 
 
 class LogonTrigger(Trigger):

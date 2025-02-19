@@ -16,10 +16,12 @@ def _construct_temporary_file(name: str) -> Path:
     return temporary_file
 
 
-@convert(parameter="file", permitted=(File, ), required=str)
+@convert(parameter="file", permitted=(File,), required=str)
 def _add_to_scheduler(name: str, file: File) -> bool:
-    command = ['schtasks', '/create', '/tn', name, '/xml', file]
-    result = subprocess.run(command, timeout=60, check=True, capture_output=True, text=True)
+    command = ["schtasks", "/create", "/tn", name, "/xml", file]
+    result = subprocess.run(
+        command, timeout=60, check=True, capture_output=True, text=True
+    )
     return result.returncode == 0
 
 

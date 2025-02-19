@@ -5,13 +5,18 @@ import pytest
 from joblib import parallel_config
 
 # noinspection PyProtectedMember
-from exporgo.io import (import_callable_from_file, import_function_from_file,
-                        select_directory, select_file, verbose_copy)
+from exporgo.io import (
+    import_callable_from_file,
+    import_function_from_file,
+    select_directory,
+    select_file,
+    verbose_copy,
+)
 
 
 # noinspection PyUnusedLocal
-@patch('exporgo.io.askopenfilename', return_value=__file__)
-@patch('exporgo.io.Tk')
+@patch("exporgo.io.askopenfilename", return_value=__file__)
+@patch("exporgo.io.Tk")
 def test_select_file_returns_correct_path(mock_tk, mock_askopenfilename):
     # Mock the Tk() class and the askopenfilename function
     result = select_file()
@@ -20,8 +25,8 @@ def test_select_file_returns_correct_path(mock_tk, mock_askopenfilename):
 
 
 # noinspection PyUnusedLocal
-@patch('exporgo.io.askopenfilename', return_value=".")
-@patch('exporgo.io.Tk')
+@patch("exporgo.io.askopenfilename", return_value=".")
+@patch("exporgo.io.Tk")
 def test_select_file_raises_file_not_found_error(mock_tk, mock_askopenfilename):
     with pytest.raises(FileNotFoundError):
         select_file()
@@ -29,8 +34,8 @@ def test_select_file_raises_file_not_found_error(mock_tk, mock_askopenfilename):
 
 
 # noinspection PyUnusedLocal
-@patch('exporgo.io.askdirectory', return_value=Path.cwd())
-@patch('exporgo.io.Tk')
+@patch("exporgo.io.askdirectory", return_value=Path.cwd())
+@patch("exporgo.io.Tk")
 def test_directory_selection_returns_correct_path(mock_tk, mock_askdirectory):
     result = select_directory()
     assert result == Path.cwd()
@@ -38,8 +43,8 @@ def test_directory_selection_returns_correct_path(mock_tk, mock_askdirectory):
 
 
 # noinspection PyUnusedLocal
-@patch('exporgo.io.askdirectory', return_value=".")
-@patch('exporgo.io.Tk')
+@patch("exporgo.io.askdirectory", return_value=".")
+@patch("exporgo.io.Tk")
 def test_directory_selection_raises_file_not_found_error(mock_tk, mock_askdirectory):
     with pytest.raises(FileNotFoundError):
         select_directory()
@@ -56,25 +61,29 @@ def test_verbose_copy(simple_source, destination):
 
 
 def test_callable_imported_successfully():
-        with patch('exporgo.io.spec_from_file_location') as mock_spec, \
-             patch('exporgo.io.module_from_spec') as mock_module, \
-             patch('exporgo.io.modules') as mock_modules:
-            mock_loader = MagicMock()
-            mock_spec.return_value.loader = mock_loader
-            mock_module.return_value.some_callable = lambda: "test"
-            mock_modules.__setitem__.return_value = None
+    with (
+        patch("exporgo.io.spec_from_file_location") as mock_spec,
+        patch("exporgo.io.module_from_spec") as mock_module,
+        patch("exporgo.io.modules") as mock_modules,
+    ):
+        mock_loader = MagicMock()
+        mock_spec.return_value.loader = mock_loader
+        mock_module.return_value.some_callable = lambda: "test"
+        mock_modules.__setitem__.return_value = None
 
-            result = import_callable_from_file('some_callable', 'some_module', 'some_path')
-            assert result() == "test"
+        result = import_callable_from_file("some_callable", "some_module", "some_path")
+        assert result() == "test"
 
 
 def test_function_imported_successfully():
-    with patch('exporgo.io.spec_from_file_location') as mock_spec, \
-         patch('exporgo.io.module_from_spec') as mock_module:
+    with (
+        patch("exporgo.io.spec_from_file_location") as mock_spec,
+        patch("exporgo.io.module_from_spec") as mock_module,
+    ):
         mock_loader = MagicMock()
         mock_spec.return_value.loader = mock_loader
         mock_module.return_value.some_function = lambda: "test"
         mock_loader.exec_module.return_value = None
 
-        result = import_function_from_file('some_function', Path('some_path'))
+        result = import_function_from_file("some_function", Path("some_path"))
         assert result() == "test"

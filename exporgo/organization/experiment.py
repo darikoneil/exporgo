@@ -13,13 +13,20 @@ from pydantic import BaseModel, field_serializer, field_validator
 
 from .._color import TERMINAL_FORMATTER
 from .._logging import get_timestamp
-from ..exceptions import (DispatchError, DuplicateRegistrationError,
-                          ExperimentNotRegisteredError)
+from ..exceptions import (
+    DispatchError,
+    DuplicateRegistrationError,
+    ExperimentNotRegisteredError,
+)
 from ..tools import check_if_string_set, conditional_dispatch, convert
 from ..types import CollectionType, Folder, Priority, Status
+
 # noinspection PyProtectedMember
-from ..validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
-                          validate_method_with_pydantic)
+from ..validators import (
+    MODEL_CONFIG,
+    validate_dumping_with_pydantic,
+    validate_method_with_pydantic,
+)
 from .files import FileSet, FileTree
 from .pipeline import Pipeline, PipelineFactory, RegisteredPipeline
 
@@ -116,16 +123,17 @@ class ValidExperiment(BaseModel):
 
 # noinspection PyUnresolvedReferences
 class Experiment:
-
-    def __init__(self,
-                 name: str,
-                 parent_directory: Folder,
-                 keys: str | CollectionType,
-                 file_tree: FileTree,
-                 pipeline: Pipeline,
-                 priority: Priority = Priority.NORMAL,
-                 meta: Optional[dict] = None,
-                 **kwargs):
+    def __init__(
+        self,
+        name: str,
+        parent_directory: Folder,
+        keys: str | CollectionType,
+        file_tree: FileTree,
+        pipeline: Pipeline,
+        priority: Priority = Priority.NORMAL,
+        meta: Optional[dict] = None,
+        **kwargs,
+    ):
         #: :class:`str`\: name of the experiment
         self._name = name
 
@@ -133,7 +141,7 @@ class Experiment:
         self._parent_directory = parent_directory
 
         #: :class:`tuple`: experiment registry keys
-        self._keys = (keys, ) if isinstance(keys, str) else keys
+        self._keys = (keys,) if isinstance(keys, str) else keys
 
         #: :class:`FileTree <exporgo.files.FileTree>`\: file tree for the experiment
         self.file_tree = file_tree
@@ -169,7 +177,9 @@ class Experiment:
                 string_to_print += f"{value}\n"
         string_to_print += TERMINAL_FORMATTER("\t\tFile Tree: \n", "GREEN")
         for key, file_set in self.file_tree.items():
-            string_to_print += TERMINAL_FORMATTER(f"\t\t\t{key.capitalize()}: ", "ORANGE")
+            string_to_print += TERMINAL_FORMATTER(
+                f"\t\t\t{key.capitalize()}: ", "ORANGE"
+            )
             string_to_print += f"{len(file_set.files)} Files\n"
         return string_to_print
 
@@ -239,24 +249,30 @@ class Experiment:
     # noinspection PyUnusedLocal
     @classmethod
     @validate_method_with_pydantic(ValidExperiment)
-    def __deserialize__(cls,
-                        name: str,
-                        parent_directory: Path,
-                        keys: dict,
-                        file_tree: FileTree,
-                        pipeline: Pipeline,
-                        priority: Priority,
-                        status: Status,
-                        meta: dict,
-                        **kwargs) -> "Experiment":
+    def __deserialize__(
+        cls,
+        name: str,
+        parent_directory: Path,
+        keys: dict,
+        file_tree: FileTree,
+        pipeline: Pipeline,
+        priority: Priority,
+        status: Status,
+        meta: dict,
+        **kwargs,
+    ) -> "Experiment":
         # status is not used
-        return Experiment(name, parent_directory, keys, file_tree, pipeline, priority, meta, **kwargs)
+        return Experiment(
+            name, parent_directory, keys, file_tree, pipeline, priority, meta, **kwargs
+        )
 
     @classmethod
     @validate_dumping_with_pydantic(ValidExperiment)
     def __serialize__(cls, self: "Experiment") -> dict:
         # noinspection PyTypeChecker
-        return dict(self)  # technically the dict constructor is not necessary, but it's here for clarity.
+        return dict(
+            self
+        )  # technically the dict constructor is not necessary, but it's here for clarity.
 
     @parent_directory.setter
     def parent_directory(self, parent_directory: Folder) -> None:
@@ -333,14 +349,16 @@ class Experiment:
         self.file_tree.validate()
 
     def __repr__(self):
-        return (f"Experiment("
-                f"{self.name=}, "
-                f"{self.parent_directory=}, "
-                f"{self.keys=}, "
-                f"{self.file_tree=}, "
-                f"{self.pipeline=}, "
-                f"{self.priority=},"
-                f"{self.meta=})")
+        return (
+            f"Experiment("
+            f"{self.name=}, "
+            f"{self.parent_directory=}, "
+            f"{self.keys=}, "
+            f"{self.file_tree=}, "
+            f"{self.pipeline=}, "
+            f"{self.priority=},"
+            f"{self.meta=})"
+        )
 
     def __call__(self):
         if self.status == Status.SOURCE or self.status == Status.COLLECT:
@@ -372,6 +390,7 @@ class RegisteredExperiment(BaseModel):
     """
     Recipe for defining an experiment
     """
+
     key: str
     additional_file_sets: str | Sequence[str] | None
     pipeline: RegisteredPipeline
@@ -399,8 +418,13 @@ class ExperimentRegistry:
     """
     Registry for storing experiment configurations
     """
+
     __registry = {}
-    __path = Path(__file__).parent.joinpath("registry").joinpath("registered_experiments.json")
+    __path = (
+        Path(__file__)
+        .parent.joinpath("registry")
+        .joinpath("registered_experiments.json")
+    )
     __new_registration = False
 
     # noinspection DuplicatedCode
@@ -415,9 +439,11 @@ class ExperimentRegistry:
                 file.write("{\n")
                 for idx, key_experiment in enumerate(cls.__registry.items()):
                     key, experiment = key_experiment
-                    str_experiment = indent(json.dumps(key)
-                                            + f": {experiment.model_dump_json(exclude_defaults=True, indent=4)}",
-                                            " " * 4)
+                    str_experiment = indent(
+                        json.dumps(key)
+                        + f": {experiment.model_dump_json(exclude_defaults=True, indent=4)}",
+                        " " * 4,
+                    )
                     str_experiment += ",\n" if idx < len(cls.__registry) - 1 else "\n"
                     file.write(str_experiment)
                 file.write("}\n")
@@ -425,7 +451,11 @@ class ExperimentRegistry:
             cls.__path.touch(exist_ok=False)
             cls._save_registry()
         except (IOError, BaseLockException) as exc:
-            print(TERMINAL_FORMATTER(f"\nError saving registry: {exc}\n\n", "announcement"))
+            print(
+                TERMINAL_FORMATTER(
+                    f"\nError saving registry: {exc}\n\n", "announcement"
+                )
+            )
 
     @classmethod
     def has(cls, key: str) -> bool:
@@ -496,13 +526,19 @@ class ExperimentRegistry:
         """
         try:
             with Lock(cls.__path, "r", timeout=10) as file:
-                cls.__registry = {key: RegisteredExperiment.model_validate(config)
-                                  for key, config in json.load(file).items()}
+                cls.__registry = {
+                    key: RegisteredExperiment.model_validate(config)
+                    for key, config in json.load(file).items()
+                }
         except FileNotFoundError:
             cls.__path.touch(exist_ok=False)
             cls._save_registry()
         except (IOError, json.JSONDecodeError) as exc:
-            print(TERMINAL_FORMATTER(f"\nError loading registry: {exc}\n\n", "announcement"))
+            print(
+                TERMINAL_FORMATTER(
+                    f"\nError loading registry: {exc}\n\n", "announcement"
+                )
+            )
 
     @classmethod
     def __enter__(cls) -> "ExperimentRegistry":
@@ -523,15 +559,15 @@ class ExperimentRegistry:
 
 
 class ExperimentFactory:
-
     @convert(parameter="parent_directory", permitted=(Folder,), required=Path)
-    def __init__(self,
-                 name: str,
-                 parent_directory: Folder,
-                 priority: Optional[Priority] = Priority.NORMAL,
-                 meta: Optional[dict] = None,
-                 **kwargs
-                 ):
+    def __init__(
+        self,
+        name: str,
+        parent_directory: Folder,
+        priority: Optional[Priority] = Priority.NORMAL,
+        meta: Optional[dict] = None,
+        **kwargs,
+    ):
         self.name = name
         self.parent_directory = parent_directory
         self.experiment_directory = parent_directory.joinpath(name)
@@ -541,9 +577,9 @@ class ExperimentFactory:
         self.meta = {**meta, **kwargs} if meta else kwargs
 
     @staticmethod
-    def _make_file_tree(experiment_directory: Path,
-                        file_sets: str | list[str] | tuple[str, ...]
-                        ) -> FileTree:
+    def _make_file_tree(
+        experiment_directory: Path, file_sets: str | list[str] | tuple[str, ...]
+    ) -> FileTree:
         return FileTree(experiment_directory, file_sets, populate=True)
 
     @staticmethod
@@ -553,18 +589,24 @@ class ExperimentFactory:
 
     def create(self, keys: str | list[str] | tuple[str, ...]) -> Experiment:
         if not isinstance(keys, str):
-            raise NotImplementedError("Only single key experiments are supported at this time.")
+            raise NotImplementedError(
+                "Only single key experiments are supported at this time."
+            )
 
         experiment_ = self.__registry.get(keys)
-        file_tree = self._make_file_tree(self.experiment_directory, experiment_.file_sets)
+        file_tree = self._make_file_tree(
+            self.experiment_directory, experiment_.file_sets
+        )
         pipeline = self._make_pipeline(experiment_.pipeline)
-        return Experiment(self.name,
-                          self.parent_directory,
-                          keys,
-                          file_tree,
-                          pipeline,
-                          self.priority,
-                          self.meta)
+        return Experiment(
+            self.name,
+            self.parent_directory,
+            keys,
+            file_tree,
+            pipeline,
+            self.priority,
+            self.meta,
+        )
 
     def __enter__(self):
         with ExperimentRegistry() as self.__registry:

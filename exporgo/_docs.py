@@ -43,7 +43,9 @@ def update_json_schema_for_registry_configurations() -> None:
     """
 
     def to_snake_case(name: str) -> str:
-        return "".join(f"_{char.lower()}" if char.isupper() else char for char in name)[1:]
+        return "".join(f"_{char.lower()}" if char.isupper() else char for char in name)[
+            1:
+        ]
 
     path = Path(__file__).parent.joinpath("schemas")
 
@@ -60,8 +62,7 @@ def update_json_schema_for_registry_configurations() -> None:
 """
 
 
-def update_yaml_schema() -> None:
-    ...
+def update_yaml_schema() -> None: ...
 
 
 """
@@ -71,5 +72,4 @@ def update_yaml_schema() -> None:
 """
 
 
-def update_toml_schema() -> None:
-    ...
+def update_toml_schema() -> None: ...

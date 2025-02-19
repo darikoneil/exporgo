@@ -7,13 +7,11 @@ from .lock import LockManager
 
 
 class ExporgoManager:
-
     timeout_duration = 60 * 15  # 15 minutes
 
     retry_interval = 30  # 30 seconds
 
     def __init__(self, file: File):
-
         #: subject's organization file
         self.file = file
 
@@ -51,7 +49,10 @@ class ExporgoManager:
     @classmethod
     def lock_file(cls, file: File) -> bool:
         start_time = time()
-        while not (locked := cls.request_lock(file) and (time()) - start_time < cls.timeout_duration):
+        while not (
+            locked := cls.request_lock(file)
+            and (time()) - start_time < cls.timeout_duration
+        ):
             sleep(cls.retry_interval)
         return locked
 

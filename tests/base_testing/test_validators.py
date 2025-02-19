@@ -4,14 +4,17 @@ import pytest
 
 # noinspection PyProtectedMember
 from exporgo._version import __current_version__
-from exporgo.exceptions import (InvalidExtensionWarning, InvalidFilenameError,
-                                UpdateVersionWarning,
-                                VersionBackwardCompatibilityError,
-                                VersionBackwardCompatibilityWarning,
-                                VersionForwardCompatibilityWarning)
+from exporgo.exceptions import (
+    InvalidExtensionWarning,
+    InvalidFilenameError,
+    UpdateVersionWarning,
+    VersionBackwardCompatibilityError,
+    VersionBackwardCompatibilityWarning,
+    VersionForwardCompatibilityWarning,
+)
+
 # noinspection PyProtectedMember
-from exporgo.validators import (validate_extension, validate_filename,
-                                validate_version)
+from exporgo.validators import validate_extension, validate_filename, validate_version
 
 
 def test_validate_extension():
@@ -41,20 +44,26 @@ def test_validate_filename():
 
 
 def test_validate_version():
-
     validate_version(__current_version__)
 
     split_version = [int(version) for version in __current_version__.split(".")]
 
     with pytest.warns(VersionForwardCompatibilityWarning):
-       validate_version(f"{split_version[0] - 1}.{split_version[1]}.{split_version[2]}")
+        validate_version(
+            f"{split_version[0] - 1}.{split_version[1]}.{split_version[2]}"
+        )
 
     with pytest.raises(VersionBackwardCompatibilityError):
-        validate_version(f"{split_version[0] + 1}.{split_version[1]}.{split_version[2]}")
+        validate_version(
+            f"{split_version[0] + 1}.{split_version[1]}.{split_version[2]}"
+        )
 
     with pytest.warns(VersionBackwardCompatibilityWarning):
-        validate_version(f"{split_version[0]}.{split_version[1] + 1}.{split_version[2]}")
+        validate_version(
+            f"{split_version[0]}.{split_version[1] + 1}.{split_version[2]}"
+        )
 
     with pytest.warns(UpdateVersionWarning):
-        validate_version(f"{split_version[0]}.{split_version[1]}.{split_version[2] + 1}")
-
+        validate_version(
+            f"{split_version[0]}.{split_version[1]}.{split_version[2] + 1}"
+        )

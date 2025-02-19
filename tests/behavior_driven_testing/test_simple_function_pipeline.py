@@ -2,34 +2,50 @@ import csv
 
 import pytest
 
-from exporgo.organization.experiment import (ExperimentRegistry,
-                                             RegisteredExperiment)
+from exporgo.organization.experiment import ExperimentRegistry, RegisteredExperiment
 from exporgo.organization.step import RegisteredStep, StepRegistry
 from exporgo.organization.subject import Subject
 from exporgo.types import Category, Priority, Status
-from tests.behavior_driven_testing.actions import (analyze_function, load_data,
-                                                   prepare_function,
-                                                   summarize_function)
-from tests.conftest import (path_experiments, path_steps,
-                            simple_action_attributes)
+from tests.behavior_driven_testing.actions import (
+    analyze_function,
+    load_data,
+    prepare_function,
+    summarize_function,
+)
+from tests.conftest import path_experiments, path_steps, simple_action_attributes
 
 
-def check_file_tree(source_attributes, action_attributes, test_class, test_subject: Subject) -> None:
+def check_file_tree(
+    source_attributes, action_attributes, test_class, test_subject: Subject
+) -> None:
     experiment = test_subject.experiments.get(test_class.test_experiment_name)
-    assert (experiment.file_tree.num_files == source_attributes.num_files_total_in_source +
-            action_attributes.num_files_created)
-    assert (len(experiment.file_tree.files.files) == source_attributes.num_files_total_in_source
-            + action_attributes.num_files_in_files)
-    assert len(experiment.file_tree.results.files) == action_attributes.num_files_in_results
+    assert (
+        experiment.file_tree.num_files
+        == source_attributes.num_files_total_in_source
+        + action_attributes.num_files_created
+    )
+    assert (
+        len(experiment.file_tree.files.files)
+        == source_attributes.num_files_total_in_source
+        + action_attributes.num_files_in_files
+    )
+    assert (
+        len(experiment.file_tree.results.files)
+        == action_attributes.num_files_in_results
+    )
 
 
 def check_data(action_attributes, test_class, test_subject: Subject) -> None:
     experiment = test_subject.experiments.get(test_class.test_experiment_name)
-    raw_header, raw_data = load_data(next(experiment.find(f"*{action_attributes.raw_filename}")))
+    raw_header, raw_data = load_data(
+        next(experiment.find(f"*{action_attributes.raw_filename}"))
+    )
     assert raw_header == action_attributes.raw_header
     for a, b in zip(raw_data, action_attributes.raw_data):
         pytest.approx(a, b)
-    results_header, results_data = load_data(next(experiment.find(f"*{action_attributes.results_filename}")))
+    results_header, results_data = load_data(
+        next(experiment.find(f"*{action_attributes.results_filename}"))
+    )
     assert results_header == action_attributes.results_header
     for a, b in zip(results_data, action_attributes.results_data):
         pytest.approx(a, b)
@@ -83,24 +99,27 @@ class TestSimpleFunctionPipeline:
         header = action_attributes.raw_header
         data = action_attributes.raw_data
         filename = save_folder.joinpath(action_attributes.raw_filename)
-        with open(filename, mode='w', newline='') as file:
+        with open(filename, mode="w", newline="") as file:
             writer = csv.writer(file)
             writer.writerow(header)
             writer.writerows(data)
 
     @pytest.fixture(scope="function", autouse=True)
-    def setup_class(self,
-                    tmp_path,
-                    simple_source,
-                    simple_source_attributes,
-                    simple_action_attributes,
-                    path_steps,
-                    path_experiments
-                    ):
+    def setup_class(
+        self,
+        tmp_path,
+        simple_source,
+        simple_source_attributes,
+        simple_action_attributes,
+        path_steps,
+        path_experiments,
+    ):
         self.base_directory = tmp_path
         self.source_directory = simple_source
         self.subject_directory = self.base_directory
-        self.test_experiment_directory = self.subject_directory.joinpath(self.test_experiment_name)
+        self.test_experiment_directory = self.subject_directory.joinpath(
+            self.test_experiment_name
+        )
         self.test_raw_files_directory = self.test_experiment_directory.joinpath("files")
         self.test_raw_files_directory.mkdir(parents=True, exist_ok=True)
         self.steps_registry_path = path_steps
@@ -129,17 +148,21 @@ class TestSimpleFunctionPipeline:
         with ExperimentRegistry() as experiment_registry:
             experiment_registry.register(self.registered_experiment)
         # instantiate subject and experiment
-        test_subject = Subject(name=self.test_name,
-                               directory=self.base_directory,
-                               study=self.test_study,
-                               meta=self.test_meta,
-                               priority=self.base_priority,
-                               **self.test_extra)
-        test_subject.create_experiment(name=self.test_experiment_name,
-                                       keys=self.test_experiment_keys,
-                                       meta=self.test_experiment_meta,
-                                       priority=self.test_experiment_priority,
-                                       **self.test_experiment_extra)
+        test_subject = Subject(
+            name=self.test_name,
+            directory=self.base_directory,
+            study=self.test_study,
+            meta=self.test_meta,
+            priority=self.base_priority,
+            **self.test_extra,
+        )
+        test_subject.create_experiment(
+            name=self.test_experiment_name,
+            keys=self.test_experiment_keys,
+            meta=self.test_experiment_meta,
+            priority=self.test_experiment_priority,
+            **self.test_experiment_extra,
+        )
         experiment = test_subject.experiments.get(self.test_experiment_name)
         experiment.add_sources("files", self.source_directory)
 
@@ -149,5 +172,7 @@ class TestSimpleFunctionPipeline:
 
         # check
         assert experiment.status == Status.SUCCESS
-        check_file_tree(self.source_attributes, self.action_attributes, self, test_subject)
+        check_file_tree(
+            self.source_attributes, self.action_attributes, self, test_subject
+        )
         check_data(self.action_attributes, self, test_subject)
