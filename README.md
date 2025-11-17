@@ -1,1 +1,1 @@
-
+Used to organize my experiments into directory tree's with validation & a running log of executed code. Originally contained features for auto-running experimental analyses (e.g., running a pipeline on any newly acquired data nightly & updating existing visuals), but it's currently in a broken/incomplete as I never finished abstracting it out for external use. 
