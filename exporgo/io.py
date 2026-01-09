@@ -72,9 +72,9 @@ def select_directory(**kwargs) -> Path:
 
 @convert(parameter="source", permitted=(Folder,), required=Path)
 @convert(parameter="destination", permitted=(Folder,), required=Path)
-def verbose_copy(source: Folder,
-                 destination: Folder,
-                 feedback: Optional[str] = None) -> bool:
+def verbose_copy(
+    source: Folder, destination: Folder, feedback: Optional[str] = None
+) -> bool:
     """
     Copy a file from source to destination. If verbose is True, print feedback.
 
@@ -96,7 +96,9 @@ def verbose_copy(source: Folder,
     # file paths they run out of system RAM, so not exposing the joblib backend to allow threading as an alternative.
     # The list of the file paths is wrapped in tqdm to provide verbose feedback (progress bar).
 
-    def _copy(source_: Path, destination_: Path, file: Path) -> Path:  # pragma: no cover
+    def _copy(
+        source_: Path, destination_: Path, file: Path
+    ) -> Path:  # pragma: no cover
         """
         Copy a file from source to destination (single file function, parallelized). Should call the system fast-copy
         regardless of the OS.
@@ -114,9 +116,12 @@ def verbose_copy(source: Folder,
     files = [file for file in source.rglob("*") if file.is_file()]
     copier = partial(_copy, source, destination)
     message = f"Copying {feedback} files" if feedback else "Copying files"
-    return all(Parallel(n_jobs=-1, backend="threading")(delayed(copier)(file) for file in tqdm(files,
-                                                                                               total=len(files),
-                                                                                               desc=message)))
+    return all(
+        Parallel(n_jobs=-1, backend="threading")(
+            delayed(copier)(file)
+            for file in tqdm(files, total=len(files), desc=message)
+        )
+    )
 
 
 """

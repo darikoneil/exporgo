@@ -1,9 +1,15 @@
 import inspect
+import subprocess
 from contextlib import suppress
 from functools import update_wrapper, wraps
 from inspect import getsourcefile
+from os import getenv, getlogin
 from types import MappingProxyType
 from typing import Any, Callable, Generator, Iterable, Optional
+from xml.dom.minidom import parseString
+from xml.etree.ElementTree import Element, tostring
+
+from .types import File
 
 __all__ = [
     "parameterize",
@@ -12,6 +18,10 @@ __all__ = [
     "check_if_string_set",
     "convert",
     "serialize_function",
+    "pretty_xml",
+    "write_xml",
+    "get_full_windows_user",
+    "get_windows_user_security_identifier",
 ]
 
 """
@@ -58,13 +68,13 @@ def parameterize(decorator: Callable) -> Callable:
 
 
 @parameterize
-def convert(function: Callable,
-            parameter: str,
-            permitted: tuple,
-            required: Any,
-            converter: Optional[Callable] = None,
-            ) -> Callable:
-
+def convert(
+    function: Callable,
+    parameter: str,
+    permitted: tuple,
+    required: Any,
+    converter: Optional[Callable] = None,
+) -> Callable:
     @wraps(function)
     def decorator(*args, **kwargs) -> Callable:
         sig = inspect.signature(function)
@@ -74,7 +84,9 @@ def convert(function: Callable,
         if isinstance(param, permitted):
             bound_args.arguments = {**bound_args.kwargs, **bound_args.arguments}
             bound_args.arguments.pop("kwargs", None)
-            bound_args.arguments[parameter] = converter(param) if converter else required(param)
+            bound_args.arguments[parameter] = (
+                converter(param) if converter else required(param)
+            )
         else:
             raise TypeError(f"{parameter} must be of type {permitted}")
         return function(**bound_args.arguments)
@@ -128,17 +140,50 @@ def conditional_dispatch(func: Callable) -> Callable:
 
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         if not args:
-            raise TypeError(f'{funcname} requires at least '
-                            '1 positional argument')
+            raise TypeError(f"{funcname} requires at least 1 positional argument")
         return dispatch(*args, **kwargs)(*args, **kwargs)
 
-    funcname = getattr(func, '__name__', 'conditional_dispatch function')
+    funcname = getattr(func, "__name__", "conditional_dispatch function")
     registry[_always_true] = func
     wrapper.register = register
     wrapper.dispatch = dispatch
     wrapper.registry = MappingProxyType(registry)
     update_wrapper(wrapper, func)
     return wrapper
+
+
+"""
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// XML Tools
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+"""
+
+
+def pretty_xml(root: Element) -> str:
+    """
+    Pretty print an XML element
+
+    :param root: XML element
+
+    :return: pretty printed XML
+    """
+    xml_string = parseString(tostring(root)).toprettyxml(indent=" " * 2)
+    xml_string = xml_string.replace(
+        '<?xml version="1.0" ?>', "<?xml version='1.0' encoding='UTF-16'?>"
+    )
+    return xml_string
+
+
+def write_xml(file: File, root: Element) -> None:
+    """
+    Write an XML element to a file
+
+    :param file: File path
+
+    :param root: XML element
+    """
+    with open(file, "w", encoding="UTF-16") as file:
+        file.write(pretty_xml(root))
 
 
 """
@@ -167,8 +212,15 @@ def check_if_string_set(iterable: Iterable) -> set:
     Checks if an iterable is simply a string when constructing a set. This is useful for ensuring that we don't
     accidentally create a set of characters when we really wanted a set of strings.
     """
-    return {iterable, } if isinstance(iterable, str) else set(iterable) \
-        if iterable else set()
+    return (
+        {
+            iterable,
+        }
+        if isinstance(iterable, str)
+        else set(iterable)
+        if iterable
+        else set()
+    )
 
 
 def serialize_function(call: Callable) -> dict:
@@ -179,7 +231,27 @@ def serialize_function(call: Callable) -> dict:
 
     :return: serialized function
     """
-    return {
-        "name": call.__name__,
-        "file": getsourcefile(call)
-    }
+    return {"name": call.__name__, "file": getsourcefile(call)}
+
+
+def get_full_windows_user() -> str:
+    """
+    Get the full user
+
+    :return: full user
+    """
+    return getenv("userdomain") + "\\" + getenv("username")
+
+
+def get_windows_user_security_identifier() -> str:
+    """
+    Get the user security identifier  by opening up a command terminal and running the following command:
+    wmic useraccount where name='<username>' get sid
+
+    :return: user security identifier
+    """
+    command = f"wmic useraccount where name='{getlogin()}' get sid"
+    out = subprocess.Popen(command, stdout=subprocess.PIPE)
+    sid = out.communicate()[0].decode().replace("\r", "")
+    out.terminate()
+    return sid.split("\n")[1].strip()

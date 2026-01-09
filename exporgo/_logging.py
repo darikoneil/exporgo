@@ -49,7 +49,7 @@ class IPythonLogger:
         Checks log status
         """
 
-        self._IP.run_line_magic('logstate', '')
+        self._IP.run_line_magic("logstate", "")
 
     def pause(self) -> bool:
         """
@@ -60,12 +60,14 @@ class IPythonLogger:
         # with warnings.catch_warnings(): I don't think this is necessary anymore, but leaving here for now
         warnings.simplefilter("error")
         try:
-            self._IP.run_line_magic('logstop', '')
+            self._IP.run_line_magic("logstop", "")
         except AttributeError:
             pass  # technically not great, but sometimes we might end up calling this twice and if it's already
             # stopped, it will throw an error, and we don't ever care about that
         except UserWarning as e:  # pragma: no cover
-            print(e)  # because it's not my problem if ipython fails, so no coverage. not even sure how to test this
+            print(
+                e
+            )  # because it's not my problem if ipython fails, so no coverage. not even sure how to test this
             return False
         self._running = False
         return True
@@ -84,16 +86,18 @@ class IPythonLogger:
         :return: True if logging is started, False otherwise
         """
         self._IP = get_ipython()
-        _magic_arguments = '-o -r -t ' + str(self._log_file) + ' append'
+        _magic_arguments = "-o -r -t " + str(self._log_file) + " append"
         # with warnings.catch_warnings(): I don't think this is necessary anymore, but leaving here for now
         warnings.simplefilter("error")
         try:
-            self._IP.run_line_magic('logstart', _magic_arguments)
+            self._IP.run_line_magic("logstart", _magic_arguments)
         except AttributeError:
             pass  # technically not great, but sometimes we might end up calling this twice and if it's already
             # stopped, it will throw an error, and we don't ever care about that
         except UserWarning as e:  # pragma: no cover
-            print(e)  # because it's not my problem if ipython fails, so no coverage. not even sure how to test this
+            print(
+                e
+            )  # because it's not my problem if ipython fails, so no coverage. not even sure how to test this
             return False
         self._running = True
         return True

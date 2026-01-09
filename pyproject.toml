@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "exporgo"
-version = "0.2.0"
+version = "0.3.0"
 description = "Experiment organizer"
 readme = "README.md"
 requires-python = ">=3.10, <=4.0"
@@ -43,6 +43,9 @@ dependencies = [
     "pydantic",
     "tqdm",
 ]
+
+[project.scripts]
+exporgo = "exporgo.__main__:main"
 
 [project.urls]
 documentation = "https://github.com/darikoneil/exporgo"
@@ -103,6 +106,8 @@ all = [
 [tool.setuptools]
 packages = [
     "exporgo",
+    "exporgo.automation",
+    "exporgo.organization",
     "exporgo.registry",
     "exporgo.schemas",
     ]

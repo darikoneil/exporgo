@@ -1,24 +1,17 @@
+from dataclasses import dataclass
 from operator import eq
-from typing import Any
-from warnings import warn
 
-from .exceptions import ImmutableInstanceWarning, SingletonError
-
-"""
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Terminal Formatter
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-"""
+__all__ = ["TERMINAL_FORMATTER"]
 
 
+@dataclass(frozen=True)
 class _TerminalFormatter:
     """
-    A container class for exporgo's terminal printing color/font scheme
-
-    :raise :class:`SingletonError` if instance already exists
-
-    :raise :class:`ImmutableInstanceWarning` if attribute setting is attempted
+    A container class for exporgo's terminal printing color/font scheme. This class is immutable and should not be
+    modified. It is intended to be used as a singleton instance, and is not intended to be instantiated more than once.
+    I mean, you can, but it's not going to do anything for you. It's just going to be a waste of memory.
     """
+
     YELLOW: str = "\u001b[38;5;11m"
     GREEN: str = "\033[38;2;64;204;139m"
     ORANGE: str = "\033[38;2;253;174;97m"
@@ -27,17 +20,6 @@ class _TerminalFormatter:
     BOLD: str = "\u001b[1m"
     UNDERLINE: str = "\u001b[7m"
     RESET: str = "\033[0m"
-
-    def __new__(cls: "_TerminalFormatter") -> "_TerminalFormatter":
-        """
-        Force color scheme to exist as singleton
-        """
-        if not hasattr(cls, "instance"):
-            # noinspection PyTypeChecker
-            cls.instance = super(_TerminalFormatter, cls).__new__(cls)
-        else:
-            raise SingletonError(cls)
-        return cls.instance
 
     @property
     def emphasis(self) -> str:
@@ -60,17 +42,15 @@ class _TerminalFormatter:
 
     @property
     def announcement(self) -> str:
+        """
+        :Getter: Red font style for critical announcements
+        :Getter Type: :class:`str`
+        """
         return self.BOLD + self.RED + self.UNDERLINE
 
     @staticmethod
     def __name__() -> str:
         return "Terminal Formatter"
-
-    def __setattr__(self, key: Any, value: Any):
-        """
-        Prevent setting of attributes
-        """
-        warn(ImmutableInstanceWarning(self), stacklevel=2)
 
     def __repr__(self):
         return "Terminal Formatter"

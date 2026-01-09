@@ -11,18 +11,22 @@ from portalocker.constants import LOCK_EX
 from portalocker.exceptions import BaseLockException
 from pydantic import BaseModel, field_serializer, field_validator
 
-from ._color import TERMINAL_FORMATTER
-from .exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
+from exporgo._color import TERMINAL_FORMATTER
+from exporgo.exceptions import AnalysisNotRegisteredError, DuplicateRegistrationError
+
 # noinspection PyProtectedMember
-from .tools import serialize_function
-from .validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
-                         validate_method_with_pydantic)
+from exporgo.tools import serialize_function
+from exporgo.validators import (
+    MODEL_CONFIG,
+    validate_dumping_with_pydantic,
+    validate_method_with_pydantic,
+)
 
 if TYPE_CHECKING:
     from .subject import Subject
 
-from .io import import_function_from_file
-from .types import Action, Category, CollectionType, File, Status
+from ..io import import_function_from_file
+from ..types import Action, Category, CollectionType, File, Status
 
 """
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -88,13 +92,14 @@ class ValidStep(BaseModel):
 
 
 class Step:
-
-    def __init__(self,
-                 key: str,
-                 call: Action,
-                 file_sets: str | list[str] | tuple[str, ...],
-                 category: Category,
-                 status: Status = Status.SOURCE):
+    def __init__(
+        self,
+        key: str,
+        call: Action,
+        file_sets: str | list[str] | tuple[str, ...],
+        category: Category,
+        status: Status = Status.SOURCE,
+    ):
         self._key = key
         self._call = call
         self._file_sets = file_sets
@@ -104,6 +109,7 @@ class Step:
     @property
     def call(self) -> str | Path | Callable:
         return self._call
+
     # TODO: Implement file-based (scripts, jupyter notebooks, etc.) calls, make this just descriptive?
 
     @property
@@ -124,13 +130,14 @@ class Step:
 
     @classmethod
     @validate_method_with_pydantic(ValidStep)
-    def __deserialize__(cls,
-                        key: str,
-                        call: str | Path | Callable,
-                        file_sets: str | list[str] | tuple[str, ...],
-                        category: Category,
-                        status: Status
-                        ) -> "Step":
+    def __deserialize__(
+        cls,
+        key: str,
+        call: str | Path | Callable,
+        file_sets: str | list[str] | tuple[str, ...],
+        category: Category,
+        status: Status,
+    ) -> "Step":
         return Step(key, call, file_sets, category, status)
 
     @classmethod
@@ -161,7 +168,7 @@ class Step:
         return not self.__eq__(other)
 
     def __hash__(self):
-        return hash(self.__repr__())    # pragma: no cover  # noqa: ANN201
+        return hash(self.__repr__())  # pragma: no cover  # noqa: ANN201
 
 
 """
@@ -226,8 +233,11 @@ class StepRegistry:
     """
     Registry for storing analysis configurations
     """
+
     __registry = {}
-    __path = Path(__file__).parent.joinpath("registry").joinpath("registered_steps.json")
+    __path = (
+        Path(__file__).parent.joinpath("registry").joinpath("registered_steps.json")
+    )
     __new_registration = False
 
     @classmethod
@@ -241,17 +251,27 @@ class StepRegistry:
                 file.write("{\n")
                 for idx, key_step in enumerate(cls.__registry.items()):
                     key, step = key_step
-                    str_step = indent(json.dumps(key)
-                                      + f": {step.model_dump_json(exclude_defaults=True, indent=4)}",
-                                      " " * 4)
-                    str_step = f"{str_step},\n" if idx != len(cls.__registry) - 1 else f"{str_step}\n"
+                    str_step = indent(
+                        json.dumps(key)
+                        + f": {step.model_dump_json(exclude_defaults=True, indent=4)}",
+                        " " * 4,
+                    )
+                    str_step = (
+                        f"{str_step},\n"
+                        if idx != len(cls.__registry) - 1
+                        else f"{str_step}\n"
+                    )
                     file.write(str_step)
                 file.write("}\n")
         except FileNotFoundError:
             cls.__path.touch(exist_ok=False)
             cls._save_registry()
         except (IOError, BaseLockException) as exc:
-            print(TERMINAL_FORMATTER(f"\nError saving registry: {exc}\n\n", "announcement"))
+            print(
+                TERMINAL_FORMATTER(
+                    f"\nError saving registry: {exc}\n\n", "announcement"
+                )
+            )
 
     @classmethod
     def has(cls, key: str) -> bool:
@@ -317,28 +337,39 @@ class StepRegistry:
     @register.register
     @classmethod
     def _(cls, step: Step) -> None:
-        cls.register(RegisteredStep(**{
-            "key": step.key,
-            "call": step.call,
-            "file_sets": step.file_sets,
-            "category": step.category,
-        }))
+        cls.register(
+            RegisteredStep(
+                **{
+                    "key": step.key,
+                    "call": step.call,
+                    "file_sets": step.file_sets,
+                    "category": step.category,
+                }
+            )
+        )
 
     # noinspection DuplicatedCode
     @classmethod
     def _load_registry(cls) -> None:
         # noinspection DuplicatedCode
         """
-                Load the registry from a JSON file
-                """
+        Load the registry from a JSON file
+        """
         try:
             with Lock(cls.__path, "r", timeout=10) as file:
-                cls.__registry = {key: RegisteredStep.model_validate(config) for key, config in json.load(file).items()}
+                cls.__registry = {
+                    key: RegisteredStep.model_validate(config)
+                    for key, config in json.load(file).items()
+                }
         except FileNotFoundError:
             cls.__path.touch(exist_ok=False)
             cls._save_registry()
         except (IOError, json.JSONDecodeError) as exc:
-            print(TERMINAL_FORMATTER(f"\nError loading registry: {exc}\n\n", "announcement"))
+            print(
+                TERMINAL_FORMATTER(
+                    f"\nError loading registry: {exc}\n\n", "announcement"
+                )
+            )
 
     @classmethod
     def __enter__(cls) -> "StepRegistry":

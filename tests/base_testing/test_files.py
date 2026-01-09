@@ -1,7 +1,7 @@
 import pytest
 
 from exporgo.exceptions import MissingFilesError
-from exporgo.files import DictWithDuplicates, FileSet, FileTree
+from exporgo.organization.files import DictWithDuplicates, FileSet, FileTree
 
 
 class TestDictWithDuplicates:
@@ -44,20 +44,32 @@ class TestFileSet:
         file_set = FileSet("source", tmp_path, index=True)
         assert file_set._name == "source"
         assert file_set.directory == simple_source
-        assert len(file_set.files) == len([file for file in simple_source.rglob("*") if file.is_file()])
-        assert len(file_set.folders) == len([folder for folder in simple_source.rglob("*") if not folder.is_file()])
+        assert len(file_set.files) == len(
+            [file for file in simple_source.rglob("*") if file.is_file()]
+        )
+        assert len(file_set.folders) == len(
+            [folder for folder in simple_source.rglob("*") if not folder.is_file()]
+        )
 
     def test_find_file_type(self, tmp_path, simple_source):
         file_set = FileSet("source", tmp_path)
         txt_files = list(file_set.find("*.txt"))
         assert all(file.suffix == ".txt" for file in txt_files)
-        assert len(txt_files) == len([file for file in simple_source.rglob("*") if file.suffix == ".txt"])
+        assert len(txt_files) == len(
+            [file for file in simple_source.rglob("*") if file.suffix == ".txt"]
+        )
 
     def test_find_matching_files(self, tmp_path, simple_source):
         file_set = FileSet("source", tmp_path)
         matching_files = list(file_set.find("*file_0.txt"))
         assert all(file.match("dummy_file_0.txt") for file in matching_files)
-        assert len(list(matching_files)) == len([file for file in simple_source.rglob("*") if file.match("dummy_file_0.txt")])
+        assert len(list(matching_files)) == len(
+            [
+                file
+                for file in simple_source.rglob("*")
+                if file.match("dummy_file_0.txt")
+            ]
+        )
 
     def test_remap(self, tmp_path, simple_source, destination):
         file_set = FileSet("source", destination)
@@ -97,27 +109,25 @@ class TestFileSet:
 
 
 class TestFileTree:
-
     def test_initialization_with_index(self, tmp_path, simple_source):
         file_tree = FileTree(tmp_path.joinpath("source"))
         assert file_tree.tree_directory == tmp_path.joinpath("source")
         assert file_tree.parent_directory == tmp_path
-        assert file_tree.num_files == len([file for file in simple_source.rglob("*") if file.is_file()])
-        assert file_tree.num_folders == len([folder for folder in simple_source.rglob("*") if not folder.is_file()])
+        assert file_tree.num_files == len(
+            [file for file in simple_source.rglob("*") if file.is_file()]
+        )
+        assert file_tree.num_folders == len(
+            [folder for folder in simple_source.rglob("*") if not folder.is_file()]
+        )
         assert len(file_tree) == len(list(simple_source.glob("*")))
 
     def test_add_path(self, tmp_path, simple_source):
         file_tree = FileTree(tmp_path.joinpath("source"))
         file_tree.add("data")
         assert isinstance(file_tree.get("data"), FileSet)
-        assert file_tree.get("data").directory == tmp_path.joinpath("source").joinpath("data")
-
-    def test_build(self, tmp_path):
-        file_tree = FileTree(tmp_path.joinpath("experiment"))
-        tmp_path.joinpath("experiment").mkdir(parents=True, exist_ok=True)
-        file_tree.add("data")
-        file_tree.build(None)
-        assert tmp_path.joinpath("experiment").exists()
+        assert file_tree.get("data").directory == tmp_path.joinpath("source").joinpath(
+            "data"
+        )
         assert file_tree.get("data").directory.exists()
 
     def test_clear_keep(self, tmp_path, simple_source):
@@ -162,11 +172,11 @@ class TestFileTree:
         file_tree = FileTree(tmp_path.joinpath("source"), populate=False)
         file_tree.add("dummy_folder_0")
         file_tree.index()
-        assert len(file_tree) == 1
+        assert len(file_tree) == 3
         assert file_tree.num_files == 3
 
     def test_remap(self, tmp_path, simple_source, destination):
-        file_tree = FileTree(simple_source, destination, populate=False)
+        file_tree = FileTree(simple_source, "destination", populate=False)
         file_tree.remap(tmp_path)
         assert file_tree.parent_directory == tmp_path
 

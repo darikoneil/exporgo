@@ -3,18 +3,24 @@ from pathlib import Path
 from typing import Any, Optional
 
 import yaml
+import json
 from pydantic import BaseModel, field_serializer, field_validator
 
-from . import __current_version__
-from ._color import TERMINAL_FORMATTER
-from ._logging import IPythonLogger, ModificationLogger, get_timestamp
-from .exceptions import DuplicateExperimentError, MissingFilesError
+from .. import FileFormat
+from .._color import TERMINAL_FORMATTER
+from .._logging import IPythonLogger, ModificationLogger, get_timestamp
+from .._version import __current_version__
+from ..exceptions import DuplicateExperimentError, MissingFilesError
+from ..io import select_directory, select_file
+from ..tools import convert
+from ..types import CollectionType, File, Folder, Modification, Priority, Status
+from ..validators import (
+    MODEL_CONFIG,
+    validate_dumping_with_pydantic,
+    validate_method_with_pydantic,
+    validate_version,
+)
 from .experiment import Experiment, ExperimentFactory
-from .io import select_directory, select_file
-from .tools import convert
-from .types import CollectionType, File, Folder, Modification, Priority, Status
-from .validators import (MODEL_CONFIG, validate_dumping_with_pydantic,
-                         validate_method_with_pydantic, validate_version)
 
 __all__ = [
     "Subject",
@@ -33,6 +39,7 @@ class ValidSubject(BaseModel):
     """
     Pydantic model for validating serialization/deserialization of a Subject object.
     """
+
     #: The name or identifier of the subject.
     name: str
     #: The directory where the subject's data is stored.
@@ -79,9 +86,13 @@ class ValidSubject(BaseModel):
         :param v: The experiments dictionary to be serialized.
 
         :return: The serialized dictionary of experiments
-                """
-        return {name: experiment.__serialize__(experiment) if experiment is not None else None
-                for name, experiment in v.items()}
+        """
+        return {
+            name: experiment.__serialize__(experiment)
+            if experiment is not None
+            else None
+            for name, experiment in v.items()
+        }
 
     @field_serializer("priority")
     @classmethod
@@ -121,8 +132,12 @@ class ValidSubject(BaseModel):
             if any(isinstance(value, Experiment) for value in v.values()):
                 return v
             elif any(isinstance(value, dict) for value in v.values()):
-                return {key: Experiment.__deserialize__(**value) if value is not None else None
-                        for key, value in v.items()}
+                return {
+                    key: Experiment.__deserialize__(**value)
+                    if value is not None
+                    else None
+                    for key, value in v.items()
+                }
             elif all((value is None for value in v.values())):
                 return v
         return v
@@ -202,25 +217,29 @@ class Subject:
     :type kwargs: :class:`Any <typing.Any>`
     """
 
-    @convert(parameter="priority",
-             permitted=(int, Priority),
-             required=Priority)
-    def __init__(self,
-                 name: str,
-                 directory: Optional[Folder] = None,
-                 study: Optional[str] = None,
-                 meta: Optional[dict] = None,
-                 priority: int | Priority = Priority.NORMAL,
-                 **kwargs):
-
+    @convert(parameter="priority", permitted=(int, Priority), required=Priority)
+    def __init__(
+        self,
+        name: str,
+        directory: Optional[Folder] = None,
+        study: Optional[str] = None,
+        meta: Optional[dict] = None,
+        priority: int | Priority = Priority.NORMAL,
+        **kwargs,
+    ):
         # first to capture all modifications at creation
         self._modifications = ModificationLogger()
 
         #: :class:`str`\: The name or identifier of the subject.
         self.name = name
 
-        directory = Path(directory) if directory \
-            else select_directory(title="Select folder to contain subject's organized data")
+        directory = (
+            Path(directory)
+            if directory
+            else select_directory(
+                title="Select folder to contain subject's organized data"
+            )
+        )
         if name not in directory.name:
             directory = directory.joinpath(name)
         #: :class:`Path <pathlib.Path>`\: The directory where the subject's data is stored.
@@ -257,6 +276,9 @@ class Subject:
         #: :class:`str`\: The version of the subject.
         self._version = __current_version__
 
+        self._file_format = FileFormat.YAML
+
+
     def __str__(self) -> str:
         """
         Returns a string representation of the Subject object.
@@ -286,7 +308,7 @@ class Subject:
                 string_to_print += f"{value}\n"
 
         string_to_print += TERMINAL_FORMATTER("Experiments:\n", "emphasis")
-        if len(self.contains) == 0:
+        if len(tuple(self.experiments.keys())) == 0:
             string_to_print += "\tNo experiments defined\n"
         else:
             for experiment in self.experiments.values():
@@ -306,10 +328,22 @@ class Subject:
         self.logger.end()
 
         with open(self.file, "w") as file:
-            yaml.safe_dump(self.__serialize__(self),
-                           file,
-                           default_flow_style=False,
-                           sort_keys=False)
+            if self._file_format == FileFormat.YAML:
+                yaml.safe_dump(
+                    self.__serialize__(self),
+                    file,
+                    default_flow_style=False,
+                    sort_keys=False,
+                )
+            elif self._file_format == FileFormat.JSON:
+                # noinspection PyTypeChecker
+                json.dump(
+                    self.__serialize__(self),
+                    file,
+                    indent=4,
+                    sort_keys=False,
+                )
+
 
         self.logger.start()
         # TODO: FileFormats option
@@ -325,17 +359,6 @@ class Subject:
         return self._created
 
     @property
-    def contains(self) -> tuple[str, ...]:
-        """
-        The names of the experiments associated with the subject.
-
-
-        :Return type: :class:`tuple` [:class:`str`\, ...]
-        :meta read-only-properties:
-        """
-        return tuple(self.experiments.keys())
-
-    @property
     def file(self) -> Path:
         """
         The path to the subject's organization file.
@@ -344,7 +367,7 @@ class Subject:
 
         :meta read-only-properties:
         """
-        return self.directory.joinpath("organization.yaml")
+        return self.directory.joinpath(f"organization.{self._file_format.name.lower()}")
 
     @property
     def last_modified(self) -> str:
@@ -374,8 +397,11 @@ class Subject:
         :Return type: :class:`Status <exporgo.types.Status>`
         :meta read-only-properties:
         """
-        return min([experiment.status for experiment in self.experiments.values()])\
-            if self.experiments else Status.EMPTY
+        return (
+            min([experiment.status for experiment in self.experiments.values()])
+            if self.experiments
+            else Status.EMPTY
+        )
 
     @property
     def version(self) -> str:
@@ -407,27 +433,37 @@ class Subject:
         """
         file = file if file else select_file(title="Select organization file")
         if not file.is_file():
-            file = file.joinpath("organization.yaml")
-        with open(file, "r") as file:
-            _dict = yaml.safe_load(file)
+            file = file.joinpath("organization.suffix")
+            for suffix in FileFormat:
+                file_ = file.with_suffix(suffix.name.lower())
+                if file_.exists():
+                    break
+        with open(file, "r") as opened_file:
+            if file.suffix == ".yaml":
+                _dict = yaml.safe_load(opened_file)
+            elif file.suffix == ".json":
+                _dict = json.load(opened_file)
+            elif file.suffix == ".toml":
+                raise NotImplementedError
         return cls.__deserialize__(_dict)
 
     # noinspection PyUnusedLocal
     @classmethod
     @validate_method_with_pydantic(ValidSubject)
-    def __deserialize__(cls,
-                        name: str,
-                        status: Status,
-                        priority: Priority,
-                        created: str,
-                        last_modified: str,
-                        directory: Path,
-                        study: Optional[str],
-                        meta: dict,
-                        experiments: dict,
-                        modifications: list,
-                        version: str,
-                        ) -> "Subject":
+    def __deserialize__(
+        cls,
+        name: str,
+        status: Status,
+        priority: Priority,
+        created: str,
+        last_modified: str,
+        directory: Path,
+        study: Optional[str],
+        meta: dict,
+        experiments: dict,
+        modifications: list,
+        version: str,
+    ) -> "Subject":
         """
         Deserializes the subject from a dictionary representation. The keys of the dictionary are sent to this method
         as a parameter, and the method returns a Subject object. The deserialization process is validated using the
@@ -482,12 +518,14 @@ class Subject:
         # noinspection PyTypeChecker
         return dict(self)
 
-    def create_experiment(self,
-                          name: str,
-                          keys: str | CollectionType,
-                          priority: Optional[Priority] = None,
-                          meta: Optional[dict] = None,
-                          **kwargs) -> None:
+    def create_experiment(
+        self,
+        name: str,
+        keys: str | CollectionType,
+        priority: Optional[Priority] = None,
+        meta: Optional[dict] = None,
+        **kwargs,
+    ) -> None:
         """
         Creates an experiment associated with the subject.
 
@@ -505,10 +543,12 @@ class Subject:
         :type kwargs: :class:`Any <typing.Any>`
 
         """
-        if name in self.contains:
+        if name in tuple(self.experiments.keys()):
             raise DuplicateExperimentError(name)
         priority = priority if priority else self.priority
-        with ExperimentFactory(name, self.directory, priority, meta, **kwargs) as factory:
+        with ExperimentFactory(
+            name, self.directory, priority, meta, **kwargs
+        ) as factory:
             self.experiments[name] = factory.create(keys)
 
         self.record(name)
@@ -524,8 +564,8 @@ class Subject:
 
     def index(self) -> None:
         """
-         Indexes all experiments associated with the subject.
-         """
+        Indexes all experiments associated with the subject.
+        """
         for experiment in self.experiments.values():
             experiment.index()
 
@@ -561,17 +601,19 @@ class Subject:
 
         :returns: A string representation of the subject.
         """
-        return "".join([
-            f"{self.__class__.__name__}"
-            f"({self.name=}, "
-            f"{self.directory=}, "
-            f"{self.study=}, "
-            f"{self.meta=}): "
-            f"{self.contains=}, "
-            f"{self.exporgo_file=}, "
-            f"{self.modifications=}, "
-            f"{self._created=}"
-        ])
+        return "".join(
+            [
+                f"{self.__class__.__name__}"
+                f"({self.name=}, "
+                f"{self.directory=}, "
+                f"{self.study=}, "
+                f"{self.meta=}): "
+                f"{tuple(self.experiments.keys())}, "
+                f"{self.exporgo_file=}, "
+                f"{self.modifications=}, "
+                f"{self._created=}"
+            ]
+        )
 
     def __call__(self, name: str) -> Any:
         """
@@ -591,7 +633,7 @@ class Subject:
 
         :returns: The attribute or experiment.
         """
-        if item in self.contains:
+        if item in tuple(self.experiments.keys()):
             return self.experiments.get(item)
         else:
             return super().__getattribute__(item)

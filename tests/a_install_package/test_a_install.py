@@ -35,7 +35,13 @@ def collect_project():
     project_file = retrieve_project_file()
     project_directory = retrieve_project_directory(project_file)
     package_name, package_version, package_dependencies = retrieve_details(project_file)
-    return project_directory, project_file, package_name, package_version, package_dependencies
+    return (
+        project_directory,
+        project_file,
+        package_name,
+        package_version,
+        package_dependencies,
+    )
 
 
 # get project information and work from correct directory
@@ -43,7 +49,10 @@ proj_dir, proj_file, pkg_name, pkg_version, pkg_dependencies = collect_project()
 os.chdir(proj_dir)
 
 
-print(TERMINAL_FORMATTER("\nPackage: ", "emphasis") + TERMINAL_FORMATTER(f"{pkg_name}", "type"))
+print(
+    TERMINAL_FORMATTER("\nPackage: ", "emphasis")
+    + TERMINAL_FORMATTER(f"{pkg_name}", "type")
+)
 print(TERMINAL_FORMATTER(f"Version: ", "emphasis") + f"{pkg_version}")
 print(TERMINAL_FORMATTER(f"Dependencies: ", "emphasis") + f"{pkg_dependencies}")
 
