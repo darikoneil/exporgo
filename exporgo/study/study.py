@@ -10,9 +10,10 @@ import tomllib
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self
-
+from typing import Any, Self
+from exporgo.datastore.spec import StoreSpec
 import tomli_w
+from exporgo.datastore.store import Store
 
 from exporgo.study.identity import (
     Identity,
@@ -21,10 +22,6 @@ from exporgo.study.identity import (
     IdentityValue,
 )
 from exporgo.study.resources import Resource
-
-if TYPE_CHECKING:
-    from exporgo.datastore.spec import StoreSpec
-    from exporgo.datastore.store import Store
 
 __all__ = ["Study", "ValidationReport"]
 
@@ -156,8 +153,6 @@ class Study:
         Returns:
             The created :class:`~exporgo.datastore.spec.StoreSpec`.
         """
-        from exporgo.datastore.spec import StoreSpec
-
         keys = (
             tuple(partition_keys) if partition_keys is not None else self.identity.names
         )
@@ -176,8 +171,6 @@ class Study:
         Raises:
             KeyError: If no store with that name has been declared.
         """
-        from exporgo.datastore.store import Store
-
         try:
             spec = self._stores[name]
         except KeyError:
