@@ -26,6 +26,11 @@ Successor to the original `exporgo`, rebuilt as layers:
 | **organization** | `exporgo[monitor]` | `pydantic` | Study → subjects → paths model + file-existence self-validation. *(future)* |
 | **monitoring / manifest** | `exporgo[monitor]` | `pydantic` | Progress *derived* from filesystem (outputs exist & fresh), rendered into an agent-readable map. *(future)* |
 
+> **Update (2026-08-24):** the "organization" row above has since been split into two
+> built layers — **`exporgo[study]`** (the Study & Identity model) and
+> **`exporgo[datastore]`** (polars/Parquet component stores). Monitoring remains planned.
+> See `2026-08-23-study-identity-design.md` and `2026-08-23-datastore-design.md`.
+
 **Guiding principle:** exporgo *describes, validates, and reports* — it never executes
 the analysis. Orchestration is delegated to project code or an LLM agent that reads the
 validated map and acts. Progress is **derived** from the filesystem (declared outputs'

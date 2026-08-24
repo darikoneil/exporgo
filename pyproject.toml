@@ -24,17 +24,28 @@ classifiers = [
 # Base dependencies (logging framework only; keep this minimal).
 dependencies = [
     "loguru",
+    "polars>=1.44.0",
 ]
 
 [project.urls]
 documentation = "https://github.com/darikoneil/exporgo"
 repository = "https://github.com/darikoneil/exporgo"
 
-# Optional runtime extras. `monitor` powers the study/organization + monitoring
-# layer (added in a later step); declared here to document the intended split.
+# Optional runtime extras — layered. `study` is the shared foundation (the Study &
+# Identity model); `monitor` and `datastore` build on it. Base install stays loguru-only.
 [project.optional-dependencies]
-monitor = [
+study = [
     "pydantic",
+    "tomli-w",  # writing study.toml (stdlib tomllib reads only)
+]
+monitor = [
+    "exporgo[study]",
+]
+datastore = [
+    "exporgo[study]",
+    "numpy",
+    "polars[numpy,pyarrow]",
+    "pyarrow==24.0.0",
 ]
 docs = [
     "sphinx",
@@ -67,10 +78,9 @@ dev = [
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = [
-    "exporgo",
-]
+[tool.setuptools.packages.find]
+include = ["exporgo*"]
+namespaces = false
 
 
 #///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -85,6 +95,7 @@ addopts = [
     "-vv",
     "-p no:cacheprovider",
     "--diff-width=88",
+    "--basetemp=.pytest_tmp",  # project-local tmp; avoids the broken %TEMP%/pytest-of-<user>
 ]
 testpaths = ["tests"]
 console_output_style = "progress"

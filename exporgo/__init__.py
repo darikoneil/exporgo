@@ -3,13 +3,16 @@
 The successor to the original ``exporgo``. This version is layered:
 
 - **logging** (base install): a reusable :mod:`loguru`-based logging framework.
-- **organization / monitoring** (``exporgo[monitor]``): a study/subject model,
-  file-existence self-validation, and derived progress tracking rendered into an
-  agent-readable map (added in later steps).
+- **study** (``exporgo[study]``): the Study & Identity model — a study's identity
+  coordinate system (1-3 keys, default ``Subject``), the resources it expects at each
+  identity, and file-existence self-validation.
+- **datastore** (``exporgo[datastore]``): fast, schema-enforced polars/Parquet
+  component stores for a study's bulk data, Hive-partitioned on the identity keys.
+- **monitoring** (``exporgo[monitor]``): progress *derived* from the filesystem,
+  rendered into an agent-readable map (planned).
 
-Only the logging layer is present so far. Logging is disabled on import so that using
-``exporgo`` (or a project built on it) as a library emits nothing until
-:func:`exporgo.log.init_logger` is called.
+Logging is disabled on import so that using ``exporgo`` (or a project built on it) as a
+library emits nothing until :func:`exporgo.log.init_logger` is called.
 """
 
 from loguru import logger

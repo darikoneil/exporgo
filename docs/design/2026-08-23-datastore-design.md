@@ -63,11 +63,15 @@ index:
 
 ```
 study_root/
-  catalog.json                       # registry: stores, schemas, keys, sort col, versions
-  behavior/  group=cms/subject=m10/session=1/part-*.parquet
-  neural/    subject=m10/session=1/part-*.parquet
-  licking/   subject=m10/session=1/part-*.parquet
+  study.toml                         # study declaration: identity keys, resources, store specs (keys, sort col)
+  behavior/  _schema.parquet  _manifest.json  group=cms/subject=m10/session=1/part-*.parquet
+  neural/    _schema.parquet  _manifest.json  subject=m10/session=1/part-*.parquet
+  licking/   _schema.parquet  _manifest.json  subject=m10/session=1/part-*.parquet
 ```
+
+*(As built: each store's schema is persisted losslessly as a 0-row `_schema.parquet`
+anchor and its fragment inventory in `_manifest.json`; the study-level catalog is
+`study.toml`, not a separate `catalog.json`.)*
 
 Retrieval is **one lazy polars query**, no manual iteration:
 
@@ -121,10 +125,38 @@ many-dimensional ad-hoc analytics ever demand it.)
 
 ## Packaging & dependencies
 
-An opt-in extra, e.g. `exporgo[datastore]`, pulling **polars + pyarrow** (and **pydantic**
-for the store/identity specs, shared with the `monitor` extra). The **base install stays
-loguru-only**. Domain libraries (pynapple, suite2p, regions, …) stay out of the store
-layer entirely — the engine is generic; schemas are supplied by the study.
+An opt-in extra, `exporgo[datastore]`, pulling **polars, pyarrow, numpy** (and **pydantic**
+via `exporgo[study]`). The **base install** is loguru + polars (polars was promoted to base).
+Domain libraries (pynapple, suite2p, regions, …) stay out of the store layer entirely — the
+engine is generic; schemas are supplied by the study.
+
+**Append uses pyarrow (not polars-native).** polars' `write_parquet(partition_by=...)` writes
+one fixed-named file per partition and **clobbers** on re-write (proven: two writes to the
+same partition lose the first), so it cannot append. `Store.write` uses
+`pyarrow.dataset.write_dataset(existing_data_behavior="overwrite_or_ignore")` with a unique
+per-write `basename_template` — an **out-of-core append** (unique fragment per write, never
+reads existing data). `Store.scan` stays native polars (`scan_parquet(hive_partitioning=True)`).
+**pyarrow is pinned `==24.0.0`:** 25.0.1's `_compute.pyd` is blocked by Windows Smart App
+Control on the dev machine (logged in Event Viewer → CodeIntegrity, not Defender Protection
+History); 24.0.0 is trusted and loads.
+
+**Build status (2026-08-23):** MVP built & verified (TDD, 28 datastore tests) — `StoreSpec`,
+`Store` (schema-enforced `write` with **append / overwrite-by-key** + pruning `scan` +
+**per-store manifest**), and `study.declare_store()` / `study.store()` with catalog
+persistence. The **manifest** (`<store>/_manifest.json`) records each written fragment
+(path, partition, rows, timestamp) and exposes `partitions()` / `row_count()` — O(1)
+"what's in here" without scanning the data. **Overwrite-by-key** (`write(frame,
+mode="overwrite")`) uses the manifest to delete the incoming partitions' fragments (files +
+entries) before writing, replacing only those partitions.
+
+**Schema = real polars dtypes (no whitelist).** `StoreSpec.columns` maps names to actual
+polars dtypes at full fidelity — exact int/float widths (`UInt16`, `Float32`), `List`/
+`Array`/`Struct`, temporal, etc. — so **array/list columns work** (e.g. neural activity as
+`pl.List(pl.Float64)`, verified end-to-end). Nested dtypes are rejected as partition/sort
+keys. The schema is persisted **losslessly** as a 0-row `_schema.parquet` anchor per store
+(Parquet is the serializer — no dtype string-parsing/`eval`); `study.toml` holds only each
+store's name/partition-keys/sort-column. Data fragments are globbed as `part-*.parquet` so
+the anchor/manifest don't interfere with scans. Deferred: schema versioning/migration.
 
 ## Sequencing
 
@@ -132,6 +164,11 @@ The datastore partitions on the **shared identity vocabulary**, which is monitor
 define. So the **identity model is the foundation of both layers** and should be designed
 first (or as the first slice of the monitoring layer). The datastore is not buildable in
 isolation — its keys come from there.
+
+**Update:** that foundation is now designed — see
+`docs/design/2026-08-23-study-identity-design.md` (the Study & Identity model). A store's
+partition keys default to the study's identity keys, and `Identity.as_path()` is the
+partition path.
 
 ## What to keep from spk / what to fix
 
