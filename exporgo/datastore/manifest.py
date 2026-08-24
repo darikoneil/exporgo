@@ -5,8 +5,6 @@ partitions, which fragment files, how many rows) without scanning the Parquet da
 is the basis for fast existence checks and, later, overwrite-by-key and schema versioning.
 """
 
-from __future__ import annotations
-
 from pydantic import BaseModel, Field
 
 __all__ = ["FragmentEntry", "Manifest"]

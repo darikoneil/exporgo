@@ -6,9 +6,9 @@ and datastore layers both build on this: identity keys become datastore partitio
 keys, and the study's validation seeds monitoring's derived status.
 """
 
-from .identity import Identity, IdentityKey, IdentitySchema
-from .resources import Resource
-from .study import Study, ValidationReport
+from exporgo.study.identity import Identity, IdentityKey, IdentitySchema
+from exporgo.study.resources import Resource
+from exporgo.study.study import Study, ValidationReport
 
 __all__ = [
     "Identity",

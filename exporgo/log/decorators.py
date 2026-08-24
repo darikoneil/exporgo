@@ -7,20 +7,15 @@ for pipeline-level entry points. Both use ``logger.opt(depth=1)`` and
 function's metadata is preserved.
 """
 
-from __future__ import annotations
-
+from collections.abc import Callable
 from functools import wraps
 from time import time
-from typing import TYPE_CHECKING
+from typing import Any
 
 from loguru import logger
 
-from .levels import LogLevel
-from .rendering import _LOG_ELEMENT_LIMIT, render_object
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-    from typing import Any
+from exporgo.log.levels import LogLevel
+from exporgo.log.rendering import _LOG_ELEMENT_LIMIT, render_object
 
 __all__ = ["log_class", "log_function_call", "log_major_function_call"]
 

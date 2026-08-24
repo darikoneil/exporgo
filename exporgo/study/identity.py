@@ -6,15 +6,11 @@ that system is an :class:`Identity` (e.g. ``Subject="m01", Session=1``), which t
 datastore uses as its partition path and the monitoring layer tracks.
 """
 
-from __future__ import annotations
-
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 __all__ = ["Identity", "IdentityKey", "IdentitySchema"]
 
@@ -73,7 +69,7 @@ class IdentitySchema(BaseModel):
         return normalized
 
     @model_validator(mode="after")
-    def _validate_bounds_and_uniqueness(self) -> IdentitySchema:
+    def _validate_bounds_and_uniqueness(self) -> Self:
         """Enforce the 1-3 key bound and unique key names."""
         count = len(self.keys)
         if not _MIN_KEYS <= count <= _MAX_KEYS:
@@ -86,7 +82,7 @@ class IdentitySchema(BaseModel):
         return self
 
     @classmethod
-    def default(cls) -> IdentitySchema:
+    def default(cls) -> Self:
         """Return the default single-key schema (``["Subject"]``)."""
         return cls(keys=(IdentityKey(name="Subject"),))
 
@@ -99,7 +95,7 @@ class IdentitySchema(BaseModel):
         """The number of identity keys."""
         return len(self.keys)
 
-    def identity(self, **values: IdentityValue) -> Identity:
+    def identity(self, **values: IdentityValue) -> "Identity":
         """Build a validated :class:`Identity` over this schema.
 
         Requires exactly the schema's keys, coercing each value to its key's dtype.

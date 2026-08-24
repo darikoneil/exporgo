@@ -6,17 +6,13 @@ of them). Combined with an :class:`~exporgo.study.identity.Identity` and a study
 it resolves to a concrete path -- which the study then checks for existence.
 """
 
-from __future__ import annotations
-
+from pathlib import Path
 from string import Formatter
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
-    from .identity import Identity
+from exporgo.study.identity import Identity
 
 __all__ = ["Resource"]
 

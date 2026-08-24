@@ -12,9 +12,13 @@ Example:
     ...     return left + right
 """
 
-from .decorators import log_class, log_function_call, log_major_function_call
-from .levels import LogLevel
-from .sinks import init_logger, reset_tqdm
+from exporgo.log.decorators import (
+    log_class,
+    log_function_call,
+    log_major_function_call,
+)
+from exporgo.log.levels import LogLevel
+from exporgo.log.sinks import init_logger, reset_tqdm
 
 __all__ = [
     "LogLevel",

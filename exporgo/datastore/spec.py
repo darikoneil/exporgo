@@ -1,8 +1,6 @@
 """Store specifications: a datastore component's declared schema, keys, sort order."""
 
-from __future__ import annotations
-
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Self
 
 import polars as pl
 from pydantic import BaseModel, ConfigDict, model_validator
@@ -36,7 +34,7 @@ class StoreSpec(BaseModel):
     sort_column: str | None = None
 
     @model_validator(mode="after")
-    def _validate(self) -> StoreSpec:
+    def _validate(self) -> Self:
         """Enforce non-empty columns, 1-3 unique in-schema scalar keys, valid sort col."""
         if not self.columns:
             msg = "A store must declare at least one column."

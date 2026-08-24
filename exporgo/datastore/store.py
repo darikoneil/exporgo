@@ -1,21 +1,15 @@
 """A single datastore component: schema-enforced partitioned writes and lazy scans."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any, Literal
 from uuid import uuid4
 
 import polars as pl
 import pyarrow.dataset as ds
 
-from .manifest import FragmentEntry, Manifest
-
-if TYPE_CHECKING:
-    from typing import Any, Literal
-
-    from .spec import StoreSpec
+from exporgo.datastore.manifest import FragmentEntry, Manifest
+from exporgo.datastore.spec import StoreSpec
 
 __all__ = ["Store"]
 

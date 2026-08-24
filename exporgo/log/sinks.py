@@ -5,20 +5,17 @@
 (e.g. ``init_logger(name="my_project", base_directory=path)``).
 """
 
-from __future__ import annotations
-
+from collections.abc import Callable
+from pathlib import Path
 from sys import stderr
 from typing import TYPE_CHECKING
 from warnings import warn
 
 from loguru import logger
 
-from .levels import LogLevel
+from exporgo.log.levels import LogLevel
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-    from pathlib import Path
-
     from loguru import Record
 
 __all__ = ["init_logger", "reset_tqdm"]
@@ -34,20 +31,20 @@ PRIMARY_FILE_FORMAT = "{time}\t{level}\n\t{message}"
 """Loguru format for the primary (INFO/WARNING) rotating log file."""
 
 
-def _exception_only_filter(record: Record) -> bool:
+def _exception_only_filter(record: "Record") -> bool:
     """Keep only log records that carry exception information."""
     return record["exception"] is not None
 
 
-def _is_primary_log(record: Record) -> bool:
+def _is_primary_log(record: "Record") -> bool:
     """Keep only ``INFO`` and ``WARNING`` records, for the primary log file."""
     return record["level"].no in {LogLevel.INFO.value, LogLevel.WARNING.value}
 
 
-def _specific_filter(log_level: LogLevel) -> Callable[[Record], bool]:
+def _specific_filter(log_level: LogLevel) -> Callable[["Record"], bool]:
     """Create a threshold filter accepting records at or above ``log_level``."""
 
-    def _inner_filter(record: Record) -> bool:
+    def _inner_filter(record: "Record") -> bool:
         """Accept records whose level meets or exceeds the threshold."""
         return record["level"].no >= log_level
 

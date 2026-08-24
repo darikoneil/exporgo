@@ -7,8 +7,8 @@ identity vocabulary. See :class:`~exporgo.datastore.spec.StoreSpec` and
 :class:`~exporgo.datastore.store.Store`.
 """
 
-from .manifest import FragmentEntry, Manifest
-from .spec import StoreSpec
-from .store import Store
+from exporgo.datastore.manifest import FragmentEntry, Manifest
+from exporgo.datastore.spec import StoreSpec
+from exporgo.datastore.store import Store
 
 __all__ = ["FragmentEntry", "Manifest", "Store", "StoreSpec"]

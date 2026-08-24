@@ -6,25 +6,25 @@ validates; it never executes. Identity keys become the datastore's partition key
 :meth:`Study.validate` seeds the monitoring layer's derived status.
 """
 
-from __future__ import annotations
-
 import tomllib
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Self
 
 import tomli_w
 
-from .identity import Identity, IdentityKey, IdentitySchema
-from .resources import Resource
+from exporgo.study.identity import (
+    Identity,
+    IdentityKey,
+    IdentitySchema,
+    IdentityValue,
+)
+from exporgo.study.resources import Resource
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping, Sequence
-    from typing import Any
-
-    from ..datastore.spec import StoreSpec
-    from ..datastore.store import Store
-    from .identity import IdentityValue
+    from exporgo.datastore.spec import StoreSpec
+    from exporgo.datastore.store import Store
 
 __all__ = ["Study", "ValidationReport"]
 
@@ -142,7 +142,7 @@ class Study:
         *,
         partition_keys: Sequence[str] | None = None,
         sort_column: str | None = None,
-    ) -> StoreSpec:
+    ) -> "StoreSpec":
         """Declare a datastore component; partition keys default to the identity keys.
 
         Args:
@@ -156,7 +156,7 @@ class Study:
         Returns:
             The created :class:`~exporgo.datastore.spec.StoreSpec`.
         """
-        from ..datastore.spec import StoreSpec
+        from exporgo.datastore.spec import StoreSpec
 
         keys = (
             tuple(partition_keys) if partition_keys is not None else self.identity.names
@@ -170,13 +170,13 @@ class Study:
         self._stores[name] = spec
         return spec
 
-    def store(self, name: str) -> Store:
+    def store(self, name: str) -> "Store":
         """Return the :class:`~exporgo.datastore.store.Store` for a declared component.
 
         Raises:
             KeyError: If no store with that name has been declared.
         """
-        from ..datastore.store import Store
+        from exporgo.datastore.store import Store
 
         try:
             spec = self._stores[name]
@@ -224,7 +224,7 @@ class Study:
         return config_path
 
     @classmethod
-    def load(cls, root: str | Path) -> Study:
+    def load(cls, root: str | Path) -> Self:
         """Reconstruct a study from ``root/study.toml`` (the declaration only)."""
         root = Path(root)
         with (root / _CONFIG_NAME).open("rb") as handle:
@@ -235,7 +235,7 @@ class Study:
             study.declare_resource(name, template)
         stores_data = data.get("stores", {})
         if stores_data:
-            from ..datastore.store import Store
+            from exporgo.datastore.store import Store
 
             for store_name, entry in stores_data.items():
                 study.declare_store(
