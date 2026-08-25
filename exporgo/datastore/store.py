@@ -93,14 +93,32 @@ class Store:
         )
 
     def scan(self) -> pl.LazyFrame:
-        """Return a lazy, partition-prunable view with the declared schema restored."""
+        """Return a lazy, partition-prunable view with the declared schema restored.
+
+        Nothing is read from disk until the frame is collected: filters on the partition
+        keys (and, when a ``sort_column`` is set, on that column) push down to skip whole
+        files and row groups, so a selective query touches only the relevant fragments.
+
+        Returns:
+            A :class:`polars.LazyFrame` over the component's Parquet fragments, cast to
+            the declared schema and projected to the declared columns.
+
+        Note:
+            Chain ``.filter(...)`` on the partition keys *before* ``.collect()`` to keep
+            partition pruning; collecting first materializes the whole dataset.
+        """
         lazy = pl.scan_parquet(
             self.root / "**" / "part-*.parquet", hive_partitioning=True
         )
         return lazy.cast(self.spec.polars_schema()).select(self.spec.column_names)
 
     def manifest(self) -> Manifest:
-        """Return the store's fragment manifest (empty if nothing has been written)."""
+        """Return the store's fragment manifest (empty if nothing has been written).
+
+        Returns:
+            The :class:`~exporgo.datastore.manifest.Manifest` read from
+            ``_manifest.json``, or an empty manifest when the store has no data yet.
+        """
         path = self.root / _MANIFEST_NAME
         if not path.exists():
             return Manifest()
@@ -115,7 +133,17 @@ class Store:
 
     @staticmethod
     def read_schema(root: str | Path) -> dict[str, Any]:
-        """Read a store's persisted column schema (name -> dtype) from its anchor."""
+        """Read a store's persisted column schema (name -> dtype) from its anchor.
+
+        Reads the 0-row anchor Parquet written by :meth:`write_schema`, letting a study
+        reload a store's schema without re-declaring its columns in code.
+
+        Args:
+            root: The store's root directory (holding ``_schema.parquet``).
+
+        Returns:
+            The column schema as a ``{name: polars dtype}`` mapping.
+        """
         schema = pl.scan_parquet(Path(root) / _SCHEMA_NAME).collect_schema()
         return dict(schema)
 

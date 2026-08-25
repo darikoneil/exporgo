@@ -25,8 +25,7 @@ Output Format:
 Provide a concise Markdown report grouped by file. Categorize findings using severity tags:
 - **CRITICAL**: Must fix immediately (vulnerabilities)
 - **ERROR**: Must fix before finalizing (logic errors, bugs)
-- **CLEAN**: Indicates excessive documentation within inline comments or docstrings 
-  containing non-user facing information.
+- **CLEAN**: Indicates excessive documentation within inline comments
 - **WARNING**: Bad practice and ambiguous code smells without associated explanatory 
   comments.
 - **PERFORMANCE**: Optional improvement for code optimization and performance.

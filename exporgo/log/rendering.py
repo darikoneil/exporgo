@@ -37,6 +37,11 @@ def render_object(obj: object) -> str:
 
     Returns:
         A string representation of ``obj`` suitable for a log message.
+
+    Note:
+        Collections are summarized to at most :data:`_LOG_ELEMENT_LIMIT` elements and
+        DataFrames to :data:`_LOG_COLUMN_LIMIT` columns, so large values never flood a
+        log record.
     """
     return str(obj)
 

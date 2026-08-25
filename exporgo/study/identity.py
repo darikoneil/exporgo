@@ -33,7 +33,14 @@ _COERCERS: dict[str, Callable[..., IdentityValue]] = {
 
 
 class IdentityKey(BaseModel):
-    """A named, typed axis of a study's identity (e.g. ``Subject``, ``Session``)."""
+    """A named, typed axis of a study's identity (e.g. ``Subject``, ``Session``).
+
+    Attributes:
+        name: The axis name, used as the keyword when addressing an identity and as the
+            Hive partition key on disk.
+        dtype: The value type — one of ``"str"``, ``"int"``, ``"float"``, ``"bool"``;
+            stored as a string label so it round-trips through ``study.toml``.
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
@@ -41,7 +48,19 @@ class IdentityKey(BaseModel):
     dtype: DType = "str"
 
     def coerce(self, value: IdentityValue) -> IdentityValue:
-        """Coerce a value to this key's declared dtype."""
+        """Coerce a value to this key's declared dtype.
+
+        Args:
+            value: The value to coerce (e.g. the string ``"1"`` for an ``int`` key).
+
+        Returns:
+            The value converted by the dtype's callable
+            (``str`` / ``int`` / ``float`` / ``bool``).
+
+        Raises:
+            ValueError: If the value cannot be converted to the declared dtype (e.g.
+                ``int("m01")``).
+        """
         return _COERCERS[self.dtype](value)
 
 
@@ -125,7 +144,16 @@ class IdentitySchema(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class Identity:
-    """One concrete address in a study's identity coordinate system."""
+    """One concrete address in a study's identity coordinate system.
+
+    Immutable and hashable, so an identity can index dictionaries and sets. Its
+    :meth:`as_path` rendering *is* the datastore partition path, so the identity you
+    register, query, and attach data to lines up across the study and datastore layers.
+
+    Attributes:
+        keys: The identity key names, in schema order.
+        values: The coerced value for each key, positionally aligned with ``keys``.
+    """
 
     keys: tuple[str, ...]
     values: tuple[IdentityValue, ...]
@@ -135,7 +163,14 @@ class Identity:
         return self.values[self.keys.index(key)]
 
     def as_path(self) -> str:
-        """Render as a Hive-style partition path fragment (``key=value/…``)."""
+        """Render as a Hive-style partition path fragment (``key=value/…``).
+
+        This is exactly the sub-path the datastore partitions on, so resource paths and
+        store partitions for the same identity line up on disk.
+
+        Returns:
+            The path fragment, e.g. ``"Subject=m01/Session=1"``.
+        """
         return "/".join(
             f"{key}={value}" for key, value in zip(self.keys, self.values, strict=True)
         )

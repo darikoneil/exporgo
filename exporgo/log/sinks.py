@@ -122,9 +122,12 @@ def init_logger(
     """Configure and enable logging for a project.
 
     Enables the given logger ``name`` (or all namespaces when ``name`` is ``None``),
-    clears existing sinks, and attaches a colorized console sink. If
-    ``base_directory`` is given, also attaches the primary and exceptions rotating
-    file sinks, and optionally a third sink filtered to ``log_level_custom``.
+    clears existing sinks, and attaches a colorized console sink. If ``base_directory``
+    is given, also attaches the primary rotating file sink (``<stem>.log``,
+    INFO/WARNING) and an exceptions sink (``.logs/.<stem>_exception.log``), plus an
+    optional third sink filtered to ``log_level_custom``. Because it removes existing
+    sinks first, it reconfigures logging cleanly and is safe to call more than once
+    (idempotent).
 
     Args:
         name: Loguru namespace to enable (typically the consuming package). When
@@ -140,6 +143,15 @@ def init_logger(
         If ``log_level_custom`` is given without ``base_directory``, a
         :class:`UserWarning` is issued and no custom sink is created, since there is
         nowhere to write it.
+
+    Example:
+        >>> from pathlib import Path
+        >>> from exporgo.log import LogLevel, init_logger
+        >>> init_logger(
+        ...     name="my_project",
+        ...     base_directory=Path("logs"),
+        ...     log_level_console=LogLevel.DEBUG,
+        ... )
     """
     logger.enable(name if name is not None else "")
     logger.remove()

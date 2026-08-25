@@ -11,7 +11,14 @@ __all__ = ["FragmentEntry", "Manifest"]
 
 
 class FragmentEntry(BaseModel):
-    """One written Parquet fragment: its path, partition, row count, and timestamp."""
+    """One written Parquet fragment: its path, partition, row count, and timestamp.
+
+    Attributes:
+        path: The fragment's path relative to the store root, POSIX-style.
+        partition: The fragment's Hive partition as a ``{key: value}`` mapping.
+        rows: The number of rows in the fragment.
+        written: The write time as an ISO-8601 UTC timestamp.
+    """
 
     path: str
     partition: dict[str, str]
@@ -20,7 +27,12 @@ class FragmentEntry(BaseModel):
 
 
 class Manifest(BaseModel):
-    """A datastore component's inventory of written fragments."""
+    """A datastore component's inventory of written fragments.
+
+    Attributes:
+        schema_version: Version of the manifest layout, for forward migration.
+        fragments: The written fragments, in write order.
+    """
 
     schema_version: int = 1
     fragments: list[FragmentEntry] = Field(default_factory=list)

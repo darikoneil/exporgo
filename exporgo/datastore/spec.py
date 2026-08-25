@@ -22,6 +22,17 @@ class StoreSpec(BaseModel):
     The schema is strict and enforced on write. Partition keys (1-3) drive the on-disk
     Hive layout and pruning; the optional sort column enables row-group range pruning.
     Partition and sort keys must be scalar (non-nested) columns.
+
+    Example:
+        >>> import polars as pl
+        >>> spec = StoreSpec(
+        ...     name="behavior",
+        ...     columns={"Subject": pl.String, "trial": pl.Int64, "rt": pl.Float64},
+        ...     partition_keys=("Subject",),
+        ...     sort_column="trial",
+        ... )
+        >>> spec.column_names
+        ('Subject', 'trial', 'rt')
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(

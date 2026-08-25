@@ -74,6 +74,12 @@ def log_function_call(
     Returns:
         A decorator that adds call/return logging while preserving the wrapped
         function's signature and metadata.
+
+    Example:
+        >>> from exporgo.log import log_function_call
+        >>> @log_function_call()
+        ... def add(left, right):
+        ...     return left + right
     """
 
     def wrapper(func: Callable) -> Callable:

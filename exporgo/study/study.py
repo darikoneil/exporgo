@@ -37,7 +37,17 @@ _CONFIG_NAME = "study.toml"
 
 @dataclass(frozen=True)
 class ValidationReport:
-    """Outcome of :meth:`Study.validate` — which (identity, resource) pairs exist."""
+    """Outcome of :meth:`Study.validate` — which (identity, resource) pairs exist.
+
+    The filesystem is the source of truth: each registered identity is paired with each
+    declared resource and bucketed by whether that resource exists on disk. The report
+    is a plain snapshot holding no live handles, so it is safe to store or diff across
+    runs (e.g. to seed the monitoring layer's derived status).
+
+    Attributes:
+        present: ``(identity, resource_name)`` pairs whose resolved path exists.
+        missing: ``(identity, resource_name)`` pairs whose resolved path is absent.
+    """
 
     present: tuple[tuple[Identity, str], ...]
     missing: tuple[tuple[Identity, str], ...]
@@ -88,16 +98,31 @@ class Study:
 
     @property
     def entities(self) -> tuple[Identity, ...]:
-        """The registered identities, in registration order."""
+        """The registered identities, as an immutable snapshot in registration order."""
         return tuple(self._entities)
 
     @property
     def resources(self) -> dict[str, Resource]:
-        """The declared resources, keyed by name."""
+        """The declared resources, keyed by name (a copy; safe to mutate)."""
         return dict(self._resources)
 
     def register(self, **values: IdentityValue) -> Identity:
-        """Register an identity the study should contain (a declared expectation)."""
+        """Register an identity the study should contain (a declared expectation).
+
+        Registration records what *should* exist; it never touches the filesystem. This
+        declared expectation is what lets :meth:`validate` detect missing data.
+        Re-registering an identical identity is a no-op (identities are de-duplicated).
+
+        Args:
+            **values: One value per identity key, keyed by key name (e.g.
+                ``Subject="m01", Session=1``); each is coerced to its key's dtype.
+
+        Returns:
+            The registered :class:`~exporgo.study.identity.Identity`.
+
+        Raises:
+            ValueError: If a key is missing or an unexpected key is supplied.
+        """
         identity = self.identity.identity(**values)
         if identity not in self._entities:
             self._entities.append(identity)
@@ -105,6 +130,19 @@ class Study:
 
     def declare_resource(self, name: str, template: str) -> Resource:
         """Declare a named resource located by a path template over the identity keys.
+
+        A resource is a file/folder the study expects at each identity (e.g. ``"raw"``,
+        ``"suite2p"``). Its ``template`` uses ``{KeyName}`` placeholders drawn from any
+        subset of the study's identity keys and is resolved against the study root by
+        :meth:`path` and :meth:`validate`.
+
+        Args:
+            name: The resource's name (its handle in :meth:`path` / :meth:`validate`).
+            template: A path template over the identity keys, e.g.
+                ``"{Subject}/{Session}/behavior.csv"``.
+
+        Returns:
+            The declared :class:`~exporgo.study.resources.Resource`.
 
         Raises:
             ValueError: If the template references keys not in the study's identity.
@@ -125,8 +163,20 @@ class Study:
     def path(self, resource: str, **values: IdentityValue) -> Path:
         """Resolve the on-disk path of ``resource`` for the given identity values.
 
+        Fills the resource's template with the identity values and joins it to the study
+        root. The path is returned whether or not it exists — use :meth:`validate` to
+        check existence.
+
+        Args:
+            resource: The name of a previously declared resource.
+            **values: One value per identity key, keyed by key name.
+
+        Returns:
+            The resolved path under the study root.
+
         Raises:
             KeyError: If no resource with that name has been declared.
+            ValueError: If a key is missing or an unexpected key is supplied.
         """
         identity = self.identity.identity(**values)
         try:
@@ -177,6 +227,16 @@ class Study:
     def store(self, name: str) -> "Store":
         """Return the :class:`~exporgo.datastore.store.Store` for a declared component.
 
+        Binds the store's declared spec to ``<root>/<name>`` so it can be written to and
+        scanned. The return type lives in the datastore extra, so it is imported lazily;
+        ``import exporgo.study`` alone does not pull in the datastore layer.
+
+        Args:
+            name: The name of a previously declared store.
+
+        Returns:
+            The :class:`~exporgo.datastore.store.Store` bound to ``<root>/<name>``.
+
         Raises:
             KeyError: If no store with that name has been declared.
         """
@@ -190,7 +250,21 @@ class Study:
         return Store(self.root / name, spec)
 
     def validate(self) -> ValidationReport:
-        """Check each registered identity against each declared resource on disk."""
+        """Check each registered identity against each declared resource on disk.
+
+        Resolves every ``(registered identity, declared resource)`` pair to a path and
+        records whether it exists — the file-existence self-check at the heart of the
+        study model. The filesystem is the source of truth; nothing is cached, so the
+        report always reflects the tree as it is at call time.
+
+        Returns:
+            A :class:`ValidationReport` partitioning the pairs into ``present`` and
+            ``missing``.
+
+        Note:
+            Cost is ``O(registered identities * declared resources)`` filesystem
+            ``stat`` calls, existence-only; file contents are never read.
+        """
         present: list[tuple[Identity, str]] = []
         missing: list[tuple[Identity, str]] = []
         for identity in self._entities:
@@ -271,7 +345,23 @@ class Study:
 
     @classmethod
     def load(cls, root: str | Path) -> Self:
-        """Reconstruct a study from ``root/study.toml`` (the declaration only)."""
+        """Reconstruct a study from ``root/study.toml`` (the declaration only).
+
+        Restores the declared structure — identity keys, registered identities, resource
+        templates, and store specs — but not the data or any derived status, which are
+        re-read from the filesystem on demand (filesystem = truth). Loading is
+        deliberately side-effect-free and does *not* reconfigure logging; call
+        :meth:`init_logging` to resume logging into a loaded study.
+
+        Args:
+            root: The study root directory containing ``study.toml``.
+
+        Returns:
+            The reconstructed :class:`Study`.
+
+        Raises:
+            FileNotFoundError: If ``root/study.toml`` does not exist.
+        """
         root = Path(root)
         with (root / _CONFIG_NAME).open("rb") as handle:
             data = tomllib.load(handle)
