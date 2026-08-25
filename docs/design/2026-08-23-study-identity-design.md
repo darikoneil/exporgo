@@ -141,6 +141,14 @@ study.save()               # writes root/study.toml + each store's _schema.parqu
 study = Study.load(root)    # points at the root dir, finds study.toml, reconstructs
 ```
 
+**Auto-logging:** `save()` also wires up logging into the study root via
+`study.init_logging()` (which drives the base `init_logger` with `base_directory=root`,
+`file_stem=name`), so every saved study automatically gets a `<root>/<name>.log` (plus a
+`.logs/.<name>_exception.log` and a console sink) that the logger writes to — a primary
+reason the logging layer exists. `load()` is deliberately side-effect-free and does *not*
+reconfigure logging; call `study.init_logging()` explicitly to resume logging into a
+loaded study.
+
 **What persists is the *declaration*** — identity keys, registered identities, resource
 templates, and (later) store/step specs. **What does *not* persist is the data or the
 derived status:** data lives in the datastore/resources on disk, and status is recomputed

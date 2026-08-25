@@ -60,6 +60,46 @@ def test_validate_reports_present_and_missing(tmp_path: Path) -> None:
     assert not report.is_complete
 
 
+def test_save_initializes_logging(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """save() wires logging into the study root via init_logger (file_stem = name)."""
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        "exporgo.study.study.init_logger", lambda **kwargs: calls.append(kwargs)
+    )
+
+    Study(name="fomo", root=tmp_path).save()
+
+    assert len(calls) == 1
+    assert calls[0]["base_directory"] == tmp_path
+    assert calls[0]["file_stem"] == "fomo"
+
+
+def test_load_does_not_initialize_logging(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Loading a study is side-effect-free: it does not reconfigure logging."""
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        "exporgo.study.study.init_logger", lambda **kwargs: calls.append(kwargs)
+    )
+
+    Study(name="fomo", root=tmp_path).save()
+    assert len(calls) == 1  # save wired logging
+    calls.clear()
+
+    Study.load(tmp_path)
+    assert calls == []  # load did not
+
+
+def test_save_creates_a_real_log_file(tmp_path: Path) -> None:
+    """End-to-end: save() leaves a real ``<root>/<name>.log`` on disk."""
+    Study(name="fomo", root=tmp_path).save()
+
+    assert (tmp_path / "fomo.log").is_file()
+
+
 def test_save_and_load_round_trip(tmp_path: Path) -> None:
     study = Study(
         name="fomo",

@@ -14,7 +14,9 @@ leaving orchestration to your code or an LLM agent.
 - **study** (`exporgo[study]`, adds `pydantic`) — the Study & Identity model: a
   study's identity coordinate system (1–3 keys, default `Subject`), the resources
   (files/folders) it expects at each identity, and file-existence self-validation.
-  Declarations persist to `study.toml` and reload via `Study.load(root)`.
+  Declarations persist to `study.toml` and reload via `Study.load(root)`. Saving a
+  study also auto-creates a `<root>/<name>.log` the logger writes to, so every study
+  gets logging for free.
 - **datastore** (`exporgo[datastore]`, adds `polars`/`pyarrow`/`numpy`) — fast,
   schema-enforced polars/Parquet component stores for a study's bulk data
   (behavior, neural, …), Hive-partitioned on the identity keys, with lazy,

@@ -306,6 +306,8 @@ source = { editable = "." }
 dependencies = [
     { name = "loguru" },
     { name = "polars" },
+    { name = "pydantic" },
+    { name = "tomli-w" },
 ]
 
 [package.optional-dependencies]
@@ -313,22 +315,12 @@ datastore = [
     { name = "numpy" },
     { name = "polars", extra = ["numpy", "pyarrow"] },
     { name = "pyarrow" },
-    { name = "pydantic" },
-    { name = "tomli-w" },
 ]
 docs = [
     { name = "autodoc-pydantic" },
     { name = "sphinx" },
     { name = "sphinx-autodoc-typehints" },
     { name = "sphinx-rtd-theme" },
-]
-monitor = [
-    { name = "pydantic" },
-    { name = "tomli-w" },
-]
-study = [
-    { name = "pydantic" },
-    { name = "tomli-w" },
 ]
 
 [package.dev-dependencies]
@@ -347,20 +339,18 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "autodoc-pydantic", marker = "extra == 'docs'" },
-    { name = "exporgo", extras = ["study"], marker = "extra == 'datastore'" },
-    { name = "exporgo", extras = ["study"], marker = "extra == 'monitor'" },
     { name = "loguru" },
     { name = "numpy", marker = "extra == 'datastore'" },
     { name = "polars", specifier = ">=1.44.0" },
     { name = "polars", extras = ["numpy", "pyarrow"], marker = "extra == 'datastore'" },
     { name = "pyarrow", marker = "extra == 'datastore'", specifier = "==24.0.0" },
-    { name = "pydantic", marker = "extra == 'study'" },
+    { name = "pydantic" },
     { name = "sphinx", marker = "extra == 'docs'" },
     { name = "sphinx-autodoc-typehints", marker = "extra == 'docs'" },
     { name = "sphinx-rtd-theme", marker = "extra == 'docs'" },
-    { name = "tomli-w", marker = "extra == 'study'" },
+    { name = "tomli-w" },
 ]
-provides-extras = ["study", "monitor", "datastore", "docs"]
+provides-extras = ["monitor", "datastore", "docs"]
 
 [package.metadata.requires-dev]
 dev = [
