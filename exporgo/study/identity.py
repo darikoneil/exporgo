@@ -3,7 +3,9 @@
 A study is organized along a small set of named axes — its :class:`IdentitySchema`,
 an ordered 1-3 :class:`IdentityKey`s (default ``["Subject"]``). A concrete point in
 that system is an :class:`Identity` (e.g. ``Subject="m01", Session=1``), which the
-datastore uses as its partition path and the monitoring layer tracks.
+datastore uses as its partition path and the monitoring layer tracks. Note that we
+don't care about narrowing conversions of integers because you'd have to be nuts to
+partition something across where that would actually matter.
 """
 
 from collections.abc import Callable
@@ -17,16 +19,16 @@ __all__ = ["Identity", "IdentityKey", "IdentitySchema"]
 _MIN_KEYS = 1
 _MAX_KEYS = 3
 
-type IdentityValue = str | int | float | bool
+
+type IdentityValue = str | int | bool
 """The value types an identity key may take."""
 
-type DType = Literal["str", "int", "float", "bool"]
+type DType = Literal["str", "int", "bool"]
 """Allowed identity-key dtype labels (strings, so they round-trip through config)."""
 
 _COERCERS: dict[str, Callable[..., IdentityValue]] = {
     "str": str,
     "int": int,
-    "float": float,
     "bool": bool,
 }
 """Maps each dtype label to the callable that coerces a value to it."""

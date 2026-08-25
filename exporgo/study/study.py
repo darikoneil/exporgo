@@ -12,10 +12,12 @@ so every study automatically gets a ``<root>/<name>.log`` the logger writes to.
 import tomllib
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
 
 import tomli_w
+from loguru import logger
 
 from exporgo.log import LogLevel, init_logger
 from exporgo.study.identity import (
@@ -24,7 +26,7 @@ from exporgo.study.identity import (
     IdentitySchema,
     IdentityValue,
 )
-from exporgo.study.resources import Resource
+from exporgo.study.resources import Resource, ResourceSpec
 
 if TYPE_CHECKING:
     from exporgo.datastore.spec import StoreSpec
@@ -79,7 +81,7 @@ class Study:
         self.root = Path(root)
         self.identity = self._coerce_schema(identity)
         self._entities: list[Identity] = []
-        self._resources: dict[str, Resource] = {}
+        self._resources: dict[str, ResourceSpec] = {}
         self._stores: dict[str, StoreSpec] = {}
 
     @staticmethod
@@ -96,15 +98,54 @@ class Study:
         )
         return IdentitySchema(keys=keys)
 
+    def __repr__(self) -> str:
+        """Return an unambiguous representation of the study for debugging."""
+        return (
+            f"{type(self).__name__}(name={self.name!r}, root={self.root!r}, "
+            f"identity={self.identity.names!r})"
+        )
+
+    def __str__(self) -> str:
+        """Return a concise one-line human-readable summary of the study."""
+        keys = ", ".join(self.identity.names)
+        return (
+            f"Study {self.name!r} [{keys}]: {len(self._entities)} identities, "
+            f"{len(self._resources)} resources, {len(self._stores)} stores"
+        )
+
+    def print(self) -> None:
+        """Print a multi-line summary of the study's declared contents to stdout.
+
+        Reports the study name and root, its identity keys, and the counts (and names)
+        of registered identities, declared resources, and declared stores.
+        """
+        resources = ", ".join(sorted(self._resources)) or "(none)"
+        stores = ", ".join(sorted(self._stores)) or "(none)"
+        keys = ", ".join(self.identity.names)
+        lines = [
+            f"Study {self.name!r}",
+            f"  root:       {self.root}",
+            f"  identity:   {keys}",
+            f"  identities: {len(self._entities)} registered",
+            f"  resources:  {len(self._resources)} ({resources})",
+            f"  stores:     {len(self._stores)} ({stores})",
+        ]
+        print("\n".join(lines))
+
     @property
     def entities(self) -> tuple[Identity, ...]:
         """The registered identities, as an immutable snapshot in registration order."""
         return tuple(self._entities)
 
     @property
-    def resources(self) -> dict[str, Resource]:
-        """The declared resources, keyed by name (a copy; safe to mutate)."""
+    def resources(self) -> dict[str, ResourceSpec]:
+        """The declared resource specs, keyed by name (a copy; safe to mutate)."""
         return dict(self._resources)
+
+    @property
+    def stores(self) -> dict[str, "StoreSpec"]:
+        """The declared store specs, keyed by name (a copy; safe to mutate)."""
+        return dict(self._stores)
 
     def register(self, **values: IdentityValue) -> Identity:
         """Register an identity the study should contain (a declared expectation).
@@ -128,44 +169,69 @@ class Study:
             self._entities.append(identity)
         return identity
 
-    def declare_resource(self, name: str, template: str) -> Resource:
+    def declare_resource(self, name: str, template: str) -> ResourceSpec:
         """Declare a named resource located by a path template over the identity keys.
 
         A resource is a file/folder the study expects at each identity (e.g. ``"raw"``,
         ``"suite2p"``). Its ``template`` uses ``{KeyName}`` placeholders drawn from any
         subset of the study's identity keys and is resolved against the study root by
-        :meth:`path` and :meth:`validate`.
+        :meth:`path` / :meth:`resource` and :meth:`validate`.
 
         Args:
-            name: The resource's name (its handle in :meth:`path` / :meth:`validate`).
+            name: The resource's name (its handle in :meth:`resource` / :meth:`path`).
             template: A path template over the identity keys, e.g.
                 ``"{Subject}/{Session}/behavior.csv"``.
 
         Returns:
-            The declared :class:`~exporgo.study.resources.Resource`.
+            The declared :class:`~exporgo.study.resources.ResourceSpec`.
 
         Raises:
             ValueError: If the template references keys not in the study's identity.
         """
-        resource = Resource(name=name, template=template)
-        unknown = [
-            key for key in resource.placeholders if key not in self.identity.names
-        ]
+        spec = ResourceSpec(name=name, template=template)
+        unknown = [key for key in spec.placeholders if key not in self.identity.names]
         if unknown:
             msg = (
                 f"Resource {name!r} template uses unknown identity keys {unknown}; "
                 f"study identity keys are {list(self.identity.names)}."
             )
             raise ValueError(msg)
-        self._resources[name] = resource
-        return resource
+        self._resources[name] = spec
+        return spec
+
+    def resource(self, name: str) -> Resource:
+        """Return the root-bound :class:`~exporgo.study.resources.Resource` handle.
+
+        Binds the named resource's declaration to the study root and identity schema, so
+        you can resolve paths (:meth:`Resource.path`) and check existence
+        (:meth:`Resource.exists`) for specific identity values. This is the resource
+        counterpart of :meth:`store`.
+
+        Args:
+            name: The name of a previously declared resource.
+
+        Returns:
+            The :class:`~exporgo.study.resources.Resource` bound to this study's root.
+
+        Raises:
+            KeyError: If no resource with that name has been declared.
+        """
+        try:
+            spec = self._resources[name]
+        except KeyError:
+            msg = (
+                f"No resource named {name!r}; "
+                f"declared resources: {sorted(self._resources)}"
+            )
+            raise KeyError(msg) from None
+        return Resource(self.root, spec, self.identity)
 
     def path(self, resource: str, **values: IdentityValue) -> Path:
         """Resolve the on-disk path of ``resource`` for the given identity values.
 
-        Fills the resource's template with the identity values and joins it to the study
-        root. The path is returned whether or not it exists — use :meth:`validate` to
-        check existence.
+        Shorthand for ``self.resource(resource).path(**values)`` — the terse one-shot for
+        when you just need the location. The path is returned whether or not it exists;
+        use :meth:`validate` to check existence.
 
         Args:
             resource: The name of a previously declared resource.
@@ -178,16 +244,7 @@ class Study:
             KeyError: If no resource with that name has been declared.
             ValueError: If a key is missing or an unexpected key is supplied.
         """
-        identity = self.identity.identity(**values)
-        try:
-            spec = self._resources[resource]
-        except KeyError:
-            msg = (
-                f"No resource named {resource!r}; "
-                f"declared resources: {sorted(self._resources)}"
-            )
-            raise KeyError(msg) from None
-        return spec.resolve(self.root, identity)
+        return self.resource(resource).path(**values)
 
     def declare_store(
         self,
@@ -315,7 +372,8 @@ class Study:
         """Write the study's declaration to ``root/study.toml`` and return that path.
 
         Also initializes logging into the study root (see :meth:`init_logging`), so a
-        saved study automatically has a ``<root>/<name>.log`` the logger writes to.
+        saved study automatically has a ``<root>/<name>.log`` the logger writes to, and
+        records the creation date to that log.
         """
         data: dict[str, object] = {
             "name": self.name,
@@ -341,6 +399,10 @@ class Study:
         for store_name in self._stores:
             self.store(store_name).write_schema()  # persist each store's schema anchor
         self.init_logging()
+        creation_date = datetime.now(UTC).isoformat(timespec="seconds")
+        logger.info(
+            f"Study {self.name!r} saved to {config_path} (created {creation_date})."
+        )
         return config_path
 
     @classmethod
@@ -349,9 +411,10 @@ class Study:
 
         Restores the declared structure — identity keys, registered identities, resource
         templates, and store specs — but not the data or any derived status, which are
-        re-read from the filesystem on demand (filesystem = truth). Loading is
-        deliberately side-effect-free and does *not* reconfigure logging; call
-        :meth:`init_logging` to resume logging into a loaded study.
+        re-read from the filesystem on demand (filesystem = truth). Loading does *not*
+        reconfigure logging (it adds no sinks); it only emits an access log record, which
+        is captured if logging is already configured. Call :meth:`init_logging` to resume
+        logging into a loaded study.
 
         Args:
             root: The study root directory containing ``study.toml``.
@@ -382,4 +445,7 @@ class Study:
                 )
         for entity in data.get("entities", []):
             study.register(**entity)
+        logger.info(
+            f"Study {study.name!r} accessed (loaded from {root / _CONFIG_NAME})."
+        )
         return study

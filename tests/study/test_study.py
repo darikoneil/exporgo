@@ -1,10 +1,13 @@
 """Tests for the Study container: identity, resources, validation, persistence."""
 
+import io
+from contextlib import redirect_stdout
 from pathlib import Path
 
 import pytest
+from loguru import logger
 
-from exporgo.study import IdentityKey, Study
+from exporgo.study import IdentityKey, ResourceSpec, Study
 
 
 def test_study_defaults_identity_to_subject() -> None:
@@ -41,6 +44,26 @@ def test_path_unknown_resource_raises() -> None:
     study = Study(name="s", root="D:/data")
     with pytest.raises(KeyError):
         study.path("nope", Subject="m01")
+
+
+def test_resources_property_returns_specs() -> None:
+    study = Study(name="s", root="D:/data", identity=["Subject"])
+    study.declare_resource("beh", "{Subject}/behavior.csv")
+    assert isinstance(study.resources["beh"], ResourceSpec)
+
+
+def test_resource_returns_a_bound_handle_matching_path(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_resource("beh", "{Subject}/behavior.csv")
+
+    handle = study.resource("beh")
+    assert handle.path(Subject="m01") == study.path("beh", Subject="m01")
+
+
+def test_resource_unknown_name_raises() -> None:
+    study = Study(name="s", root="D:/data")
+    with pytest.raises(KeyError):
+        study.resource("nope")
 
 
 def test_validate_reports_present_and_missing(tmp_path: Path) -> None:
@@ -119,3 +142,62 @@ def test_save_and_load_round_trip(tmp_path: Path) -> None:
     assert loaded.identity.keys[1].dtype == "int"
     assert loaded.entities == study.entities
     assert loaded.resources["beh"].template == "{Subject}/{Session}/behavior.csv"
+
+
+def test_repr_is_unambiguous() -> None:
+    study = Study(name="fomo", root="D:/data", identity=["Subject", "Session"])
+
+    result = repr(study)
+
+    assert result.startswith("Study(")
+    assert "name='fomo'" in result
+    assert "Subject" in result
+    assert "Session" in result
+
+
+def test_str_is_a_concise_summary() -> None:
+    study = Study(name="fomo", root="D:/data", identity=["Subject"])
+    study.declare_resource("raw", "{Subject}/raw")
+    study.register(Subject="m01")
+
+    text = str(study)
+
+    assert "fomo" in text
+    assert "1 resource" in text
+    assert "1 identit" in text
+
+
+def test_print_outputs_a_multiline_summary() -> None:
+    study = Study(name="fomo", root="D:/data", identity=["Subject", "Session"])
+    study.declare_resource("raw", "{Subject}/{Session}/raw")
+    study.register(Subject="m01", Session=1)
+
+    buffer = io.StringIO()
+    with redirect_stdout(buffer):
+        study.print()
+    out = buffer.getvalue()
+
+    assert "fomo" in out
+    assert "raw" in out
+    assert "resources" in out.lower()
+    assert "\n" in out
+
+
+def test_save_logs_the_creation_date(tmp_path: Path) -> None:
+    Study(name="fomo", root=tmp_path).save()
+
+    logger.remove()  # flush + close the async file sink so the record is on disk
+    content = (tmp_path / "fomo.log").read_text(encoding="utf-8")
+
+    assert "created" in content.lower()
+    assert "fomo" in content
+
+
+def test_load_logs_that_the_study_was_accessed(tmp_path: Path) -> None:
+    Study(name="fomo", root=tmp_path).save()  # configures logging into fomo.log
+    Study.load(tmp_path)  # emits an access record to the still-active sink
+
+    logger.remove()  # flush
+    content = (tmp_path / "fomo.log").read_text(encoding="utf-8")
+
+    assert "accessed" in content.lower()

@@ -7,7 +7,7 @@ keys, and the study's validation seeds monitoring's derived status.
 """
 
 from exporgo.study.identity import Identity, IdentityKey, IdentitySchema
-from exporgo.study.resources import Resource
+from exporgo.study.resources import Resource, ResourceSpec
 from exporgo.study.study import Study, ValidationReport
 
 __all__ = [
@@ -15,6 +15,7 @@ __all__ = [
     "IdentityKey",
     "IdentitySchema",
     "Resource",
+    "ResourceSpec",
     "Study",
     "ValidationReport",
 ]

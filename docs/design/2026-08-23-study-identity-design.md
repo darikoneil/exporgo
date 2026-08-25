@@ -26,14 +26,20 @@ things), validates against the schema, and renders to the path fragment `Subject
 the *same* fragment the datastore partitions on. It is the addressable unit you register,
 query for, and attach data to.
 
-**`Resource` — a named file/folder the study expects at each identity.** e.g. `"raw"`,
+**`ResourceSpec` — a named file/folder the study expects at each identity.** e.g. `"raw"`,
 `"suite2p"`, `"behavior"`. Each carries a **per-resource path template** over the identity
 keys (a template may use any subset — a per-subject genotype file uses only `{Subject}`).
-Combined with an `Identity`, a resource resolves to a concrete path, and its existence can
-be checked.
+This is the resource *declaration*; combined with an `Identity` it resolves to a concrete
+path whose existence can be checked. `ResourceSpec` is to a resource what `StoreSpec` is to
+a store.
+
+**`Resource` — a `ResourceSpec` bound to the study root + identity schema.** The root-bound
+*handle* returned by `study.resource(name)`: call `.path(**identity)` to resolve a location
+or `.exists(**identity)` to check it. It is the resource counterpart of a datastore `Store`
+(the live handle), so the two component surfaces are symmetric (see below).
 
 **`Study` — the container.** `name`, `root`, the ordered identity keys, the set of
-**registered `Identity`s**, and the declared **`Resource`s**. Later it also carries the
+**registered `Identity`s**, and the declared **`ResourceSpec`s**. Later it also carries the
 datastore catalog and the monitoring steps — which consume this same identity + layout.
 
 ## Resource vs. datastore (the access boundary)
@@ -41,7 +47,7 @@ datastore catalog and the monitoring steps — which consume this same identity 
 A `resource` gives you a **location**; a `store` gives you **data**. They sit at opposite
 ends of a pipeline, and exporgo brackets the ends without running the middle:
 
-| | **Resource** (`study.path`) | **Datastore** (`study.store`) |
+| | **Resource** (`study.resource` / `study.path`) | **Datastore** (`study.store`) |
 |---|---|---|
 | exporgo's job | locate + validate existence | own format/schema/partitioning + do the IO/query |
 | You get back | a `Path` | a polars `LazyFrame`/`DataFrame` |
@@ -58,6 +64,20 @@ study.path(...) ──►  read, compute, transform  ──►  study.store("neu
 Both are addressed by the **same `Identity`**, so resource paths and store partitions line
 up. Rule of thumb: external/arbitrary/raw → **resource** (get a path, load it yourself);
 curated/queryable/exporgo-owned → **datastore** (get polars back).
+
+### Symmetric accessor surface
+
+The resource and store surfaces mirror each other — a lightweight `ResourceSpec`/`Resource`
+pair alongside the datastore's `StoreSpec`/`Store`:
+
+| | declaration | declare verb | specs collection | handle getter | handle |
+|---|---|---|---|---|---|
+| **Resource** | `ResourceSpec` | `declare_resource` | `resources` | `resource(name)` | `Resource` |
+| **Store** | `StoreSpec` | `declare_store` | `stores` | `store(name)` | `Store` |
+
+`study.path(name, **identity)` is kept as terse sugar for
+`study.resource(name).path(**identity)`; there is no store equivalent because a `Store` is
+already the usable handle.
 
 ## Declaring a study
 
@@ -172,8 +192,8 @@ mutation is an option to decide at build).
 exporgo/study/
   __init__.py       # public API
   identity.py       # IdentityKey, IdentitySchema, Identity
-  study.py          # Study: register/discover/declare_resource/path/validate
-  resources.py      # Resource + path-template resolution
+  study.py          # Study: register / declare_resource / resource / path / declare_store / store / validate
+  resources.py      # ResourceSpec (declaration) + Resource (root-bound handle)
 ```
 
 ## Packaging & dependencies
