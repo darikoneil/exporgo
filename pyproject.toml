@@ -24,7 +24,9 @@ classifiers = [
 # Base dependencies (logging framework only; keep this minimal).
 dependencies = [
     "loguru",
+    "pydantic",
     "polars>=1.44.0",
+    "tomli-w",
 ]
 
 [project.urls]
@@ -34,15 +36,8 @@ repository = "https://github.com/darikoneil/exporgo"
 # Optional runtime extras — layered. `study` is the shared foundation (the Study &
 # Identity model); `monitor` and `datastore` build on it. Base install stays loguru-only.
 [project.optional-dependencies]
-study = [
-    "pydantic",
-    "tomli-w",  # writing study.toml (stdlib tomllib reads only)
-]
-monitor = [
-    "exporgo[study]",
-]
+monitor = []
 datastore = [
-    "exporgo[study]",
     "numpy",
     "polars[numpy,pyarrow]",
     "pyarrow==24.0.0",
