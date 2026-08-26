@@ -167,6 +167,10 @@ class Study:
         identity = self.identity.identity(**values)
         if identity not in self._entities:
             self._entities.append(identity)
+
+        msg = f"Registered {values} to {self.name}"
+        logger.info(msg)
+
         return identity
 
     def declare_resource(self, name: str, template: str) -> ResourceSpec:
@@ -197,6 +201,10 @@ class Study:
             )
             raise ValueError(msg)
         self._resources[name] = spec
+
+        msg = f"Declared the resource {spec}"
+        logger.info(msg)
+
         return spec
 
     def resource(self, name: str) -> Resource:
@@ -279,6 +287,10 @@ class Study:
             sort_column=sort_column,
         )
         self._stores[name] = spec
+
+        msg = f"Declared the store {spec}"
+        logger.info(msg)
+
         return spec
 
     def store(self, name: str) -> "Store":
@@ -400,9 +412,8 @@ class Study:
             self.store(store_name).write_schema()  # persist each store's schema anchor
         self.init_logging()
         creation_date = datetime.now(UTC).isoformat(timespec="seconds")
-        logger.info(
-            f"Study {self.name!r} saved to {config_path} (created {creation_date})."
-        )
+        msg = f"Study {self.name!r} saved to {config_path} (created {creation_date})."
+        logger.info(msg)
         return config_path
 
     @classmethod
@@ -445,7 +456,6 @@ class Study:
                 )
         for entity in data.get("entities", []):
             study.register(**entity)
-        logger.info(
-            f"Study {study.name!r} accessed (loaded from {root / _CONFIG_NAME})."
-        )
+        msg = f"Study {study.name!r} accessed (loaded from {root / _CONFIG_NAME})."
+        logger.info(msg)
         return study

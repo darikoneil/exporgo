@@ -131,3 +131,19 @@ def test_write_casts_to_declared_dtypes(tmp_path: Path) -> None:
     store.write(frame)
 
     assert store.scan().collect().schema["Session"] == pl.Int64
+
+
+def test_write_logs_a_summary(tmp_path: Path) -> None:
+    from loguru import logger
+
+    records: list[str] = []
+    logger.enable("exporgo")
+    sink_id = logger.add(records.append, level="INFO", format="{message}")
+    try:
+        Store(tmp_path, _spec()).write(_frame())  # 4 rows across 2 partitions
+    finally:
+        logger.remove(sink_id)
+
+    joined = " ".join(records).lower()
+    assert "behavior" in joined
+    assert "4 rows" in joined

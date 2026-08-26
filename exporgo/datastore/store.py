@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import polars as pl
 import pyarrow.dataset as ds
+from loguru import logger
 
 from exporgo.datastore.manifest import FragmentEntry, Manifest
 from exporgo.datastore.spec import StoreSpec
@@ -62,6 +63,9 @@ class Store:
         data is written; partitions absent from ``frame`` are left untouched. Both are
         out-of-core -- data for other partitions is never read.
 
+        A successful write emits an ``INFO`` log record summarizing the rows and
+        fragments written (silent unless logging is enabled, e.g. after ``study.save()``).
+
         Args:
             frame: The data to write; its columns must match the declared schema.
             mode: ``"append"`` to add, ``"overwrite"`` to replace by partition.
@@ -91,6 +95,11 @@ class Store:
         self._record_fragments(
             [self._fragment_entry(written_file, timestamp) for written_file in written]
         )
+        msg = (
+            f"Wrote {frame.height} rows to store {self.spec.name!r} "
+            f"({mode}, {len(written)} fragment(s))."
+        )
+        logger.info(msg)
 
     def scan(self) -> pl.LazyFrame:
         """Return a lazy, partition-prunable view with the declared schema restored.
