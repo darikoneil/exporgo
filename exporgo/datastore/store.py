@@ -53,25 +53,32 @@ class Store:
         self,
         frame: pl.DataFrame,
         *,
-        mode: Literal["append", "overwrite"] = "append",
+        mode: Literal["append", "overwrite", "unique"] = "append",
     ) -> None:
-        """Validate, cast, and write ``frame`` -- appending, or overwriting by key.
+        """Validate, cast, and write ``frame`` -- appending, overwriting, or unique-only.
 
-        With ``mode="append"`` (default) each write adds new fragments. With
-        ``mode="overwrite"`` the partitions present in ``frame`` are **replaced**:
-        their existing fragments (files + manifest entries) are deleted before the new
-        data is written; partitions absent from ``frame`` are left untouched. Both are
-        out-of-core -- data for other partitions is never read.
+        Modes:
 
-        A successful write emits an ``INFO`` log record summarizing the rows and
-        fragments written (silent unless logging is enabled, e.g. after ``study.save()``).
+        - ``"append"`` (default): each write adds new fragments (a partition may gain
+          more rows across writes).
+        - ``"overwrite"``: the partitions present in ``frame`` are **replaced** -- their
+          existing fragments (files + manifest entries) are deleted before the new data
+          is written; partitions absent from ``frame`` are left untouched.
+        - ``"unique"``: refuse the write if ``frame`` carries any identity (partition) the
+          store already contains -- nothing is written (all-or-nothing).
+
+        All modes are out-of-core -- data for other partitions is never read. A successful
+        write emits an ``INFO`` log record summarizing the rows and fragments written
+        (silent unless logging is enabled, e.g. after ``study.save()``).
 
         Args:
             frame: The data to write; its columns must match the declared schema.
-            mode: ``"append"`` to add, ``"overwrite"`` to replace by partition.
+            mode: ``"append"`` to add, ``"overwrite"`` to replace by partition,
+                ``"unique"`` to add only if no incoming identity is already present.
 
         Raises:
-            ValueError: If the frame's columns do not match the declared schema.
+            ValueError: If the frame's columns do not match the declared schema, or if
+                ``mode="unique"`` and an incoming identity is already in the store.
         """
         self._validate_columns(frame)
         frame = frame.cast(self.spec.polars_schema())
@@ -80,6 +87,8 @@ class Store:
         self.root.mkdir(parents=True, exist_ok=True)
         if mode == "overwrite":
             self._remove_partitions(self._incoming_partitions(frame))
+        elif mode == "unique":
+            self._reject_existing_partitions(frame)
         written: list[Any] = []
         ds.write_dataset(
             frame.to_arrow(),
@@ -134,6 +143,22 @@ class Store:
             return Manifest()
         return Manifest.model_validate_json(path.read_text(encoding="utf-8"))
 
+    @property
+    def schema(self) -> pl.Schema:
+        """The store's declared column schema (name -> polars dtype).
+
+        The in-memory schema from the store's
+        :class:`~exporgo.datastore.spec.StoreSpec` -- the same schema
+        :meth:`write_schema` persists and :meth:`scan` restores. Cheap (no IO) and
+        available even before anything has been written. Use the static
+        :meth:`read_schema` only when no store instance exists (the bootstrap during
+        :meth:`~exporgo.study.study.Study.load`).
+
+        Returns:
+            The declared schema as a :class:`polars.Schema` (a dict-like mapping).
+        """
+        return self.spec.polars_schema()
+
     def write_schema(self) -> None:
         """Persist the store's declared schema as a 0-row anchor Parquet file."""
         self.root.mkdir(parents=True, exist_ok=True)
@@ -146,7 +171,9 @@ class Store:
         """Read a store's persisted column schema (name -> dtype) from its anchor.
 
         Reads the 0-row anchor Parquet written by :meth:`write_schema`, letting a study
-        reload a store's schema without re-declaring its columns in code.
+        reload a store's schema without re-declaring its columns in code. This is the
+        pre-instance bootstrap (before a :class:`Store`/``StoreSpec`` exists); with a live
+        store in hand, use the :attr:`schema` property instead (in-memory, no IO).
 
         Args:
             root: The store's root directory (holding ``_schema.parquet``).
@@ -200,6 +227,27 @@ class Store:
             tuple(str(row[key]) for key in keys)
             for row in distinct.iter_rows(named=True)
         }
+
+    def _existing_partitions(self) -> set[tuple[str, ...]]:
+        """The partition-key tuples already present in the store, from the manifest."""
+        return {
+            self._partition_tuple(partition)
+            for partition in self.manifest().partitions()
+        }
+
+    def _reject_existing_partitions(self, frame: pl.DataFrame) -> None:
+        """Raise if ``frame`` carries any identity (partition) the store already contains."""
+        conflicts = self._incoming_partitions(frame) & self._existing_partitions()
+        if conflicts:
+            keys = list(self.spec.partition_keys)
+            pretty = [
+                dict(zip(keys, values, strict=True)) for values in sorted(conflicts)
+            ]
+            msg = (
+                f"Store {self.spec.name!r} already contains identities {pretty}; "
+                f"refusing to write (mode='unique')."
+            )
+            raise ValueError(msg)
 
     def _remove_partitions(self, targets: set[tuple[str, ...]]) -> None:
         """Delete fragments (files + manifest entries) for the target partitions."""

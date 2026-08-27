@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from exporgo.datastore.spec import StoreSpec
     from exporgo.datastore.store import Store
 
-__all__ = ["Study", "ValidationReport"]
+__all__ = ["CoverageReport", "Study", "ValidationReport"]
 
 _CONFIG_NAME = "study.toml"
 
@@ -58,6 +58,42 @@ class ValidationReport:
     def is_complete(self) -> bool:
         """True when every registered identity has every declared resource on disk."""
         return not self.missing
+
+
+@dataclass(frozen=True)
+class CoverageReport:
+    """Which identities each component (store/resource) contains, derived on demand.
+
+    Generalizes :class:`ValidationReport` across both stores and resources. Resources are
+    reported closed-world (registered identities whose file exists); stores are reported
+    open-world from their manifest, so a store may contain identities that were never
+    registered -- those land in ``unregistered`` (drift) rather than ``missing``.
+
+    Attributes:
+        present: ``(identity, component_name)`` pairs where the registered identity is
+            contained in that store/resource.
+        missing: ``(identity, component_name)`` pairs where a registered identity is
+            absent from that component.
+        unregistered: ``(identity, store_name)`` pairs for identities physically present
+            in a store but not registered in the study (store-only drift).
+    """
+
+    present: tuple[tuple[Identity, str], ...]
+    missing: tuple[tuple[Identity, str], ...]
+    unregistered: tuple[tuple[Identity, str], ...]
+
+    @property
+    def is_complete(self) -> bool:
+        """True when every registered identity is present in every declared component."""
+        return not self.missing
+
+    def identities(self, component: str) -> set[Identity]:
+        """The identities present in the named store or resource."""
+        return {identity for identity, name in self.present if name == component}
+
+    def components(self, identity: Identity) -> set[str]:
+        """The store/resource names that contain the given identity."""
+        return {name for present, name in self.present if present == identity}
 
 
 class Study:
@@ -342,6 +378,115 @@ class Study:
                 bucket = present if target.exists() else missing
                 bucket.append((identity, name))
         return ValidationReport(present=tuple(present), missing=tuple(missing))
+
+    def identities(
+        self,
+        *,
+        store: str | None = None,
+        resource: str | None = None,
+    ) -> set[Identity]:
+        """Return the identities contained in one declared store or resource.
+
+        Exactly one of ``store``/``resource`` must be given. A **store** is reported
+        open-world from its manifest -- the partitions physically present, which may
+        include identities never registered in the study. A **resource** is reported
+        closed-world -- the registered identities whose resolved file exists on disk
+        (there is no scan for unregistered files; that is :meth:`discover`'s future role).
+
+        Args:
+            store: The name of a declared store to inventory, or ``None``.
+            resource: The name of a declared resource to inventory, or ``None``.
+
+        Returns:
+            The contained :class:`~exporgo.study.identity.Identity` objects. Store
+            identities are built over the store's partition keys; resource identities are
+            the registered identities that are present.
+
+        Raises:
+            ValueError: If neither or both of ``store``/``resource`` are given.
+            KeyError: If no store/resource with that name has been declared.
+        """
+        if store is not None and resource is not None:
+            msg = "identities() accepts only one of 'store' or 'resource', not both."
+            raise ValueError(msg)
+        if store is not None:
+            component = self.store(store)
+            return {
+                self._identity_from_partition(component.spec.partition_keys, partition)
+                for partition in component.manifest().partitions()
+            }
+        if resource is not None:
+            handle = self.resource(resource)
+            return {
+                entity for entity in self._entities if handle.exists(**entity.to_dict())
+            }
+        msg = "identities() requires one of 'store' or 'resource'."
+        raise ValueError(msg)
+
+    def _identity_from_partition(
+        self, partition_keys: tuple[str, ...], partition: Mapping[str, str]
+    ) -> Identity:
+        """Coerce a manifest partition dict into a typed :class:`Identity`."""
+        key_by_name = {key.name: key for key in self.identity.keys}
+        values = tuple(
+            key_by_name[name].coerce(partition[name])
+            if name in key_by_name
+            else partition[name]
+            for name in partition_keys
+        )
+        return Identity(keys=tuple(partition_keys), values=values)
+
+    def _project(self, identity: Identity, keys: tuple[str, ...]) -> Identity | None:
+        """Project a registered identity onto ``keys`` (``None`` if a key isn't in it)."""
+        try:
+            values = tuple(identity[key] for key in keys)
+        except ValueError:
+            return None
+        return Identity(keys=tuple(keys), values=values)
+
+    def coverage(self) -> CoverageReport:
+        """Report which registered identities each declared store/resource contains.
+
+        Generalizes :meth:`validate` to cover both resources (existence of the declared
+        file) and stores (presence in the store's manifest), classifying every
+        ``(registered identity, component)`` pair as present or missing. Store identities
+        present on disk but not registered are collected in
+        :attr:`CoverageReport.unregistered` (drift). Filesystem/manifest = truth; nothing
+        is cached.
+
+        Returns:
+            A :class:`CoverageReport` over registered identities and declared components.
+        """
+        present: list[tuple[Identity, str]] = []
+        missing: list[tuple[Identity, str]] = []
+        unregistered: list[tuple[Identity, str]] = []
+
+        for resource_name in self._resources:
+            contained = self.identities(resource=resource_name)
+            for identity in self._entities:
+                bucket = present if identity in contained else missing
+                bucket.append((identity, resource_name))
+
+        for store_name, spec in self._stores.items():
+            contained = self.identities(store=store_name)
+            projected: set[Identity] = set()
+            for identity in self._entities:
+                projection = self._project(identity, spec.partition_keys)
+                if projection is None:
+                    continue
+                projected.add(projection)
+                bucket = present if projection in contained else missing
+                bucket.append((identity, store_name))
+            unregistered.extend(
+                (extra, store_name)
+                for extra in sorted(contained - projected, key=Identity.as_path)
+            )
+
+        return CoverageReport(
+            present=tuple(present),
+            missing=tuple(missing),
+            unregistered=tuple(unregistered),
+        )
 
     def init_logging(
         self,

@@ -8,9 +8,10 @@ keys, and the study's validation seeds monitoring's derived status.
 
 from exporgo.study.identity import Identity, IdentityKey, IdentitySchema
 from exporgo.study.resources import Resource, ResourceSpec
-from exporgo.study.study import Study, ValidationReport
+from exporgo.study.study import CoverageReport, Study, ValidationReport
 
 __all__ = [
+    "CoverageReport",
     "Identity",
     "IdentityKey",
     "IdentitySchema",

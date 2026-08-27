@@ -127,6 +127,24 @@ report.present   # ...
 identities × declared resources*. This is the file-existence self-check, and it's exactly
 what the monitoring layer later turns into **derived** per-step status.
 
+### Which identities a component contains (built 2026-08-27)
+
+Two related accessors report component membership, both derived on demand:
+
+- **`study.identities(store=…)` / `study.identities(resource=…)`** — the per-component
+  primitive, returning a `set[Identity]`. A **store** is answered **open-world** from its
+  manifest (the partitions physically present — which may include identities never
+  registered); a **resource** is answered **closed-world** (the registered identities whose
+  file exists — there is no scan for unregistered files; that is `discover()`'s future job).
+- **`study.coverage()`** — a study-wide `CoverageReport` layered on the primitive: every
+  `(registered identity, component)` pair classified `present`/`missing` across both stores
+  and resources, plus `unregistered` — store identities present on disk but not registered
+  (the open-world drift a registered-only matrix would miss). It generalizes `validate()`
+  (which stays resource-only).
+
+The write-time counterpart lives in the datastore: `store.write(frame, mode="unique")`
+refuses to write an identity the store already contains (see the datastore design doc).
+
 ## Layout: per-resource templates, default by ownership
 
 There is **no single forced tree**. Each resource declares its own path template, and the

@@ -147,3 +147,60 @@ def test_write_logs_a_summary(tmp_path: Path) -> None:
     joined = " ".join(records).lower()
     assert "behavior" in joined
     assert "4 rows" in joined
+
+
+def test_schema_property_returns_the_declared_schema(tmp_path: Path) -> None:
+    store = Store(tmp_path, _spec())  # nothing written yet -> no IO, still works
+
+    assert store.schema == store.spec.polars_schema()
+    assert store.schema["Subject"] == pl.String
+    assert store.schema["Session"] == pl.Int64
+
+
+def test_unique_rejects_rewriting_an_existing_identity(tmp_path: Path) -> None:
+    store = Store(tmp_path, _spec())
+    store.write(_frame())  # partitions m01/1 and m02/2
+
+    with pytest.raises(ValueError, match="already contains"):
+        store.write(_frame(), mode="unique")
+
+    assert store.manifest().row_count() == 4  # store unchanged
+
+
+def test_unique_allows_a_genuinely_new_identity(tmp_path: Path) -> None:
+    store = Store(tmp_path, _spec())
+    first = pl.DataFrame(
+        {"Subject": ["m01"], "Session": [1], "trial": [1], "lick_rate": [0.5]}
+    )
+    second = pl.DataFrame(
+        {"Subject": ["m03"], "Session": [3], "trial": [1], "lick_rate": [0.9]}
+    )
+
+    store.write(first, mode="unique")
+    store.write(second, mode="unique")
+
+    assert len(store.manifest().partitions()) == 2
+
+
+def test_unique_is_all_or_nothing(tmp_path: Path) -> None:
+    store = Store(tmp_path, _spec())
+    store.write(
+        pl.DataFrame(
+            {"Subject": ["m01"], "Session": [1], "trial": [1], "lick_rate": [0.5]}
+        )
+    )
+    mixed = pl.DataFrame(  # m01/1 already present, m02/2 is new
+        {
+            "Subject": ["m01", "m02"],
+            "Session": [1, 2],
+            "trial": [1, 1],
+            "lick_rate": [0.5, 0.1],
+        }
+    )
+
+    with pytest.raises(ValueError, match="already contains"):
+        store.write(mixed, mode="unique")
+
+    parts = {(p["Subject"], p["Session"]) for p in store.manifest().partitions()}
+    assert ("m01", "1") in parts
+    assert ("m02", "2") not in parts  # nothing from the rejected write landed

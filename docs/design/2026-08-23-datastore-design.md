@@ -141,13 +141,17 @@ Control on the dev machine (logged in Event Viewer → CodeIntegrity, not Defend
 History); 24.0.0 is trusted and loads.
 
 **Build status (2026-08-23):** MVP built & verified (TDD, 28 datastore tests) — `StoreSpec`,
-`Store` (schema-enforced `write` with **append / overwrite-by-key** + pruning `scan` +
-**per-store manifest**), and `study.declare_store()` / `study.store()` with catalog
+`Store` (schema-enforced `write` with **append / overwrite-by-key / unique** + pruning
+`scan` + **per-store manifest**), and `study.declare_store()` / `study.store()` with catalog
 persistence. The **manifest** (`<store>/_manifest.json`) records each written fragment
 (path, partition, rows, timestamp) and exposes `partitions()` / `row_count()` — O(1)
-"what's in here" without scanning the data. **Overwrite-by-key** (`write(frame,
-mode="overwrite")`) uses the manifest to delete the incoming partitions' fragments (files +
-entries) before writing, replacing only those partitions.
+"what's in here" without scanning the data; it is the store's record of **which identities
+it contains** (a partition == an identity when partition keys default to the identity keys).
+**Overwrite-by-key** (`write(frame, mode="overwrite")`) uses the manifest to delete the
+incoming partitions' fragments (files + entries) before writing, replacing only those
+partitions. **`mode="unique"`** (added 2026-08-27) is the write-time guard: it refuses the
+write (raises, all-or-nothing) if `frame` carries any identity already present in the
+manifest, so a store never accumulates duplicate identities.
 
 **Schema = real polars dtypes (no whitelist).** `StoreSpec.columns` maps names to actual
 polars dtypes at full fidelity — exact int/float widths (`UInt16`, `Float32`), `List`/
