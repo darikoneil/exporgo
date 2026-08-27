@@ -38,6 +38,18 @@ __all__ = ["CoverageReport", "Study", "ValidationReport"]
 _CONFIG_NAME = "study.toml"
 
 
+def _rows_to_toml(value: int | None) -> int:
+    """Encode a ``max_rows`` setting for ``study.toml`` (``None`` -> the 0 sentinel)."""
+    return 0 if value is None else value
+
+
+def _rows_from_toml(value: int | None, default: int | None) -> int | None:
+    """Decode a persisted ``max_rows`` value (absent -> default, 0 sentinel -> ``None``)."""
+    if value is None:
+        return default
+    return None if value == 0 else value
+
+
 @dataclass(frozen=True)
 class ValidationReport:
     """Outcome of :meth:`Study.validate` — which (identity, resource) pairs exist.
@@ -311,6 +323,8 @@ class Study:
         *,
         partition_keys: Sequence[str] | None = None,
         sort_column: str | None = None,
+        max_rows_per_file: int | None = 25_000_000,
+        max_rows_per_group: int | None = None,
     ) -> "StoreSpec":
         """Declare a datastore component; partition keys default to the identity keys.
 
@@ -321,6 +335,10 @@ class Study:
             partition_keys: Columns to partition by (1-3); defaults to the study's
                 identity keys.
             sort_column: Optional column to sort by within partitions.
+            max_rows_per_file: Write-time cap on rows per Parquet fragment (``None`` = no
+                exporgo-imposed limit). Part of the declaration, so it survives save/load.
+            max_rows_per_group: Write-time cap on rows per row group (``None`` = pyarrow's
+                default). Part of the declaration, so it survives save/load.
 
         Returns:
             The created :class:`~exporgo.datastore.spec.StoreSpec`.
@@ -335,6 +353,8 @@ class Study:
             columns=dict(columns),
             partition_keys=keys,
             sort_column=sort_column,
+            max_rows_per_file=max_rows_per_file,
+            max_rows_per_group=max_rows_per_group,
         )
         self._stores[name] = spec
 
@@ -616,7 +636,11 @@ class Study:
         }
         stores: dict[str, dict[str, object]] = {}
         for store_name, spec in self._stores.items():
-            entry: dict[str, object] = {"partition_keys": list(spec.partition_keys)}
+            entry: dict[str, object] = {
+                "partition_keys": list(spec.partition_keys),
+                "max_rows_per_file": _rows_to_toml(spec.max_rows_per_file),
+                "max_rows_per_group": _rows_to_toml(spec.max_rows_per_group),
+            }
             if spec.sort_column is not None:
                 entry["sort_column"] = spec.sort_column
             stores[store_name] = entry
@@ -677,6 +701,12 @@ class Study:
                     Store.read_schema(root / store_name),
                     partition_keys=entry["partition_keys"],
                     sort_column=entry.get("sort_column"),
+                    max_rows_per_file=_rows_from_toml(
+                        entry.get("max_rows_per_file"), 25_000_000
+                    ),
+                    max_rows_per_group=_rows_from_toml(
+                        entry.get("max_rows_per_group"), None
+                    ),
                 )
         for filemap_name in data.get("filemaps", []):
             study.declare_filemap(filemap_name)

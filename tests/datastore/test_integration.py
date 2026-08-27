@@ -149,3 +149,45 @@ def test_coverage_reports_present_missing_and_unregistered(tmp_path: Path) -> No
     assert (m03, "behavior") in report.unregistered
     assert not report.is_complete
     assert report.identities("behavior") == {m01}
+
+
+def test_store_reads_max_rows_from_its_spec(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_store(
+        "behavior", {"Subject": pl.String}, max_rows_per_file=7, max_rows_per_group=3
+    )
+
+    spec = study.store("behavior").spec
+
+    assert spec.max_rows_per_file == 7
+    assert spec.max_rows_per_group == 3
+
+
+def test_max_rows_settings_round_trip_through_save_load(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_store(
+        "behavior",
+        {"Subject": pl.String, "trial": pl.Int64},
+        max_rows_per_file=1_000,  # a set value round-trips exactly
+        max_rows_per_group=None,  # None (default) stays None
+    )
+    study.save()
+
+    spec = Study.load(tmp_path).store("behavior").spec
+    assert spec.max_rows_per_file == 1_000
+    assert spec.max_rows_per_group is None
+
+
+def test_max_rows_none_round_trips_via_the_zero_sentinel(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_store(
+        "behavior",
+        {"Subject": pl.String},
+        max_rows_per_file=None,  # deliberate "no limit" survives (None -> 0 -> None)
+        max_rows_per_group=5_000,
+    )
+    study.save()
+
+    spec = Study.load(tmp_path).store("behavior").spec
+    assert spec.max_rows_per_file is None
+    assert spec.max_rows_per_group == 5_000

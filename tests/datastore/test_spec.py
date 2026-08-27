@@ -14,6 +14,23 @@ BEHAVIOR = {
 }
 
 
+def test_defaults_the_max_rows_write_settings() -> None:
+    spec = StoreSpec(name="s", columns={"Subject": pl.String}, partition_keys=("Subject",))
+
+    assert spec.max_rows_per_file == 25_000_000
+    assert spec.max_rows_per_group is None
+
+
+def test_rejects_a_negative_max_rows_setting() -> None:
+    with pytest.raises(ValidationError):
+        StoreSpec(
+            name="s",
+            columns={"Subject": pl.String},
+            partition_keys=("Subject",),
+            max_rows_per_file=-1,
+        )
+
+
 def test_polars_schema_preserves_declared_dtypes_exactly() -> None:
     spec = StoreSpec(
         name="neural",

@@ -100,6 +100,8 @@ class Store:
             basename_template=f"part-{uuid4().hex}-{{i}}.parquet",
             file_visitor=written.append,
             use_threads=True,
+            max_rows_per_file=self.spec.max_rows_per_file,
+            max_rows_per_group=self.spec.max_rows_per_group,
         )
         timestamp = datetime.now(UTC).isoformat()
         self._record_fragments(

@@ -3,7 +3,7 @@
 from typing import Any, ClassVar, Self
 
 import polars as pl
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 __all__ = ["StoreSpec"]
 
@@ -21,7 +21,10 @@ class StoreSpec(BaseModel):
     fidelity -- exact int/float widths, ``List``/``Array``/``Struct``, temporal, etc.).
     The schema is strict and enforced on write. Partition keys (1-3) drive the on-disk
     Hive layout and pruning; the optional sort column enables row-group range pruning.
-    Partition and sort keys must be scalar (non-nested) columns.
+    Partition and sort keys must be scalar (non-nested) columns. ``max_rows_per_file`` and
+    ``max_rows_per_group`` are the write-time chunking limits passed through to
+    :func:`pyarrow.dataset.write_dataset` (``None`` = no exporgo-imposed limit); part of
+    the declaration, so they persist with the store.
 
     Example:
         >>> import polars as pl
@@ -43,6 +46,8 @@ class StoreSpec(BaseModel):
     columns: dict[str, Any]
     partition_keys: tuple[str, ...]
     sort_column: str | None = None
+    max_rows_per_file: int | None = Field(default=25_000_000, ge=0)
+    max_rows_per_group: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def _validate(self) -> Self:
