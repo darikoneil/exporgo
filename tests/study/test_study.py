@@ -183,7 +183,7 @@ def test_print_outputs_a_multiline_summary() -> None:
     assert "\n" in out
 
 
-def test_save_logs_the_creation_date(tmp_path: Path) -> None:
+def test_first_save_logs_the_creation_date(tmp_path: Path) -> None:
     Study(name="fomo", root=tmp_path).save()
 
     logger.remove()  # flush + close the async file sink so the record is on disk
@@ -191,6 +191,20 @@ def test_save_logs_the_creation_date(tmp_path: Path) -> None:
 
     assert "created" in content.lower()
     assert "fomo" in content
+
+
+def test_second_save_does_not_relog_created(tmp_path: Path) -> None:
+    study = Study(name="fomo", root=tmp_path)
+    study.save()  # first save: study.toml is created -> logs "created"
+    logger.remove()  # flush + close the file sink
+    (tmp_path / "fomo.log").unlink()  # isolate the second save's output
+
+    study.save()  # study.toml already exists -> plain "saved", no "created"
+    logger.remove()
+    content = (tmp_path / "fomo.log").read_text(encoding="utf-8")
+
+    assert "created" not in content.lower()
+    assert "saved" in content.lower()
 
 
 def test_load_logs_that_the_study_was_accessed(tmp_path: Path) -> None:

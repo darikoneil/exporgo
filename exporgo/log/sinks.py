@@ -68,7 +68,7 @@ def _set_primary_log(base_directory: Path, file_stem: str) -> None:
         format=PRIMARY_FILE_FORMAT,
         filter=_is_primary_log,
         rotation="100 MB",
-        retention="10 years",
+        retention="100 years",
         delay=False,
     )
 

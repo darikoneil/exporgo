@@ -384,8 +384,9 @@ class Study:
         """Write the study's declaration to ``root/study.toml`` and return that path.
 
         Also initializes logging into the study root (see :meth:`init_logging`), so a
-        saved study automatically has a ``<root>/<name>.log`` the logger writes to, and
-        records the creation date to that log.
+        saved study automatically has a ``<root>/<name>.log`` the logger writes to. The
+        **first** save (when ``study.toml`` does not yet exist) records a "created" line
+        with the creation date to that log; subsequent saves record a plain "saved" line.
         """
         data: dict[str, object] = {
             "name": self.name,
@@ -406,13 +407,19 @@ class Study:
         data["stores"] = stores
         self.root.mkdir(parents=True, exist_ok=True)
         config_path = self.root / _CONFIG_NAME
+        is_first_save = not config_path.exists()  # before we (over)write it below
         with config_path.open("wb") as handle:
             tomli_w.dump(data, handle)
         for store_name in self._stores:
             self.store(store_name).write_schema()  # persist each store's schema anchor
         self.init_logging()
-        creation_date = datetime.now(UTC).isoformat(timespec="seconds")
-        msg = f"Study {self.name!r} saved to {config_path} (created {creation_date})."
+        if is_first_save:
+            creation_date = datetime.now(UTC).isoformat(timespec="seconds")
+            msg = (
+                f"Study {self.name!r} created {creation_date} (saved to {config_path})."
+            )
+        else:
+            msg = f"Study {self.name!r} saved to {config_path}."
         logger.info(msg)
         return config_path
 

@@ -90,6 +90,7 @@ class Store:
             existing_data_behavior="overwrite_or_ignore",
             basename_template=f"part-{uuid4().hex}-{{i}}.parquet",
             file_visitor=written.append,
+            use_threads=True,
         )
         timestamp = datetime.now(UTC).isoformat()
         self._record_fragments(

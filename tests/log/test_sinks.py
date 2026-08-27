@@ -61,7 +61,7 @@ def test_primary_log_sink_uses_stem_and_expected_options(
         "format": sinks.PRIMARY_FILE_FORMAT,
         "filter": sinks._is_primary_log,
         "rotation": "100 MB",
-        "retention": "10 years",
+        "retention": "100 years",
         "delay": False,
     }
 
