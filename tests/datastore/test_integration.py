@@ -114,9 +114,9 @@ def test_identities_of_a_resource_returns_registered_present(tmp_path: Path) -> 
 
 def test_identities_requires_exactly_one_target(tmp_path: Path) -> None:
     study = Study(name="s", root=tmp_path)
-    with pytest.raises(ValueError, match="one of"):
+    with pytest.raises(ValueError, match="exactly one"):
         study.identities()
-    with pytest.raises(ValueError, match="only one"):
+    with pytest.raises(ValueError, match="exactly one"):
         study.identities(store="a", resource="b")
 
 

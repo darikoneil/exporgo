@@ -20,6 +20,7 @@ import tomli_w
 from loguru import logger
 
 from exporgo.log import LogLevel, init_logger
+from exporgo.study.filemaps import FileMap
 from exporgo.study.identity import (
     Identity,
     IdentityKey,
@@ -119,6 +120,7 @@ class Study:
         self._entities: list[Identity] = []
         self._resources: dict[str, ResourceSpec] = {}
         self._stores: dict[str, StoreSpec] = {}
+        self._filemaps: list[str] = []
 
     @staticmethod
     def _coerce_schema(
@@ -146,17 +148,19 @@ class Study:
         keys = ", ".join(self.identity.names)
         return (
             f"Study {self.name!r} [{keys}]: {len(self._entities)} identities, "
-            f"{len(self._resources)} resources, {len(self._stores)} stores"
+            f"{len(self._resources)} resources, {len(self._stores)} stores, "
+            f"{len(self._filemaps)} filemaps"
         )
 
     def print(self) -> None:
         """Print a multi-line summary of the study's declared contents to stdout.
 
         Reports the study name and root, its identity keys, and the counts (and names)
-        of registered identities, declared resources, and declared stores.
+        of registered identities, declared resources, stores, and filemaps.
         """
         resources = ", ".join(sorted(self._resources)) or "(none)"
         stores = ", ".join(sorted(self._stores)) or "(none)"
+        filemaps = ", ".join(sorted(self._filemaps)) or "(none)"
         keys = ", ".join(self.identity.names)
         lines = [
             f"Study {self.name!r}",
@@ -165,6 +169,7 @@ class Study:
             f"  identities: {len(self._entities)} registered",
             f"  resources:  {len(self._resources)} ({resources})",
             f"  stores:     {len(self._stores)} ({stores})",
+            f"  filemaps:   {len(self._filemaps)} ({filemaps})",
         ]
         print("\n".join(lines))
 
@@ -182,6 +187,15 @@ class Study:
     def stores(self) -> dict[str, "StoreSpec"]:
         """The declared store specs, keyed by name (a copy; safe to mutate)."""
         return dict(self._stores)
+
+    @property
+    def filemaps(self) -> dict[str, FileMap]:
+        """The declared filemaps, keyed by name.
+
+        Returns the :class:`~exporgo.study.filemaps.FileMap` handles (a filemap has no
+        separate spec, so this returns the components themselves rather than declarations).
+        """
+        return {name: self.filemap(name) for name in self._filemaps}
 
     def register(self, **values: IdentityValue) -> Identity:
         """Register an identity the study should contain (a declared expectation).
@@ -354,6 +368,48 @@ class Study:
             raise KeyError(msg) from None
         return Store(self.root / name, spec)
 
+    def declare_filemap(self, name: str) -> FileMap:
+        """Declare a filemap component and return its handle.
+
+        A filemap records the concrete location(s) of particular files for each identity
+        (see :class:`~exporgo.study.filemaps.FileMap`) -- the third component type beside
+        resources and stores. It has no declaration beyond its name; the recorded paths
+        live in a sidecar ``<root>/<name>/_filemap.json`` written by the handle.
+
+        Args:
+            name: The filemap's name (also its subdirectory under the study root).
+
+        Returns:
+            The :class:`~exporgo.study.filemaps.FileMap` handle bound to ``<root>/<name>``.
+        """
+        if name not in self._filemaps:
+            self._filemaps.append(name)
+
+        msg = f"Declared the filemap {name!r}"
+        logger.info(msg)
+
+        return self.filemap(name)
+
+    def filemap(self, name: str) -> FileMap:
+        """Return the :class:`~exporgo.study.filemaps.FileMap` handle for a component.
+
+        Args:
+            name: The name of a previously declared filemap.
+
+        Returns:
+            The :class:`~exporgo.study.filemaps.FileMap` bound to ``<root>/<name>``.
+
+        Raises:
+            KeyError: If no filemap with that name has been declared.
+        """
+        if name not in self._filemaps:
+            msg = (
+                f"No filemap named {name!r}; "
+                f"declared filemaps: {sorted(self._filemaps)}"
+            )
+            raise KeyError(msg)
+        return FileMap(self.root / name, name, self.identity)
+
     def validate(self) -> ValidationReport:
         """Check each registered identity against each declared resource on disk.
 
@@ -384,30 +440,34 @@ class Study:
         *,
         store: str | None = None,
         resource: str | None = None,
+        filemap: str | None = None,
     ) -> set[Identity]:
-        """Return the identities contained in one declared store or resource.
+        """Return the identities contained in one declared store, resource, or filemap.
 
-        Exactly one of ``store``/``resource`` must be given. A **store** is reported
-        open-world from its manifest -- the partitions physically present, which may
-        include identities never registered in the study. A **resource** is reported
-        closed-world -- the registered identities whose resolved file exists on disk
-        (there is no scan for unregistered files; that is :meth:`discover`'s future role).
+        Exactly one target must be given. A **store** and a **filemap** are reported
+        open-world (the store's manifest partitions / the filemap's recorded identities),
+        so they may include identities never registered in the study. A **resource** is
+        reported closed-world -- the registered identities whose resolved file exists on
+        disk (there is no scan for unregistered files; that is :meth:`discover`'s role).
 
         Args:
             store: The name of a declared store to inventory, or ``None``.
             resource: The name of a declared resource to inventory, or ``None``.
+            filemap: The name of a declared filemap to inventory, or ``None``.
 
         Returns:
             The contained :class:`~exporgo.study.identity.Identity` objects. Store
             identities are built over the store's partition keys; resource identities are
-            the registered identities that are present.
+            the registered identities that are present; filemap identities are those with
+            at least one recorded file.
 
         Raises:
-            ValueError: If neither or both of ``store``/``resource`` are given.
-            KeyError: If no store/resource with that name has been declared.
+            ValueError: If not exactly one target is given.
+            KeyError: If no store/resource/filemap with that name has been declared.
         """
-        if store is not None and resource is not None:
-            msg = "identities() accepts only one of 'store' or 'resource', not both."
+        provided = [name for name in (store, resource, filemap) if name is not None]
+        if len(provided) != 1:
+            msg = "identities() requires exactly one of 'store', 'resource', 'filemap'."
             raise ValueError(msg)
         if store is not None:
             component = self.store(store)
@@ -420,8 +480,8 @@ class Study:
             return {
                 entity for entity in self._entities if handle.exists(**entity.to_dict())
             }
-        msg = "identities() requires one of 'store' or 'resource'."
-        raise ValueError(msg)
+        assert filemap is not None  # the only remaining option after the guard above
+        return self.filemap(filemap).identities()
 
     def _identity_from_partition(
         self, partition_keys: tuple[str, ...], partition: Mapping[str, str]
@@ -447,12 +507,12 @@ class Study:
     def coverage(self) -> CoverageReport:
         """Report which registered identities each declared store/resource contains.
 
-        Generalizes :meth:`validate` to cover both resources (existence of the declared
-        file) and stores (presence in the store's manifest), classifying every
-        ``(registered identity, component)`` pair as present or missing. Store identities
-        present on disk but not registered are collected in
-        :attr:`CoverageReport.unregistered` (drift). Filesystem/manifest = truth; nothing
-        is cached.
+        Generalizes :meth:`validate` to cover resources (existence of the declared file),
+        stores (presence in the store's manifest), and filemaps (a recorded location for
+        the identity), classifying every ``(registered identity, component)`` pair as
+        present or missing. Store/filemap identities present on disk but not registered are
+        collected in :attr:`CoverageReport.unregistered` (drift). Filesystem/manifest =
+        truth; nothing is cached.
 
         Returns:
             A :class:`CoverageReport` over registered identities and declared components.
@@ -480,6 +540,17 @@ class Study:
             unregistered.extend(
                 (extra, store_name)
                 for extra in sorted(contained - projected, key=Identity.as_path)
+            )
+
+        registered = set(self._entities)
+        for filemap_name in self._filemaps:
+            contained = self.identities(filemap=filemap_name)
+            for identity in self._entities:
+                bucket = present if identity in contained else missing
+                bucket.append((identity, filemap_name))
+            unregistered.extend(
+                (extra, filemap_name)
+                for extra in sorted(contained - registered, key=Identity.as_path)
             )
 
         return CoverageReport(
@@ -550,6 +621,7 @@ class Study:
                 entry["sort_column"] = spec.sort_column
             stores[store_name] = entry
         data["stores"] = stores
+        data["filemaps"] = list(self._filemaps)
         self.root.mkdir(parents=True, exist_ok=True)
         config_path = self.root / _CONFIG_NAME
         is_first_save = not config_path.exists()  # before we (over)write it below
@@ -606,6 +678,8 @@ class Study:
                     partition_keys=entry["partition_keys"],
                     sort_column=entry.get("sort_column"),
                 )
+        for filemap_name in data.get("filemaps", []):
+            study.declare_filemap(filemap_name)
         for entity in data.get("entities", []):
             study.register(**entity)
         msg = f"Study {study.name!r} accessed (loaded from {root / _CONFIG_NAME})."

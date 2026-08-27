@@ -67,17 +67,30 @@ curated/queryable/exporgo-owned → **datastore** (get polars back).
 
 ### Symmetric accessor surface
 
-The resource and store surfaces mirror each other — a lightweight `ResourceSpec`/`Resource`
-pair alongside the datastore's `StoreSpec`/`Store`:
+The three component surfaces mirror each other — a `ResourceSpec`/`Resource` pair, the
+datastore's `StoreSpec`/`Store`, and the `FileMap` (which has no separate spec):
 
-| | declaration | declare verb | specs collection | handle getter | handle |
+| | declaration | declare verb | collection | handle getter | handle |
 |---|---|---|---|---|---|
 | **Resource** | `ResourceSpec` | `declare_resource` | `resources` | `resource(name)` | `Resource` |
 | **Store** | `StoreSpec` | `declare_store` | `stores` | `store(name)` | `Store` |
+| **FileMap** | *(none — name only)* | `declare_filemap` | `filemaps` | `filemap(name)` | `FileMap` |
 
 `study.path(name, **identity)` is kept as terse sugar for
-`study.resource(name).path(**identity)`; there is no store equivalent because a `Store` is
-already the usable handle.
+`study.resource(name).path(**identity)`; there is no store/filemap equivalent because a
+`Store`/`FileMap` is already the usable handle.
+
+**FileMap (built 2026-08-27) — recorded locations.** Where a `Resource` *derives* a path
+from a template and a `Store` *owns* the data, a `FileMap` *records* the concrete
+location(s) of particular files per identity — typically raw acquisition files that live
+anywhere on disk (an external drive) and follow no naming pattern. Each identity maps to a
+`{name -> path}` set (name defaults to the file stem); paths are stored as-given (absolute,
+outside the root, never copied/created). Records persist to a sidecar
+`<root>/<name>/_filemap.json`. `record(path, **identity)` adds one; `discover(directory,
+**identity)` indexes a directory (like v1's `FileSet.index()`); `path`/`paths`/`exists`
+retrieve and validate; `identities()` lists which identities have records — so
+`study.identities(filemap=…)` and `study.coverage()` extend to it (open-world, like a
+store).
 
 ## Declaring a study
 

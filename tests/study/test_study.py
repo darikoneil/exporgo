@@ -215,3 +215,55 @@ def test_load_logs_that_the_study_was_accessed(tmp_path: Path) -> None:
     content = (tmp_path / "fomo.log").read_text(encoding="utf-8")
 
     assert "accessed" in content.lower()
+
+
+def test_declare_and_get_filemap(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_filemap("raw")
+
+    assert study.filemap("raw").name == "raw"
+    assert set(study.filemaps) == {"raw"}
+
+
+def test_filemap_unknown_name_raises(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path)
+    with pytest.raises(KeyError):
+        study.filemap("nope")
+
+
+def test_filemap_round_trips_through_save_load(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_filemap("raw")
+    study.filemap("raw").record("Z:/a.tif", Subject="m01")
+    study.save()
+
+    loaded = Study.load(tmp_path)
+
+    assert set(loaded.filemaps) == {"raw"}
+    assert loaded.filemap("raw").path("a", Subject="m01") == Path("Z:/a.tif")
+
+
+def test_identities_of_a_filemap(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_filemap("raw")
+    study.filemap("raw").record("Z:/a.tif", Subject="m01")
+
+    assert study.identities(filemap="raw") == {study.identity.identity(Subject="m01")}
+
+
+def test_coverage_includes_filemaps(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_filemap("raw")
+    study.register(Subject="m01")  # registered + recorded -> present
+    study.register(Subject="m02")  # registered, never recorded -> missing
+    study.filemap("raw").record("Z:/a.tif", Subject="m01")
+    study.filemap("raw").record("Z:/b.tif", Subject="m03")  # unregistered
+
+    report = study.coverage()
+    m01 = study.identity.identity(Subject="m01")
+    m02 = study.identity.identity(Subject="m02")
+    m03 = study.identity.identity(Subject="m03")
+
+    assert (m01, "raw") in report.present
+    assert (m02, "raw") in report.missing
+    assert (m03, "raw") in report.unregistered
