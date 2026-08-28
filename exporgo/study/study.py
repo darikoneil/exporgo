@@ -579,6 +579,71 @@ class Study:
             unregistered=tuple(unregistered),
         )
 
+    def discover(self, *, register: bool = False) -> CoverageReport:
+        """Scan the filesystem for resource identities and report the drift.
+
+        The open-world counterpart to :meth:`coverage` for resources: rather than checking
+        only whether *registered* identities' files exist, it reverse-resolves each
+        resource template (see :meth:`~exporgo.study.resources.Resource.discover`) to find
+        which identities are physically present, so on-disk-but-unregistered data surfaces
+        as :attr:`CoverageReport.unregistered` drift. Each resource is compared over its
+        own placeholder keys, projecting registered identities onto them (exactly how
+        subset-key stores are handled), so subset-key templates yield partial identities.
+
+        With ``register=True``, the discovered **full-key** identities (those spanning all
+        the study's identity keys) are then registered, bootstrapping the registry from an
+        existing dataset; subset-key partials are reported but not registered (they cannot
+        form a complete identity). The returned report always reflects the **pre-bootstrap**
+        state, so the drift that ``register=True`` resolves is still visible in it.
+
+        Constant-template resources (no placeholders) have no identity dimension and are
+        skipped. Stores and filemaps are not scanned here -- they are already open-world in
+        :meth:`coverage`.
+
+        Args:
+            register: If ``True``, register the discovered full-key identities after
+                building the report (a no-op for already-registered ones).
+
+        Returns:
+            A :class:`CoverageReport` over the declared resources, reflecting the registry
+            as it stood *before* any bootstrapping.
+        """
+        present: list[tuple[Identity, str]] = []
+        missing: list[tuple[Identity, str]] = []
+        unregistered: list[tuple[Identity, str]] = []
+        discovered: list[Identity] = []
+
+        for resource_name, spec in self._resources.items():
+            keys = spec.placeholders
+            if not keys:  # constant template: no identity to reverse-resolve
+                continue
+            contained = self.resource(resource_name).discover()
+            discovered.extend(contained)
+            projected: set[Identity] = set()
+            for identity in self._entities:
+                projection = self._project(identity, keys)
+                if projection is None:
+                    continue
+                projected.add(projection)
+                bucket = present if projection in contained else missing
+                bucket.append((identity, resource_name))
+            unregistered.extend(
+                (extra, resource_name)
+                for extra in sorted(contained - projected, key=Identity.as_path)
+            )
+
+        report = CoverageReport(
+            present=tuple(present),
+            missing=tuple(missing),
+            unregistered=tuple(unregistered),
+        )
+        if register:
+            full = set(self.identity.names)
+            for identity in discovered:
+                if set(identity.keys) == full:
+                    self.register(**identity.to_dict())
+        return report
+
     def init_logging(
         self,
         *,

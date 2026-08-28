@@ -11,6 +11,7 @@ The pair mirrors the datastore's split of
 ``StoreSpec`` as ``Resource`` is to ``Store``.
 """
 
+import re
 from pathlib import Path
 from string import Formatter
 from typing import ClassVar
@@ -20,6 +21,57 @@ from pydantic import BaseModel, ConfigDict
 from exporgo.study.identity import Identity, IdentitySchema, IdentityValue
 
 __all__ = ["Resource", "ResourceSpec"]
+
+
+def _template_to_glob(template: str) -> str:
+    """Turn a resource template into a filesystem glob (each ``{Key}`` becomes ``*``).
+
+    Example:
+        ``"{Subject}/{Session}/behavior.csv"`` -> ``"*/*/behavior.csv"``. The resulting
+        glob over-matches (any string, across siblings); a regex from
+        :func:`_template_to_regex` filters the candidates precisely.
+
+    Args:
+        template: A resource path template using ``{Key}`` placeholders.
+
+    Returns:
+        A glob pattern (relative to the resource root) matching the template's literals.
+    """
+    parts: list[str] = []
+    for literal, field, _spec, _conversion in Formatter().parse(template):
+        parts.append(literal)
+        if field is not None:
+            parts.append("*")
+    return "".join(parts)
+
+
+def _template_to_regex(template: str) -> re.Pattern[str]:
+    """Compile a resource template into an anchored regex with one group per placeholder.
+
+    Each literal is escaped verbatim and each ``{Key}`` becomes a named group
+    ``(?P<Key>[^/]+)`` on first use, or a backreference ``(?P=Key)`` when the key repeats
+    (so all occurrences of a key must resolve to the same value). ``[^/]+`` keeps a
+    captured value within a single path segment. Match against a resource-root-relative
+    **posix** path with :meth:`re.Pattern.fullmatch`.
+
+    Args:
+        template: A resource path template using ``{Key}`` placeholders.
+
+    Returns:
+        The compiled pattern; each placeholder's captured value is available by key name.
+    """
+    parts: list[str] = []
+    seen: set[str] = set()
+    for literal, field, _spec, _conversion in Formatter().parse(template):
+        parts.append(re.escape(literal))
+        if field is None:
+            continue
+        if field in seen:
+            parts.append(f"(?P={field})")
+        else:
+            seen.add(field)
+            parts.append(f"(?P<{field}>[^/]+)")
+    return re.compile("".join(parts))
 
 
 class ResourceSpec(BaseModel):
@@ -126,6 +178,47 @@ class Resource:
             ValueError: If a key is missing or an unexpected key is supplied.
         """
         return self.path(**values).exists()
+
+    def discover(self) -> set[Identity]:
+        """Reverse-resolve the template to find which identities exist on disk.
+
+        The inverse of :meth:`path`: instead of filling the template for a known identity,
+        this scans the study root for paths matching the template and reads each
+        placeholder's value back out, yielding an open-world inventory of what is
+        physically present (including identities never registered in the study). It is the
+        basis for :meth:`~exporgo.study.study.Study.discover`'s drift report and registry
+        bootstrap.
+
+        A template using only some identity keys yields **partial** identities over those
+        keys (mirroring how a subset-key store reports its partitions); a constant template
+        (no placeholders) has no identity dimension and yields an empty set. Captured
+        segments are coerced to their key's dtype via the schema.
+
+        Returns:
+            The identities physically present on disk, one per matching path (files and
+            folders both match). Empty when the template has no placeholders or the root
+            has no matches.
+
+        Note:
+            Cost is one directory glob plus a regex match per candidate path; nothing is
+            read from the files themselves.
+        """
+        placeholders = self.spec.placeholders
+        if not placeholders:
+            return set()
+        pattern = _template_to_regex(self.spec.template)
+        key_by_name = {key.name: key for key in self.schema.keys}
+        found: set[Identity] = set()
+        for candidate in self.root.glob(_template_to_glob(self.spec.template)):
+            relative = candidate.relative_to(self.root).as_posix()
+            match = pattern.fullmatch(relative)
+            if match is None:
+                continue
+            values = tuple(
+                key_by_name[name].coerce(match.group(name)) for name in placeholders
+            )
+            found.add(Identity(keys=placeholders, values=values))
+        return found
 
     @property
     def name(self) -> str:

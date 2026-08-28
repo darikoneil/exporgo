@@ -251,6 +251,57 @@ def test_identities_of_a_filemap(tmp_path: Path) -> None:
     assert study.identities(filemap="raw") == {study.identity.identity(Subject="m01")}
 
 
+def test_discover_reports_present_missing_and_drift(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_resource("beh", "{Subject}/behavior.csv")
+    study.register(Subject="m01")  # registered + on disk -> present
+    study.register(Subject="m02")  # registered, not on disk -> missing
+    for subject in ("m01", "m03"):  # m03 on disk but unregistered -> drift
+        (tmp_path / subject).mkdir()
+        (tmp_path / subject / "behavior.csv").write_text("x", encoding="utf-8")
+
+    report = study.discover()
+    m01 = study.identity.identity(Subject="m01")
+    m02 = study.identity.identity(Subject="m02")
+    m03 = study.identity.identity(Subject="m03")
+
+    assert (m01, "beh") in report.present
+    assert (m02, "beh") in report.missing
+    assert (m03, "beh") in report.unregistered
+    assert not report.is_complete
+
+
+def test_discover_register_bootstraps_full_key_identities(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_resource("beh", "{Subject}/behavior.csv")
+    for subject in ("m01", "m02"):
+        (tmp_path / subject).mkdir()
+        (tmp_path / subject / "behavior.csv").write_text("x", encoding="utf-8")
+
+    report = study.discover(register=True)
+    m01 = study.identity.identity(Subject="m01")
+    m02 = study.identity.identity(Subject="m02")
+
+    # the report reflects the pre-bootstrap state (both were unregistered drift)...
+    assert (m01, "beh") in report.unregistered
+    assert (m02, "beh") in report.unregistered
+    # ...but the discovered identities are now registered
+    assert set(study.entities) == {m01, m02}
+
+
+def test_discover_register_leaves_subset_key_partials_unregistered(
+    tmp_path: Path,
+) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject", "Session"])
+    study.declare_resource("geno", "{Subject}/genotype.txt")  # subset: Subject only
+    (tmp_path / "m01").mkdir()
+    (tmp_path / "m01" / "genotype.txt").write_text("x", encoding="utf-8")
+
+    study.discover(register=True)
+
+    assert study.entities == ()  # a partial identity cannot form a full (Subject, Session)
+
+
 def test_coverage_includes_filemaps(tmp_path: Path) -> None:
     study = Study(name="s", root=tmp_path, identity=["Subject"])
     study.declare_filemap("raw")

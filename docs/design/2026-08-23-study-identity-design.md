@@ -2,7 +2,8 @@
 
 *Design record, 2026-08-23. Shaped through discussion; the shared foundation both the
 monitoring and datastore layers build on. **Built & verified 2026-08-24** (TDD;
-ruff/pyrefly clean). `discover()` is the one deferred piece — flagged inline below.*
+ruff/pyrefly clean). `discover()` for resources was **built 2026-08-27** (reverse-resolves
+templates to find on-disk identities; noted inline).*
 
 ## Context
 
@@ -121,9 +122,11 @@ study.path(Subject="m01", Session=1, resource="suite2p")
 
 - **`register(...)`** is the **canonical expectation** — what the study *should* contain.
   This is what lets validation detect **missing** data.
-- **`discover()`** *(deferred — not yet implemented)* scans the tree to (a) **bootstrap**
-  a registry from an existing dataset and (b) report **drift** in both directions:
-  registered-but-missing, and on-disk-but-unregistered.
+- **`discover()`** *(built 2026-08-27, resources)* reverse-resolves each resource template
+  to find which identities physically exist on disk, and (a) reports **drift** in both
+  directions (registered-but-missing, on-disk-but-unregistered) as a `CoverageReport`, and
+  (b) with `register=True` **bootstraps** the registry from an existing dataset. See
+  "Reverse-resolving templates" below.
 
 Registration is the declared truth; discovery only reconciles it against reality — keeping
 the "describe + validate" philosophy intact.
@@ -148,12 +151,36 @@ Two related accessors report component membership, both derived on demand:
   primitive, returning a `set[Identity]`. A **store** is answered **open-world** from its
   manifest (the partitions physically present — which may include identities never
   registered); a **resource** is answered **closed-world** (the registered identities whose
-  file exists — there is no scan for unregistered files; that is `discover()`'s future job).
+  file exists — there is no scan for unregistered files; the open-world resource scan is
+  `discover()`, below).
 - **`study.coverage()`** — a study-wide `CoverageReport` layered on the primitive: every
   `(registered identity, component)` pair classified `present`/`missing` across both stores
   and resources, plus `unregistered` — store identities present on disk but not registered
   (the open-world drift a registered-only matrix would miss). It generalizes `validate()`
   (which stays resource-only).
+
+### Reverse-resolving templates — `discover()` (built 2026-08-27)
+
+`resolve()` fills a template *forward* for a known identity; `discover()` runs it
+*backward*. Two module-level helpers in `resources.py` invert the template:
+`_template_to_glob` (`{Key}` → `*`, e.g. `"*/*/behavior.csv"`) narrows the filesystem scan,
+and `_template_to_regex` (`{Key}` → named group `(?P<Key>[^/]+)`, repeats → backreference
+`(?P=Key)`) captures each placeholder's value from a root-relative posix path. `[^/]+`
+confines a value to one path segment; the backreference enforces that a repeated key
+resolves to the same value everywhere.
+
+- **`resource.discover() -> set[Identity]`** — the open-world primitive: globs the root,
+  `fullmatch`es each candidate, coerces the captured strings to their key dtypes, and
+  returns the identities present (files *and* folders match). A **subset-key** template
+  yields **partial** identities over just its keys (like a subset-key store's partitions); a
+  **constant** template (no placeholders) has no identity dimension and yields `∅`.
+- **`study.discover(*, register=False) -> CoverageReport`** — the resource-focused,
+  open-world counterpart to `coverage()`. Per resource it projects registered identities
+  onto the template's placeholder keys, classifies `present`/`missing`, and collects
+  `contained − projected` as `unregistered` drift. With `register=True` it then bootstraps
+  the registry from the discovered **full-key** identities (subset-key partials are reported
+  but not registered — they can't form a complete identity); the returned report always
+  reflects the **pre-bootstrap** state, so the drift it resolves stays visible.
 
 The write-time counterpart lives in the datastore: `store.write(frame, mode="unique")`
 refuses to write an identity the store already contains (see the datastore design doc).
@@ -243,12 +270,15 @@ is generic; identity keys, resources, and templates are all supplied by the stud
 
 ## Open / spec-level items (resolve when building)
 
-- Path-template syntax and edge cases (globs, optional segments, resources keyed on a
-  subset of identity keys, multiple files per resource).
+- Path-template edge cases still open: optional segments and multiple files per resource
+  (globs and subset-of-identity-key templates are **built** — see "Reverse-resolving
+  templates").
 - `study.toml` schema and `Study.from_config` / round-trip.
 - Freshness semantics for `validate()` (existence only vs. mtime-vs-inputs), which the
   monitoring layer will lean on.
-- Exact `discover()` reconciliation rules and drift reporting.
+- `discover()` reconciliation rules and drift reporting are **built** for resources
+  (2026-08-27); extending discovery to stores/filemaps beyond their existing open-world
+  reporting is still open.
 
 ## Verification (when built)
 
