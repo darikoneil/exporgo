@@ -301,11 +301,10 @@ wheels = [
 
 [[package]]
 name = "exporgo"
-version = "2.0.6"
+version = "2.0.7"
 source = { editable = "." }
 dependencies = [
     { name = "loguru" },
-    { name = "polars" },
     { name = "pydantic" },
     { name = "tomli-w" },
 ]
@@ -328,6 +327,7 @@ dev = [
     { name = "coverage" },
     { name = "numpy" },
     { name = "polars" },
+    { name = "pyarrow" },
     { name = "pyrefly" },
     { name = "pytest" },
     { name = "pytest-clarity" },
@@ -341,8 +341,7 @@ requires-dist = [
     { name = "autodoc-pydantic", marker = "extra == 'docs'" },
     { name = "loguru" },
     { name = "numpy", marker = "extra == 'datastore'" },
-    { name = "polars", specifier = ">=1.44.1" },
-    { name = "polars", extras = ["numpy", "pyarrow"], marker = "extra == 'datastore'" },
+    { name = "polars", extras = ["numpy", "pyarrow"], marker = "extra == 'datastore'", specifier = ">=1.44.1" },
     { name = "pyarrow", marker = "extra == 'datastore'", specifier = "==24.0.0" },
     { name = "pydantic" },
     { name = "sphinx", marker = "extra == 'docs'" },
@@ -357,6 +356,7 @@ dev = [
     { name = "coverage", extras = ["toml"] },
     { name = "numpy" },
     { name = "polars" },
+    { name = "pyarrow", specifier = ">=24.0.0" },
     { name = "pyrefly" },
     { name = "pytest" },
     { name = "pytest-clarity" },

@@ -30,6 +30,8 @@ from exporgo.study.identity import (
 from exporgo.study.resources import Resource, ResourceSpec
 
 if TYPE_CHECKING:
+    import polars as pl
+
     from exporgo.datastore.spec import StoreSpec
     from exporgo.datastore.store import Store
 
@@ -52,16 +54,24 @@ def _rows_from_toml(value: int | None, default: int | None) -> int | None:
 
 @dataclass(frozen=True)
 class ValidationReport:
-    """Outcome of :meth:`Study.validate` — which (identity, resource) pairs exist.
+    """Outcome of :meth:`Study.validate` — whether each identity's indicated files exist.
 
-    The filesystem is the source of truth: each registered identity is paired with each
-    declared resource and bucketed by whether that resource exists on disk. The report
-    is a plain snapshot holding no live handles, so it is safe to store or diff across
-    runs (e.g. to seed the monitoring layer's derived status).
+    A **liveness** self-check: for every registered identity, each declared **resource**
+    (its templated path) and each declared **filemap** (its recorded file locations) is
+    bucketed by whether the file(s) it points at are actually present on disk. This catches
+    data that was expected, or once recorded, but has since been deleted or moved. The
+    filesystem is the source of truth; the report is a plain snapshot holding no live
+    handles, so it is safe to store or diff across runs (e.g. to seed the monitoring layer's
+    derived status).
+
+    Unlike :class:`CoverageReport` (membership plus open-world drift), this is closed-world
+    and existence-only: it never reports unregistered data, and stores are out of scope
+    (their data is exporgo-owned — :meth:`Study.coverage` reports store membership).
 
     Attributes:
-        present: ``(identity, resource_name)`` pairs whose resolved path exists.
-        missing: ``(identity, resource_name)`` pairs whose resolved path is absent.
+        present: ``(identity, component_name)`` pairs whose indicated file(s) exist.
+        missing: ``(identity, component_name)`` pairs whose indicated file(s) are absent
+            (for a filemap, this includes an identity with nothing recorded).
     """
 
     present: tuple[tuple[Identity, str], ...]
@@ -69,7 +79,7 @@ class ValidationReport:
 
     @property
     def is_complete(self) -> bool:
-        """True when every registered identity has every declared resource on disk."""
+        """True when every registered identity's resources and filemaps exist on disk."""
         return not self.missing
 
 
@@ -107,6 +117,87 @@ class CoverageReport:
     def components(self, identity: Identity) -> set[str]:
         """The store/resource names that contain the given identity."""
         return {name for present, name in self.present if present == identity}
+
+    def __str__(self) -> str:
+        """Render a grouped, human-readable summary (a header line plus per-status lists).
+
+        Lists the actionable buckets first (``missing`` then ``unregistered``) and finally
+        ``present``, each as ``component: identity`` lines sorted by component then identity.
+        For programmatic filtering, prefer :meth:`to_polars`.
+        """
+        state = "complete" if self.is_complete else "incomplete"
+        header = (
+            f"CoverageReport: {len(self.present)} present, {len(self.missing)} missing, "
+            f"{len(self.unregistered)} unregistered ({state})"
+        )
+        lines = [header]
+        for label, pairs in (
+            ("missing", self.missing),
+            ("unregistered", self.unregistered),
+            ("present", self.present),
+        ):
+            if not pairs:
+                continue
+            lines.append(f"  {label}:")
+            lines.extend(
+                f"    {component}: {identity.as_path()}"
+                for identity, component in sorted(
+                    pairs, key=lambda pair: (pair[1], pair[0].as_path())
+                )
+            )
+        return "\n".join(lines)
+
+    def to_polars(self) -> "pl.DataFrame":
+        """Materialize the report as a tidy, long-format :class:`polars.DataFrame`.
+
+        Each ``(identity, component)`` pair becomes one row: the identity's keys explode
+        into their own columns (null-filled where a partial identity -- e.g. a subset-key
+        store partition -- lacks a key), followed by a ``component`` column and a ``status``
+        column (``"present"`` / ``"missing"`` / ``"unregistered"``). This is the readable,
+        filterable, pivotable view of the report:
+
+        >>> frame = study.coverage().to_polars()  # doctest: +SKIP
+        >>> frame.filter(pl.col("status") == "missing")  # doctest: +SKIP
+
+        polars is imported lazily here, so the rest of the study layer never requires it.
+
+        Returns:
+            A DataFrame with one row per ``(identity, component)`` pair, columns
+            ``[*identity_keys, "component", "status"]``.
+
+        Raises:
+            ImportError: If polars is not installed (it ships with the ``datastore`` extra).
+        """
+        try:
+            import polars as pl
+        except ImportError as error:
+            msg = (
+                "CoverageReport.to_polars() requires polars; install the datastore extra "
+                "(exporgo[datastore])."
+            )
+            raise ImportError(msg) from error
+
+        buckets = (
+            ("present", self.present),
+            ("missing", self.missing),
+            ("unregistered", self.unregistered),
+        )
+        key_order: list[str] = []
+        for _status, pairs in buckets:
+            for identity, _component in pairs:
+                for key in identity.keys:
+                    if key not in key_order:
+                        key_order.append(key)
+        columns = [*key_order, "component", "status"]
+        data: dict[str, list[object]] = {column: [] for column in columns}
+        for status, pairs in buckets:
+            for identity, component in pairs:
+                values = identity.to_dict()
+                for key in key_order:
+                    data[key].append(values.get(key))
+                data["component"].append(component)
+                data["status"].append(status)
+        return pl.DataFrame(data)
 
 
 class Study:
@@ -431,27 +522,40 @@ class Study:
         return FileMap(self.root / name, name, self.identity)
 
     def validate(self) -> ValidationReport:
-        """Check each registered identity against each declared resource on disk.
+        """Check that each registered identity's indicated files still exist on disk.
 
-        Resolves every ``(registered identity, declared resource)`` pair to a path and
-        records whether it exists — the file-existence self-check at the heart of the
-        study model. The filesystem is the source of truth; nothing is cached, so the
-        report always reflects the tree as it is at call time.
+        For every registered identity, tests each declared **resource** (does its resolved
+        template path exist?) and each declared **filemap** (do its recorded files exist?),
+        bucketing the ``(identity, component)`` pair as ``present`` or ``missing``. This is
+        the liveness self-check at the heart of the study model -- it catches expected or
+        previously-recorded files that have since been deleted or moved. The filesystem is
+        the source of truth; nothing is cached, so the report always reflects the tree as it
+        is at call time.
+
+        Stores are intentionally out of scope (they hold exporgo-owned data, not files the
+        study merely points at); use :meth:`coverage` for store membership and open-world
+        drift.
 
         Returns:
             A :class:`ValidationReport` partitioning the pairs into ``present`` and
             ``missing``.
 
         Note:
-            Cost is ``O(registered identities * declared resources)`` filesystem
-            ``stat`` calls, existence-only; file contents are never read.
+            Existence-only (file contents are never read). A filemap counts as ``present``
+            for an identity only when it has at least one recorded file and all recorded
+            files exist.
         """
         present: list[tuple[Identity, str]] = []
         missing: list[tuple[Identity, str]] = []
+        resources = {name: self.resource(name) for name in self._resources}
+        filemaps = {name: self.filemap(name) for name in self._filemaps}
         for identity in self._entities:
-            for name, resource in self._resources.items():
-                target = resource.resolve(self.root, identity)
-                bucket = present if target.exists() else missing
+            values = identity.to_dict()
+            for name, resource in resources.items():
+                bucket = present if resource.exists(**values) else missing
+                bucket.append((identity, name))
+            for name, filemap in filemaps.items():
+                bucket = present if filemap.exists(**values) else missing
                 bucket.append((identity, name))
         return ValidationReport(present=tuple(present), missing=tuple(missing))
 
@@ -643,6 +747,55 @@ class Study:
                 if set(identity.keys) == full:
                     self.register(**identity.to_dict())
         return report
+
+    def sync_registry(self) -> tuple[Identity, ...]:
+        """Register every identity found in any declared component that is not yet registered.
+
+        Sweeps all three component types for the identities physically present -- resources
+        (reverse-resolved from their templates, see
+        :meth:`~exporgo.study.resources.Resource.discover`), stores (their manifest
+        partitions), and filemaps (their recorded identities) -- and registers each one that
+        the study does not already contain. It is the bulk, all-component companion to
+        :meth:`discover` (which is resource-only and returns a drift report): use this to
+        seed the registry from an existing dataset in one call.
+
+        Only **full-key** identities (those spanning all the study's identity keys) can be
+        registered. Subset-key stores and resources yield partial identities that cannot form
+        a complete identity, so they are skipped here (they still surface as
+        :attr:`CoverageReport.unregistered` drift in :meth:`coverage` / :meth:`discover`).
+        The sweep is idempotent: already-registered identities are left untouched and are not
+        returned. Discovered identities are canonicalized to the schema's key order before
+        comparison, so a store partitioned in a different key order still de-duplicates
+        correctly.
+
+        Returns:
+            The newly registered :class:`~exporgo.study.identity.Identity` objects, in
+            ``as_path`` order (empty if every found identity was already registered).
+        """
+        contained: set[Identity] = set()
+        for resource_name in self._resources:
+            contained |= self.resource(resource_name).discover()
+        for store_name in self._stores:
+            contained |= self.identities(store=store_name)
+        for filemap_name in self._filemaps:
+            contained |= self.identities(filemap=filemap_name)
+
+        full = set(self.identity.names)
+        registered = set(self._entities)
+        newly: list[Identity] = []
+        for identity in sorted(contained, key=Identity.as_path):
+            if set(identity.keys) != full:
+                continue  # partial identity (subset-key store/resource); cannot register
+            canonical = self.identity.identity(**identity.to_dict())
+            if canonical in registered:
+                continue
+            self.register(**identity.to_dict())
+            registered.add(canonical)
+            newly.append(canonical)
+
+        msg = f"Auto-registered {len(newly)} new identities to {self.name}."
+        logger.info(msg)
+        return tuple(newly)
 
     def init_logging(
         self,

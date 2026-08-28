@@ -1,6 +1,7 @@
 """Tests for the Study container: identity, resources, validation, persistence."""
 
 import io
+import sys
 from contextlib import redirect_stdout
 from pathlib import Path
 
@@ -80,6 +81,28 @@ def test_validate_reports_present_and_missing(tmp_path: Path) -> None:
     m02 = study.identity.identity(Subject="m02")
     assert (m01, "beh") in report.present
     assert (m02, "beh") in report.missing
+    assert not report.is_complete
+
+
+def test_validate_checks_filemap_recorded_files_still_exist(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_filemap("raw")
+    study.register(Subject="m01")  # recorded file exists -> present
+    study.register(Subject="m02")  # recorded file was deleted -> missing
+    study.register(Subject="m03")  # nothing recorded at all -> missing
+    live = tmp_path / "a.tif"
+    live.write_text("x", encoding="utf-8")
+    study.filemap("raw").record(live, Subject="m01")
+    study.filemap("raw").record(tmp_path / "gone.tif", Subject="m02")  # never created
+
+    report = study.validate()
+    m01 = study.identity.identity(Subject="m01")
+    m02 = study.identity.identity(Subject="m02")
+    m03 = study.identity.identity(Subject="m03")
+
+    assert (m01, "raw") in report.present
+    assert (m02, "raw") in report.missing
+    assert (m03, "raw") in report.missing
     assert not report.is_complete
 
 
@@ -300,6 +323,106 @@ def test_discover_register_leaves_subset_key_partials_unregistered(
     study.discover(register=True)
 
     assert study.entities == ()  # a partial identity cannot form a full (Subject, Session)
+
+
+def test_coverage_to_polars_is_a_tidy_long_frame(tmp_path: Path) -> None:
+    import polars as pl
+
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_resource("beh", "{Subject}/behavior.csv")
+    study.register(Subject="m01")  # present
+    study.register(Subject="m02")  # missing
+    (tmp_path / "m01").mkdir()
+    (tmp_path / "m01" / "behavior.csv").write_text("x", encoding="utf-8")
+
+    frame = study.coverage().to_polars()
+
+    assert set(frame.columns) == {"Subject", "component", "status"}
+    missing = frame.filter(pl.col("status") == "missing")
+    assert missing["Subject"].to_list() == ["m02"]
+    assert missing["component"].to_list() == ["beh"]
+
+
+def test_coverage_to_polars_without_polars_raises_helpful_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(sys.modules, "polars", None)  # simulate polars not installed
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+
+    with pytest.raises(ImportError, match="datastore"):
+        study.coverage().to_polars()
+
+
+def test_coverage_str_groups_by_status(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_resource("beh", "{Subject}/behavior.csv")
+    study.register(Subject="m01")  # present
+    study.register(Subject="m02")  # missing
+    (tmp_path / "m01").mkdir()
+    (tmp_path / "m01" / "behavior.csv").write_text("x", encoding="utf-8")
+
+    text = str(study.coverage())
+
+    assert "CoverageReport" in text
+    assert "incomplete" in text
+    assert "missing" in text
+    assert "Subject=m02" in text
+
+
+def test_sync_registry_registers_resource_and_filemap_identities(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_resource("beh", "{Subject}/behavior.csv")
+    study.declare_filemap("raw")
+    (tmp_path / "m01").mkdir()  # resource on disk -> m01
+    (tmp_path / "m01" / "behavior.csv").write_text("x", encoding="utf-8")
+    study.filemap("raw").record("Z:/a.tif", Subject="m02")  # filemap recorded -> m02
+
+    newly = study.sync_registry()
+
+    m01 = study.identity.identity(Subject="m01")
+    m02 = study.identity.identity(Subject="m02")
+    assert set(newly) == {m01, m02}
+    assert set(study.entities) == {m01, m02}
+
+
+def test_sync_registry_is_idempotent(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_resource("beh", "{Subject}/behavior.csv")
+    (tmp_path / "m01").mkdir()
+    (tmp_path / "m01" / "behavior.csv").write_text("x", encoding="utf-8")
+
+    first = study.sync_registry()
+    second = study.sync_registry()
+
+    assert set(first) == {study.identity.identity(Subject="m01")}
+    assert second == ()  # nothing new the second time
+    assert len(study.entities) == 1
+
+
+def test_sync_registry_returns_only_the_unregistered(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_resource("beh", "{Subject}/behavior.csv")
+    study.register(Subject="m01")  # already registered
+    for subject in ("m01", "m02"):
+        (tmp_path / subject).mkdir()
+        (tmp_path / subject / "behavior.csv").write_text("x", encoding="utf-8")
+
+    newly = study.sync_registry()
+
+    assert set(newly) == {study.identity.identity(Subject="m02")}  # m01 not re-added
+    assert len(study.entities) == 2
+
+
+def test_sync_registry_skips_subset_key_partials(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject", "Session"])
+    study.declare_resource("geno", "{Subject}/genotype.txt")  # subset: Subject only
+    (tmp_path / "m01").mkdir()
+    (tmp_path / "m01" / "genotype.txt").write_text("x", encoding="utf-8")
+
+    newly = study.sync_registry()
+
+    assert newly == ()  # a partial identity cannot form a full (Subject, Session)
+    assert study.entities == ()
 
 
 def test_coverage_includes_filemaps(tmp_path: Path) -> None:

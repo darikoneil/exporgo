@@ -151,6 +151,65 @@ def test_coverage_reports_present_missing_and_unregistered(tmp_path: Path) -> No
     assert report.identities("behavior") == {m01}
 
 
+def test_sync_registry_registers_store_identities(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject", "Session"])
+    study.declare_store("behavior", BEHAVIOR, sort_column="trial")
+    study.store("behavior").write(
+        pl.DataFrame(
+            {
+                "Subject": ["m01", "m02"],
+                "Session": [1, 2],
+                "trial": [1, 1],
+                "lick_rate": [0.5, 0.1],
+            }
+        )
+    )
+
+    newly = study.sync_registry()
+
+    expected = {
+        study.identity.identity(Subject="m01", Session=1),
+        study.identity.identity(Subject="m02", Session=2),
+    }
+    assert set(newly) == expected
+    assert set(study.entities) == expected
+
+
+def test_validate_ignores_stores(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_store("neural", {"Subject": pl.String, "unit": pl.Int64})
+    study.register(Subject="m01")
+
+    report = study.validate()
+
+    assert report.present == ()  # stores are exporgo-owned data, not "indicated" files
+    assert report.missing == ()  # store membership is a coverage() concern
+
+
+def test_coverage_to_polars_null_fills_partial_identities(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject", "Session"])
+    study.declare_store(
+        "neural", {"Subject": pl.String, "Session": pl.Int64, "unit": pl.Int64}
+    )
+    study.declare_store(  # subset partition: Subject only -> partial identities
+        "geno", {"Subject": pl.String, "value": pl.String}, partition_keys=["Subject"]
+    )
+    study.register(Subject="m01", Session=1)  # full identity, present in "neural"
+    study.store("neural").write(
+        pl.DataFrame({"Subject": ["m01"], "Session": [1], "unit": [7]})
+    )
+    study.store("geno").write(pl.DataFrame({"Subject": ["m09"], "value": ["wt"]}))
+
+    frame = study.coverage().to_polars()
+
+    assert set(frame.columns) == {"Subject", "Session", "component", "status"}
+    # m09 is the sole unregistered id: a subset-key (Subject-only) partition of "geno"
+    unregistered = frame.filter(pl.col("status") == "unregistered")
+    assert unregistered["Subject"].to_list() == ["m09"]
+    assert unregistered["Session"].to_list() == [None]  # partial identity -> null-filled
+    assert unregistered["component"].to_list() == ["geno"]
+
+
 def test_store_reads_max_rows_from_its_spec(tmp_path: Path) -> None:
     study = Study(name="s", root=tmp_path, identity=["Subject"])
     study.declare_store(

@@ -21,11 +21,11 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
 ]
 
-# Base dependencies (logging framework only; keep this minimal).
+# Base dependencies: the log + study foundation. Keep this minimal -- the heavy analytical
+# stack (numpy/polars/pyarrow) lives in the `datastore` extra, not here.
 dependencies = [
     "loguru",
     "pydantic",
-    "polars>=1.44.1",
     "tomli-w",
 ]
 
@@ -33,13 +33,14 @@ dependencies = [
 documentation = "https://github.com/darikoneil/exporgo"
 repository = "https://github.com/darikoneil/exporgo"
 
-# Optional runtime extras — layered. `study` is the shared foundation (the Study &
-# Identity model); `monitor` and `datastore` build on it. Base install stays loguru-only.
+# Optional runtime extras — layered. The `study` layer's deps live in the base above (it is
+# the shared foundation); `monitor` and `datastore` build on it. Only `datastore` pulls the
+# heavy analytical stack (numpy/polars/pyarrow).
 [project.optional-dependencies]
 monitor = []
 datastore = [
     "numpy",
-    "polars[numpy,pyarrow]",
+    "polars[numpy,pyarrow]>=1.44.1",
     "pyarrow==24.0.0",
 ]
 docs = [
@@ -57,11 +58,13 @@ dev = [
     "pytest-sugar",
     "pytest-clarity",
     "ruff",
-    # Present so the optional numpy/polars/tqdm logging paths can be exercised
-    # in the test suite even though they are not runtime dependencies.
+    # Present so the optional analytical/logging paths (numpy/polars/pyarrow rich
+    # rendering, datastore reads/writes, tqdm sinks) can be exercised in the test suite
+    # even though they are not base runtime dependencies.
     "numpy",
     "polars",
     "tqdm",
+    "pyarrow>=24.0.0",
 ]
 
 
@@ -252,5 +255,5 @@ project-includes = [
 ]
 project-excludes = [
     "**/scratch/**",
-    "**/tests/**",
+    "**/tests/*.py",
 ]

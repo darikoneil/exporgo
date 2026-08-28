@@ -127,6 +127,15 @@ study.path(Subject="m01", Session=1, resource="suite2p")
   directions (registered-but-missing, on-disk-but-unregistered) as a `CoverageReport`, and
   (b) with `register=True` **bootstraps** the registry from an existing dataset. See
   "Reverse-resolving templates" below.
+- **`sync_registry()`** *(built 2026-08-27)* — the bulk, all-component bootstrap: sweeps
+  resources (reverse-resolved), stores (manifest partitions), and filemaps (recorded ids)
+  and registers every **full-key** identity not already registered, returning the newly
+  added ones. Subset-key stores/resources yield *partial* identities that can't form a
+  complete identity, so they're skipped (they still surface as `unregistered` drift).
+  Idempotent; discovered ids are canonicalized to schema key order before de-duplication, so
+  a store partitioned in a different key order still matches. `discover(register=True)` is
+  the resource-only, drift-reporting cousin; `sync_registry()` is the one-call "seed the
+  registry from everything on disk".
 
 Registration is the declared truth; discovery only reconciles it against reality — keeping
 the "describe + validate" philosophy intact.
@@ -135,13 +144,23 @@ the "describe + validate" philosophy intact.
 
 ```python
 report = study.validate()
-report.missing   # [(Identity(Subject='m02', Session=1), resource='suite2p'), ...]
+report.missing   # [(Identity(Subject='m02', Session=1), 'suite2p'), ...]
 report.present   # ...
 ```
 
-`validate()` reads the filesystem (the source of truth) and compares it against *registered
-identities × declared resources*. This is the file-existence self-check, and it's exactly
-what the monitoring layer later turns into **derived** per-step status.
+`validate()` reads the filesystem (the source of truth) and asks a **liveness** question:
+for every *registered* identity, do the files it indicates via each declared **resource**
+(the templated path) and each declared **filemap** (the recorded external locations) still
+exist? It catches data that was expected, or once recorded, but has since been deleted or
+moved. This is the file-existence self-check, and it's exactly what the monitoring layer
+later turns into **derived** per-step status.
+
+`validate()` is deliberately **closed-world and existence-only** — it never reports
+unregistered data, and **stores are out of scope** (they hold exporgo-owned data, not files
+the study merely points at). Contrast `coverage()` below, which is the membership + open-world
+drift view (and *does* cover stores). Keeping them distinct is intentional: `validate()`
+answers "is everything I registered still on disk?"; `coverage()` answers "which identities
+does each component contain, and what's registered vs. present?".
 
 ### Which identities a component contains (built 2026-08-27)
 
@@ -154,10 +173,24 @@ Two related accessors report component membership, both derived on demand:
   file exists — there is no scan for unregistered files; the open-world resource scan is
   `discover()`, below).
 - **`study.coverage()`** — a study-wide `CoverageReport` layered on the primitive: every
-  `(registered identity, component)` pair classified `present`/`missing` across both stores
-  and resources, plus `unregistered` — store identities present on disk but not registered
-  (the open-world drift a registered-only matrix would miss). It generalizes `validate()`
-  (which stays resource-only).
+  `(registered identity, component)` pair classified `present`/`missing` across stores,
+  resources, and filemaps, plus `unregistered` — store/filemap identities present on disk but
+  not registered (the open-world drift a registered-only matrix would miss). It **generalizes**
+  `validate()` (membership + drift, vs. `validate()`'s pure resource/filemap liveness).
+
+`CoverageReport` is a plain frozen dataclass (hashable, dependency-light), with two
+consumer-facing renderings *(added 2026-08-27)*:
+
+- **`report.to_polars()`** — a tidy, **long-format** `polars.DataFrame`: one row per
+  `(identity, component)`, the identity keys exploded into columns (null-filled where a
+  partial identity, e.g. a subset-key store partition, lacks a key), then `component` and
+  `status` (`present`/`missing`/`unregistered`). Readable, filterable
+  (`frame.filter(pl.col("status") == "missing")`), pivotable, and exportable. polars is
+  imported **lazily inside the method** (and lives in the `datastore` extra, not base — so
+  the study layer never requires it at import); absent polars, the method raises a clear
+  `ImportError` pointing to `exporgo[datastore]`.
+- **`report.__str__`** — a grouped text summary (a counts header, then per-status
+  `component: identity` lines, actionable buckets first) for a quick `print(report)`.
 
 ### Reverse-resolving templates — `discover()` (built 2026-08-27)
 
