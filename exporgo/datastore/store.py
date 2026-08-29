@@ -67,9 +67,7 @@ class Store:
         - ``"unique"``: refuse the write if ``frame`` carries any identity (partition) the
           store already contains -- nothing is written (all-or-nothing).
 
-        All modes are out-of-core -- data for other partitions is never read. A successful
-        write emits an ``INFO`` log record summarizing the rows and fragments written
-        (silent unless logging is enabled, e.g. after ``study.save()``).
+        All modes are out-of-core -- data for other partitions is never read.
 
         Args:
             frame: The data to write; its columns must match the declared schema.
@@ -79,6 +77,9 @@ class Store:
         Raises:
             ValueError: If the frame's columns do not match the declared schema, or if
                 ``mode="unique"`` and an incoming identity is already in the store.
+
+        Note:
+            See the "Write to a store" how-to for choosing among the modes.
         """
         self._validate_columns(frame)
         frame = frame.cast(self.spec.polars_schema())
@@ -116,9 +117,8 @@ class Store:
     def scan(self) -> pl.LazyFrame:
         """Return a lazy, partition-prunable view with the declared schema restored.
 
-        Nothing is read from disk until the frame is collected: filters on the partition
-        keys (and, when a ``sort_column`` is set, on that column) push down to skip whole
-        files and row groups, so a selective query touches only the relevant fragments.
+        Nothing is read from disk until the frame is collected; filters on the partition
+        keys push down to skip whole files and row groups.
 
         Returns:
             A :class:`polars.LazyFrame` over the component's Parquet fragments, cast to

@@ -2,7 +2,8 @@
 
 The manifest is a small JSON index that answers "what's in this store?" (which
 partitions, which fragment files, how many rows) without scanning the Parquet data. It
-is the basis for fast existence checks and, later, overwrite-by-key and schema versioning.
+is the basis for fast existence checks and overwrite-by-key writes, and, later, schema
+versioning.
 """
 
 from pydantic import BaseModel, Field

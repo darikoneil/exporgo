@@ -40,8 +40,8 @@ class IdentityKey(BaseModel):
     Attributes:
         name: The axis name, used as the keyword when addressing an identity and as the
             Hive partition key on disk.
-        dtype: The value type — one of ``"str"``, ``"int"``, ``"float"``, ``"bool"``;
-            stored as a string label so it round-trips through ``study.toml``.
+        dtype: The value type — one of ``"str"``, ``"int"``, ``"bool"``; stored as a
+            string label so it round-trips through ``study.toml``.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -56,8 +56,7 @@ class IdentityKey(BaseModel):
             value: The value to coerce (e.g. the string ``"1"`` for an ``int`` key).
 
         Returns:
-            The value converted by the dtype's callable
-            (``str`` / ``int`` / ``float`` / ``bool``).
+            The value converted by the dtype's callable (``str`` / ``int`` / ``bool``).
 
         Raises:
             ValueError: If the value cannot be converted to the declared dtype (e.g.

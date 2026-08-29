@@ -56,22 +56,18 @@ def _rows_from_toml(value: int | None, default: int | None) -> int | None:
 class ValidationReport:
     """Outcome of :meth:`Study.validate` — whether each identity's indicated files exist.
 
-    A **liveness** self-check: for every registered identity, each declared **resource**
-    (its templated path) and each declared **filemap** (its recorded file locations) is
-    bucketed by whether the file(s) it points at are actually present on disk. This catches
-    data that was expected, or once recorded, but has since been deleted or moved. The
-    filesystem is the source of truth; the report is a plain snapshot holding no live
-    handles, so it is safe to store or diff across runs (e.g. to seed the monitoring layer's
-    derived status).
-
-    Unlike :class:`CoverageReport` (membership plus open-world drift), this is closed-world
-    and existence-only: it never reports unregistered data, and stores are out of scope
-    (their data is exporgo-owned — :meth:`Study.coverage` reports store membership).
+    A closed-world, existence-only snapshot: each registered identity's declared resources
+    and filemaps are bucketed by whether the file(s) they point at exist on disk. Holds no
+    live handles, so it is safe to store or diff across runs.
 
     Attributes:
         present: ``(identity, component_name)`` pairs whose indicated file(s) exist.
         missing: ``(identity, component_name)`` pairs whose indicated file(s) are absent
             (for a filemap, this includes an identity with nothing recorded).
+
+    Note:
+        See the "Coverage and validation" explanation for the closed- vs open-world
+        distinction and how this differs from :class:`CoverageReport`.
     """
 
     present: tuple[tuple[Identity, str], ...]
@@ -87,10 +83,7 @@ class ValidationReport:
 class CoverageReport:
     """Which identities each component (store/resource) contains, derived on demand.
 
-    Generalizes :class:`ValidationReport` across both stores and resources. Resources are
-    reported closed-world (registered identities whose file exists); stores are reported
-    open-world from their manifest, so a store may contain identities that were never
-    registered -- those land in ``unregistered`` (drift) rather than ``missing``.
+    Generalizes :class:`ValidationReport` across stores, resources, and filemaps.
 
     Attributes:
         present: ``(identity, component_name)`` pairs where the registered identity is
@@ -99,6 +92,11 @@ class CoverageReport:
             absent from that component.
         unregistered: ``(identity, store_name)`` pairs for identities physically present
             in a store but not registered in the study (store-only drift).
+
+    Note:
+        See the "Coverage and validation" explanation for closed- vs open-world reporting
+        (resources closed-world; stores/filemaps open-world, surfacing drift as
+        ``unregistered``).
     """
 
     present: tuple[tuple[Identity, str], ...]
@@ -151,15 +149,9 @@ class CoverageReport:
         """Materialize the report as a tidy, long-format :class:`polars.DataFrame`.
 
         Each ``(identity, component)`` pair becomes one row: the identity's keys explode
-        into their own columns (null-filled where a partial identity -- e.g. a subset-key
-        store partition -- lacks a key), followed by a ``component`` column and a ``status``
-        column (``"present"`` / ``"missing"`` / ``"unregistered"``). This is the readable,
-        filterable, pivotable view of the report:
-
-        >>> frame = study.coverage().to_polars()  # doctest: +SKIP
-        >>> frame.filter(pl.col("status") == "missing")  # doctest: +SKIP
-
-        polars is imported lazily here, so the rest of the study layer never requires it.
+        into their own columns (null-filled where a partial identity lacks a key), followed
+        by a ``component`` column and a ``status`` column
+        (``"present"`` / ``"missing"`` / ``"unregistered"``).
 
         Returns:
             A DataFrame with one row per ``(identity, component)`` pair, columns
@@ -167,6 +159,9 @@ class CoverageReport:
 
         Raises:
             ImportError: If polars is not installed (it ships with the ``datastore`` extra).
+
+        Note:
+            See the "Validate and report on a study" how-to for filtering and pivoting.
         """
         try:
             import polars as pl
@@ -526,15 +521,9 @@ class Study:
 
         For every registered identity, tests each declared **resource** (does its resolved
         template path exist?) and each declared **filemap** (do its recorded files exist?),
-        bucketing the ``(identity, component)`` pair as ``present`` or ``missing``. This is
-        the liveness self-check at the heart of the study model -- it catches expected or
-        previously-recorded files that have since been deleted or moved. The filesystem is
-        the source of truth; nothing is cached, so the report always reflects the tree as it
-        is at call time.
-
-        Stores are intentionally out of scope (they hold exporgo-owned data, not files the
-        study merely points at); use :meth:`coverage` for store membership and open-world
-        drift.
+        bucketing the ``(identity, component)`` pair as ``present`` or ``missing``. Nothing
+        is cached, so the report always reflects the tree at call time. Stores are out of
+        scope; use :meth:`coverage` for store membership.
 
         Returns:
             A :class:`ValidationReport` partitioning the pairs into ``present`` and
@@ -543,7 +532,8 @@ class Study:
         Note:
             Existence-only (file contents are never read). A filemap counts as ``present``
             for an identity only when it has at least one recorded file and all recorded
-            files exist.
+            files exist. See the "Coverage and validation" explanation for validate vs
+            coverage.
         """
         present: list[tuple[Identity, str]] = []
         missing: list[tuple[Identity, str]] = []
@@ -634,12 +624,14 @@ class Study:
         Generalizes :meth:`validate` to cover resources (existence of the declared file),
         stores (presence in the store's manifest), and filemaps (a recorded location for
         the identity), classifying every ``(registered identity, component)`` pair as
-        present or missing. Store/filemap identities present on disk but not registered are
-        collected in :attr:`CoverageReport.unregistered` (drift). Filesystem/manifest =
-        truth; nothing is cached.
+        present or missing. Identities present on disk but not registered are collected in
+        :attr:`CoverageReport.unregistered`.
 
         Returns:
             A :class:`CoverageReport` over registered identities and declared components.
+
+        Note:
+            See the "Coverage and validation" explanation for closed- vs open-world drift.
         """
         present: list[tuple[Identity, str]] = []
         missing: list[tuple[Identity, str]] = []
@@ -686,23 +678,13 @@ class Study:
     def discover(self, *, register: bool = False) -> CoverageReport:
         """Scan the filesystem for resource identities and report the drift.
 
-        The open-world counterpart to :meth:`coverage` for resources: rather than checking
-        only whether *registered* identities' files exist, it reverse-resolves each
-        resource template (see :meth:`~exporgo.study.resources.Resource.discover`) to find
-        which identities are physically present, so on-disk-but-unregistered data surfaces
-        as :attr:`CoverageReport.unregistered` drift. Each resource is compared over its
-        own placeholder keys, projecting registered identities onto them (exactly how
-        subset-key stores are handled), so subset-key templates yield partial identities.
-
-        With ``register=True``, the discovered **full-key** identities (those spanning all
-        the study's identity keys) are then registered, bootstrapping the registry from an
-        existing dataset; subset-key partials are reported but not registered (they cannot
-        form a complete identity). The returned report always reflects the **pre-bootstrap**
-        state, so the drift that ``register=True`` resolves is still visible in it.
-
-        Constant-template resources (no placeholders) have no identity dimension and are
-        skipped. Stores and filemaps are not scanned here -- they are already open-world in
-        :meth:`coverage`.
+        Reverse-resolves each resource template (see
+        :meth:`~exporgo.study.resources.Resource.discover`) to find which identities are
+        physically present, surfacing on-disk-but-unregistered data as
+        :attr:`CoverageReport.unregistered`. With ``register=True``, the discovered
+        **full-key** identities are registered afterward; subset-key partials are reported
+        but never registered. The returned report always reflects the **pre-bootstrap**
+        state.
 
         Args:
             register: If ``True``, register the discovered full-key identities after
@@ -711,6 +693,10 @@ class Study:
         Returns:
             A :class:`CoverageReport` over the declared resources, reflecting the registry
             as it stood *before* any bootstrapping.
+
+        Note:
+            Constant-template resources are skipped; stores and filemaps are not scanned
+            here. See the "Discover identities from an existing dataset" how-to.
         """
         present: list[tuple[Identity, str]] = []
         missing: list[tuple[Identity, str]] = []
@@ -749,28 +735,23 @@ class Study:
         return report
 
     def sync_registry(self) -> tuple[Identity, ...]:
-        """Register every identity found in any declared component that is not yet registered.
+        """Register every identity found in any declared component not yet registered.
 
         Sweeps all three component types for the identities physically present -- resources
         (reverse-resolved from their templates, see
         :meth:`~exporgo.study.resources.Resource.discover`), stores (their manifest
-        partitions), and filemaps (their recorded identities) -- and registers each one that
-        the study does not already contain. It is the bulk, all-component companion to
-        :meth:`discover` (which is resource-only and returns a drift report): use this to
-        seed the registry from an existing dataset in one call.
-
-        Only **full-key** identities (those spanning all the study's identity keys) can be
-        registered. Subset-key stores and resources yield partial identities that cannot form
-        a complete identity, so they are skipped here (they still surface as
-        :attr:`CoverageReport.unregistered` drift in :meth:`coverage` / :meth:`discover`).
-        The sweep is idempotent: already-registered identities are left untouched and are not
-        returned. Discovered identities are canonicalized to the schema's key order before
-        comparison, so a store partitioned in a different key order still de-duplicates
-        correctly.
+        partitions), and filemaps (their recorded identities) -- and registers each one the
+        study does not already contain. Only **full-key** identities can be registered;
+        subset-key partials are skipped. The sweep is idempotent: already-registered
+        identities are left untouched and are not returned.
 
         Returns:
             The newly registered :class:`~exporgo.study.identity.Identity` objects, in
             ``as_path`` order (empty if every found identity was already registered).
+
+        Note:
+            The bulk, all-component companion to :meth:`discover`. See the "Discover
+            identities from an existing dataset" how-to.
         """
         contained: set[Identity] = set()
         for resource_name in self._resources:

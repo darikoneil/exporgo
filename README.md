@@ -11,7 +11,7 @@ leaving orchestration to your code or an LLM agent.
 - **logging** (base install, `loguru` only) — a reusable logging framework:
   parameterized console + rotating file/exception sinks and logging decorators
   that any project can drive via `init_logger(name="my_project", ...)`.
-- **study** (`exporgo[study]`, adds `pydantic`) — the Study & Identity model: a
+- **study** (base install, adds `pydantic`) — the Study & Identity model: a
   study's identity coordinate system (1–3 keys, default `Subject`), the resources
   (files/folders) it expects at each identity, and file-existence self-validation.
   Declarations persist to `study.toml` and reload via `Study.load(root)`. Saving a
@@ -33,10 +33,9 @@ For development, using [uv](https://docs.astral.sh/uv/):
 uv sync
 ```
 
-Add optional layers as needed:
+The base install includes the study layer. Add the datastore extra as needed:
 
 ```bash
-uv add "exporgo[study]"      # Study & Identity model
 uv add "exporgo[datastore]"  # polars/Parquet datastore
 ```
 

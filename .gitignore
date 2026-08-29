@@ -254,3 +254,7 @@ fabric.properties
 /linting/
 /tests/*.html
 /tests/assets/
+
+# personal voice-profile reference for the voice-matcher agent (contains verbatim
+# snippets from private writing samples; kept out of version control)
+/.claude/agents/references/

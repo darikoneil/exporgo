@@ -182,17 +182,11 @@ class Resource:
     def discover(self) -> set[Identity]:
         """Reverse-resolve the template to find which identities exist on disk.
 
-        The inverse of :meth:`path`: instead of filling the template for a known identity,
-        this scans the study root for paths matching the template and reads each
-        placeholder's value back out, yielding an open-world inventory of what is
-        physically present (including identities never registered in the study). It is the
-        basis for :meth:`~exporgo.study.study.Study.discover`'s drift report and registry
-        bootstrap.
-
-        A template using only some identity keys yields **partial** identities over those
-        keys (mirroring how a subset-key store reports its partitions); a constant template
-        (no placeholders) has no identity dimension and yields an empty set. Captured
-        segments are coerced to their key's dtype via the schema.
+        The inverse of :meth:`path`: scans the study root for paths matching the template
+        and reads each placeholder's value back out, yielding an open-world inventory of
+        what is physically present (including unregistered identities). A subset-key
+        template yields **partial** identities; a constant template yields an empty set.
+        Captured segments are coerced to their key's dtype via the schema.
 
         Returns:
             The identities physically present on disk, one per matching path (files and
