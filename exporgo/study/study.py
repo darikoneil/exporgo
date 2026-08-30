@@ -20,7 +20,7 @@ import tomli_w
 from loguru import logger
 
 from exporgo.log import LogLevel, init_logger
-from exporgo.study.filemaps import FileMap
+from exporgo.study.filemaps import Dump, FileMap
 from exporgo.study.identity import (
     Identity,
     IdentityKey,
@@ -218,7 +218,8 @@ class Study:
         self._entities: list[Identity] = []
         self._resources: dict[str, ResourceSpec] = {}
         self._stores: dict[str, StoreSpec] = {}
-        self._filemaps: list[str] = []
+        self._filemaps: dict[str, str | None] = {}
+        self._dumps: list[str] = []
 
     @staticmethod
     def _coerce_schema(
@@ -247,7 +248,7 @@ class Study:
         return (
             f"Study {self.name!r} [{keys}]: {len(self._entities)} identities, "
             f"{len(self._resources)} resources, {len(self._stores)} stores, "
-            f"{len(self._filemaps)} filemaps"
+            f"{len(self._filemaps)} filemaps, {len(self._dumps)} dumps"
         )
 
     def print(self) -> None:
@@ -259,6 +260,7 @@ class Study:
         resources = ", ".join(sorted(self._resources)) or "(none)"
         stores = ", ".join(sorted(self._stores)) or "(none)"
         filemaps = ", ".join(sorted(self._filemaps)) or "(none)"
+        dumps = ", ".join(sorted(self._dumps)) or "(none)"
         keys = ", ".join(self.identity.names)
         lines = [
             f"Study {self.name!r}",
@@ -268,6 +270,7 @@ class Study:
             f"  resources:  {len(self._resources)} ({resources})",
             f"  stores:     {len(self._stores)} ({stores})",
             f"  filemaps:   {len(self._filemaps)} ({filemaps})",
+            f"  dumps:      {len(self._dumps)} ({dumps})",
         ]
         print("\n".join(lines))
 
@@ -474,22 +477,42 @@ class Study:
             raise KeyError(msg) from None
         return Store(self.root / name, spec)
 
-    def declare_filemap(self, name: str) -> FileMap:
+    def declare_filemap(
+        self, name: str, *, root_template: str | None = None
+    ) -> FileMap:
         """Declare a filemap component and return its handle.
 
-        A filemap records the concrete location(s) of particular files for each identity
-        (see :class:`~exporgo.study.filemaps.FileMap`) -- the third component type beside
-        resources and stores. It has no declaration beyond its name; the recorded paths
-        live in a sidecar ``<root>/<name>/_filemap.json`` written by the handle.
+        A filemap indexes the concrete location(s) of files for each identity, keyed by path
+        relative to the identity's root (see :class:`~exporgo.study.filemaps.FileMap`) -- the
+        third component type beside resources and stores. Its mode is fixed here: pass
+        ``root_template`` for a *templated* filemap (each identity's root folder is derived
+        from the template), or omit it for a *recorded* filemap. The recorded paths live in a
+        sidecar ``<root>/<name>/_filemap.json`` written by the handle.
 
         Args:
             name: The filemap's name (also its subdirectory under the study root).
+            root_template: An optional path template over the identity keys locating each
+                identity's root folder (e.g. ``"{Subject}/{Session}/suite2p"``). ``None``
+                makes the filemap recorded rather than templated.
 
         Returns:
             The :class:`~exporgo.study.filemaps.FileMap` handle bound to ``<root>/<name>``.
+
+        Raises:
+            ValueError: If ``root_template`` references keys not in the study's identity.
         """
-        if name not in self._filemaps:
-            self._filemaps.append(name)
+        if root_template is not None:
+            spec = ResourceSpec(name=name, template=root_template)
+            unknown = [
+                key for key in spec.placeholders if key not in self.identity.names
+            ]
+            if unknown:
+                msg = (
+                    f"Filemap {name!r} root_template uses unknown identity keys {unknown}; "
+                    f"study identity keys are {list(self.identity.names)}."
+                )
+                raise ValueError(msg)
+        self._filemaps[name] = root_template
 
         msg = f"Declared the filemap {name!r}"
         logger.info(msg)
@@ -514,7 +537,53 @@ class Study:
                 f"declared filemaps: {sorted(self._filemaps)}"
             )
             raise KeyError(msg)
-        return FileMap(self.root / name, name, self.identity)
+        return FileMap(
+            self.root, name, self.identity, root_template=self._filemaps[name]
+        )
+
+    def declare_dump(self, name: str) -> Dump:
+        """Declare a study-global dump component and return its handle.
+
+        A dump is an identity-less :class:`~exporgo.study.filemaps.FileMap`: one root and one
+        relative-path-keyed file set for the whole study, for assets that aren't per-identity
+        (an atlas, a README, a shared lookup table). The recorded paths live in a sidecar
+        ``<root>/<name>/_dump.json`` written by the handle.
+
+        Args:
+            name: The dump's name (also its subdirectory under the study root).
+
+        Returns:
+            The :class:`~exporgo.study.filemaps.Dump` handle bound to ``<root>/<name>``.
+        """
+        if name not in self._dumps:
+            self._dumps.append(name)
+
+        msg = f"Declared the dump {name!r}"
+        logger.info(msg)
+
+        return self.dump(name)
+
+    def dump(self, name: str) -> Dump:
+        """Return the :class:`~exporgo.study.filemaps.Dump` handle for a component.
+
+        Args:
+            name: The name of a previously declared dump.
+
+        Returns:
+            The :class:`~exporgo.study.filemaps.Dump` bound to ``<root>/<name>``.
+
+        Raises:
+            KeyError: If no dump with that name has been declared.
+        """
+        if name not in self._dumps:
+            msg = f"No dump named {name!r}; declared dumps: {sorted(self._dumps)}"
+            raise KeyError(msg)
+        return Dump(self.root / name, name)
+
+    @property
+    def dumps(self) -> dict[str, Dump]:
+        """The declared dumps, keyed by name (the study-global :class:`Dump` handles)."""
+        return {name: self.dump(name) for name in self._dumps}
 
     def validate(self) -> ValidationReport:
         """Check that each registered identity's indicated files still exist on disk.
@@ -844,7 +913,11 @@ class Study:
                 entry["sort_column"] = spec.sort_column
             stores[store_name] = entry
         data["stores"] = stores
-        data["filemaps"] = list(self._filemaps)
+        data["filemaps"] = {
+            name: ({"root_template": template} if template is not None else {})
+            for name, template in self._filemaps.items()
+        }
+        data["dumps"] = list(self._dumps)
         self.root.mkdir(parents=True, exist_ok=True)
         config_path = self.root / _CONFIG_NAME
         is_first_save = not config_path.exists()  # before we (over)write it below
@@ -907,8 +980,12 @@ class Study:
                         entry.get("max_rows_per_group"), None
                     ),
                 )
-        for filemap_name in data.get("filemaps", []):
-            study.declare_filemap(filemap_name)
+        for filemap_name, filemap_config in data.get("filemaps", {}).items():
+            study.declare_filemap(
+                filemap_name, root_template=filemap_config.get("root_template")
+            )
+        for dump_name in data.get("dumps", []):
+            study.declare_dump(dump_name)
         for entity in data.get("entities", []):
             study.register(**entity)
         msg = f"Study {study.name!r} accessed (loaded from {root / _CONFIG_NAME})."

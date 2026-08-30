@@ -9,12 +9,12 @@ import polars as pl
 import pyarrow.dataset as ds
 from loguru import logger
 
-from exporgo.datastore.manifest import FragmentEntry, Manifest
+from exporgo.datastore.manifest import FragmentEntry, Manifest, append_manifest_log
 from exporgo.datastore.spec import StoreSpec
 
 __all__ = ["Store"]
 
-_MANIFEST_NAME = "_manifest.json"
+_MANIFEST_DIR = "_manifest"
 _SCHEMA_NAME = "_schema.parquet"
 
 
@@ -134,16 +134,16 @@ class Store:
         return lazy.cast(self.spec.polars_schema()).select(self.spec.column_names)
 
     def manifest(self) -> Manifest:
-        """Return the store's fragment manifest (empty if nothing has been written).
+        """Return the store's fragment manifest, aggregated from its append-only log.
+
+        Reads every entry in the ``_manifest/`` log directory and applies tombstones (see
+        :meth:`~exporgo.datastore.manifest.Manifest.from_log_directory`). Empty when the store
+        has no data yet.
 
         Returns:
-            The :class:`~exporgo.datastore.manifest.Manifest` read from
-            ``_manifest.json``, or an empty manifest when the store has no data yet.
+            The aggregated :class:`~exporgo.datastore.manifest.Manifest`.
         """
-        path = self.root / _MANIFEST_NAME
-        if not path.exists():
-            return Manifest()
-        return Manifest.model_validate_json(path.read_text(encoding="utf-8"))
+        return Manifest.from_log_directory(self.root / _MANIFEST_DIR)
 
     @property
     def schema(self) -> pl.Schema:
@@ -187,15 +187,9 @@ class Store:
         return dict(schema)
 
     def _record_fragments(self, entries: list[FragmentEntry]) -> None:
-        """Append fragment entries to the on-disk manifest."""
-        current = self.manifest()
-        updated = Manifest(
-            schema_version=current.schema_version,
-            fragments=[*current.fragments, *entries],
-        )
-        (self.root / _MANIFEST_NAME).write_text(
-            updated.model_dump_json(indent=2), encoding="utf-8"
-        )
+        """Record one write's fragments as a new append-only manifest log entry."""
+        if entries:
+            append_manifest_log(self.root / _MANIFEST_DIR, added=entries)
 
     def _fragment_entry(self, written_file: Any, timestamp: str) -> FragmentEntry:
         """Build a manifest entry from a pyarrow ``WrittenFile``."""
@@ -252,18 +246,14 @@ class Store:
             raise ValueError(msg)
 
     def _remove_partitions(self, targets: set[tuple[str, ...]]) -> None:
-        """Delete fragments (files + manifest entries) for the target partitions."""
-        manifest = self.manifest()
-        kept: list[FragmentEntry] = []
-        for fragment in manifest.fragments:
+        """Delete the target partitions' data files and tombstone them in the manifest log."""
+        removed: list[str] = []
+        for fragment in self.manifest().fragments:
             if self._partition_tuple(fragment.partition) in targets:
                 (self.root / fragment.path).unlink(missing_ok=True)
-            else:
-                kept.append(fragment)
-        updated = Manifest(schema_version=manifest.schema_version, fragments=kept)
-        (self.root / _MANIFEST_NAME).write_text(
-            updated.model_dump_json(indent=2), encoding="utf-8"
-        )
+                removed.append(fragment.path)
+        if removed:
+            append_manifest_log(self.root / _MANIFEST_DIR, removed=removed)
 
     def _partition_tuple(self, partition: dict[str, str]) -> tuple[str, ...]:
         """Order a fragment's partition dict by the spec's partition keys."""

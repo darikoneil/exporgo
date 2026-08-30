@@ -257,12 +257,13 @@ def test_filemap_unknown_name_raises(tmp_path: Path) -> None:
 def test_filemap_round_trips_through_save_load(tmp_path: Path) -> None:
     study = Study(name="s", root=tmp_path, identity=["Subject"])
     study.declare_filemap("raw")
-    study.filemap("raw").record("Z:/a.tif", Subject="m01")
+    study.filemap("raw").record("Z:/a.tif", name="a", Subject="m01")
     study.save()
 
     loaded = Study.load(tmp_path)
 
     assert set(loaded.filemaps) == {"raw"}
+    assert loaded.filemap("raw").templated is False
     assert loaded.filemap("raw").path("a", Subject="m01") == Path("Z:/a.tif")
 
 
@@ -272,6 +273,49 @@ def test_identities_of_a_filemap(tmp_path: Path) -> None:
     study.filemap("raw").record("Z:/a.tif", Subject="m01")
 
     assert study.identities(filemap="raw") == {study.identity.identity(Subject="m01")}
+
+
+def test_declare_filemap_rejects_an_unknown_template_key(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    with pytest.raises(ValueError, match="unknown identity keys"):
+        study.declare_filemap("s2p", root_template="{Session}/suite2p")
+
+
+def test_templated_filemap_round_trips_through_save_load(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_filemap("s2p", root_template="{Subject}/suite2p")
+    study.save()
+
+    handle = Study.load(tmp_path).filemap("s2p")
+
+    assert handle.templated is True
+    assert handle.root_template == "{Subject}/suite2p"
+
+
+def test_declare_and_get_dump(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_dump("reference")
+
+    assert study.dump("reference").name == "reference"
+    assert set(study.dumps) == {"reference"}
+
+
+def test_dump_unknown_name_raises(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path)
+    with pytest.raises(KeyError):
+        study.dump("nope")
+
+
+def test_dump_round_trips_through_save_load(tmp_path: Path) -> None:
+    study = Study(name="s", root=tmp_path, identity=["Subject"])
+    study.declare_dump("reference")
+    study.dump("reference").record("Z:/atlas.nrrd", name="atlas")
+    study.save()
+
+    loaded = Study.load(tmp_path)
+
+    assert set(loaded.dumps) == {"reference"}
+    assert loaded.dump("reference").path("atlas") == Path("Z:/atlas.nrrd")
 
 
 def test_discover_reports_present_missing_and_drift(tmp_path: Path) -> None:

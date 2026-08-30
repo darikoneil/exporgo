@@ -34,21 +34,23 @@ without the full profile. Never hardcode or echo the location of the private sou
 ## The voice, distilled (apply mechanically)
 
 1. **Lead with the claim.** Open every section and paragraph with a short, standalone
-   declarative — the behavior or the takeaway first, the support after.
+   declarative: the behavior or takeaway first, the support after.
 2. **Vary sentence length hard.** Follow a long, clause-rich sentence with a punchy four-to-
    eight-word one at each turn. The short sentence is the emphasis.
-3. **Define a term the first time you use it**, with an em-dash appositive gloss, and bold the
-   term on first appearance.
-4. **Use the em-dash** for inline definitions and asides — make it the default over
-   parentheses for emphasis.
+3. **Define a term the first time you use it**, bolding it on first appearance; introduce the
+   gloss with a comma appositive, a colon, or a short parenthetical.
+4. **Use the em-dash sparingly.** It's a genuine part of the voice, but reserve it for real
+   emphasis, not routine asides or definitions: dense em-dash use now reads to many readers as
+   an AI tell. Prefer a comma, a colon, parentheses, or two short sentences, and recast when
+   em-dashes cluster. As a rough gauge, at most one em-dash in a short paragraph.
 5. **Use a colon to set up a payoff or an example**, not just to introduce a list.
-6. **Motivation before mechanism.** Open a guide with what the thing accomplishes, then how —
+6. **Motivation before mechanism.** Open a guide with what the thing accomplishes, then how:
    a compact "reach for this when…", not a sales pitch.
 7. **Active voice, explicit agent.** "The parser accepts…", "Call `x` to…". Imperative for what
    the reader does; plain present-tense declarative for what the software does.
-8. **Ground every abstraction in one concrete specific** — a real value, a real call, a named
+8. **Ground every abstraction in one concrete specific:** a real value, a real call, a named
    case. Never `foo`/`bar` when a real example exists.
-9. **Write in triads** — parallel lists of three — and always with the Oxford comma.
+9. **Write in triads** (parallel lists of three), always with the Oxford comma.
 10. **Give exact values and units** for defaults, limits, and ranges; never a vague magnitude.
 11. **Hedge only genuinely non-deterministic behavior** ("may be cached", "order is not
     guaranteed") — and then only once. State guaranteed behavior flatly.

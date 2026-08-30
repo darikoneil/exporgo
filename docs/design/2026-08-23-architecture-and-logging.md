@@ -27,7 +27,7 @@ Successor to the original `exporgo`, rebuilt as layers:
 | **monitoring / manifest** | `exporgo[monitor]` | `pydantic` | Progress *derived* from filesystem (outputs exist & fresh), rendered into an agent-readable map. *(future)* |
 
 > **Update (2026-08-24):** the "organization" row above has since been split into two
-> built layers — **`exporgo[study]`** (the Study & Identity model) and
+> built layers — the **Study & Identity model** (in the base install, not a separate extra) and
 > **`exporgo[datastore]`** (polars/Parquet component stores). Monitoring remains planned.
 > See `2026-08-23-study-identity-design.md` and `2026-08-23-datastore-design.md`.
 
@@ -37,8 +37,9 @@ validated map and acts. Progress is **derived** from the filesystem (declared ou
 existence/freshness), not tracked in a mutable ledger — so "self-validate existence",
 DVC-style staleness, and progress-monitoring are one mechanism.
 
-Dependency direction: `dlis` ← (optionally) `exporgo`. exporgo's logging base is
-loguru-only and pulls neither pydantic nor matplotlib.
+exporgo's base install is **loguru + pydantic + tomli-w** (the log + study foundation); it
+pulls no matplotlib and none of the heavy analytical stack (numpy/polars/pyarrow live only in
+the `datastore` extra). *(Corrected 2026-08-29: the base is no longer loguru-only.)*
 
 ## Build sequence
 

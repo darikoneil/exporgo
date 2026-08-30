@@ -121,12 +121,17 @@ many-dimensional ad-hoc analytics ever demand it.)
   what keys are present," so existence and identity checks are O(1) rather than full-scan.
 - **Versioned schema evolution**: adding a column is a deliberate, versioned migration
   (bump store version, backfill/default old fragments) — never a side effect of a write.
-- Atomicity/locking for parallel per-subject writers.
+- Atomicity for parallel per-subject writers. *(Built 2026-08-29, **without locking**: the
+  manifest is an append-only log directory — each write drops a unique `<uuid>.json`, so
+  independent/multi-host writers never read-modify-write or clobber. File locking over NFS/SMB
+  was deliberately rejected as unreliable. See the "Storage and concurrency" explanation.)*
 
 ## Packaging & dependencies
 
-An opt-in extra, `exporgo[datastore]`, pulling **polars, pyarrow, numpy** (and **pydantic**
-via `exporgo[study]`). The **base install** is loguru + polars (polars was promoted to base).
+An opt-in extra, `exporgo[datastore]`, pulling **polars, pyarrow, numpy**. The **base
+install** is loguru + pydantic + tomli-w (the log + study foundation). *(Corrected 2026-08-29:
+there is no `exporgo[study]` extra — the study layer ships in base — and polars/pyarrow/numpy
+live only in this datastore extra, never base.)*
 Domain libraries (pynapple, suite2p, regions, …) stay out of the store layer entirely — the
 engine is generic; schemas are supplied by the study.
 
@@ -152,6 +157,13 @@ incoming partitions' fragments (files + entries) before writing, replacing only 
 partitions. **`mode="unique"`** (added 2026-08-27) is the write-time guard: it refuses the
 write (raises, all-or-nothing) if `frame` carries any identity already present in the
 manifest, so a store never accumulates duplicate identities.
+
+*(Update 2026-08-29: the manifest is now an **append-only log directory** —
+`<store>/_manifest/<uuid>.json` per write, aggregated (applying overwrite tombstones) on read —
+instead of a single read-modify-written `_manifest.json`. This makes concurrent and multi-host
+writers safe by conflict-avoidance (unique fragment names, like the `part-<uuid>.parquet` data
+files) rather than locking; overwrite deletes the target data files and appends a tombstone
+entry. The public `Manifest` API is unchanged. See the "Storage and concurrency" docs page.)*
 
 **Schema = real polars dtypes (no whitelist).** `StoreSpec.columns` maps names to actual
 polars dtypes at full fidelity — exact int/float widths (`UInt16`, `Float32`), `List`/

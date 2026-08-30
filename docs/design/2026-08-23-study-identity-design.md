@@ -289,9 +289,10 @@ exporgo/study/
 
 ## Packaging & dependencies
 
-`exporgo.study` is the shared foundation and needs **pydantic** (models + config), so it's
-an extra — `exporgo[study]` — that both `[monitor]` and `[datastore]` depend on. The **base
-install stays loguru-only.** No domain libraries (no pynapple/suite2p/regions) — the model
+`exporgo.study` is the shared foundation and needs **pydantic** (models + config), so pydantic
+ships in the **base install** (loguru + pydantic + tomli-w) alongside logging — the study layer
+is part of base, not a separate extra. *(Corrected 2026-08-29: there is no `exporgo[study]`
+extra, and the base is not loguru-only.)* No domain libraries (no pynapple/suite2p/regions) — the model
 is generic; identity keys, resources, and templates are all supplied by the study.
 
 ## Principles honored
