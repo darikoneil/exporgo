@@ -18,7 +18,7 @@ from exporgo.log.decorators import (
     log_major_function_call,
 )
 from exporgo.log.levels import LogLevel
-from exporgo.log.sinks import init_logger, reset_tqdm
+from exporgo.log.sinks import init_logger, read_log, reset_tqdm
 
 __all__ = [
     "LogLevel",
@@ -26,5 +26,6 @@ __all__ = [
     "log_class",
     "log_function_call",
     "log_major_function_call",
+    "read_log",
     "reset_tqdm",
 ]

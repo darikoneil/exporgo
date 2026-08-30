@@ -162,11 +162,12 @@ class Store:
         return self.spec.polars_schema()
 
     def write_schema(self) -> None:
-        """Persist the store's declared schema as a 0-row anchor Parquet file."""
+        """Persist the store's declared schema as a 0-row anchor Parquet file, atomically."""
         self.root.mkdir(parents=True, exist_ok=True)
-        pl.DataFrame(schema=self.spec.polars_schema()).write_parquet(
-            self.root / _SCHEMA_NAME
-        )
+        target = self.root / _SCHEMA_NAME
+        temporary = target.with_name(f"{_SCHEMA_NAME}.{uuid4().hex}.tmp")
+        pl.DataFrame(schema=self.spec.polars_schema()).write_parquet(temporary)
+        temporary.replace(target)
 
     @staticmethod
     def read_schema(root: str | Path) -> dict[str, Any]:

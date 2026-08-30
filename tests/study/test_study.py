@@ -140,10 +140,10 @@ def test_load_does_not_initialize_logging(
 
 
 def test_save_creates_a_real_log_file(tmp_path: Path) -> None:
-    """End-to-end: save() leaves a real ``<root>/<name>.log`` on disk."""
+    """End-to-end: save() leaves a real per-writer log file under ``.logs/``."""
     Study(name="fomo", root=tmp_path).save()
 
-    assert (tmp_path / "fomo.log").is_file()
+    assert list((tmp_path / ".logs").glob("*/fomo.log"))  # a per-writer log file exists
 
 
 def test_save_and_load_round_trip(tmp_path: Path) -> None:
@@ -207,10 +207,11 @@ def test_print_outputs_a_multiline_summary() -> None:
 
 
 def test_first_save_logs_the_creation_date(tmp_path: Path) -> None:
-    Study(name="fomo", root=tmp_path).save()
+    study = Study(name="fomo", root=tmp_path)
+    study.save()
 
     logger.remove()  # flush + close the async file sink so the record is on disk
-    content = (tmp_path / "fomo.log").read_text(encoding="utf-8")
+    content = study.read_log()
 
     assert "created" in content.lower()
     assert "fomo" in content
@@ -220,22 +221,24 @@ def test_second_save_does_not_relog_created(tmp_path: Path) -> None:
     study = Study(name="fomo", root=tmp_path)
     study.save()  # first save: study.toml is created -> logs "created"
     logger.remove()  # flush + close the file sink
-    (tmp_path / "fomo.log").unlink()  # isolate the second save's output
+    for log_file in (tmp_path / ".logs").glob("*/fomo.log"):
+        log_file.unlink()  # isolate the second save's output
 
     study.save()  # study.toml already exists -> plain "saved", no "created"
     logger.remove()
-    content = (tmp_path / "fomo.log").read_text(encoding="utf-8")
+    content = study.read_log()
 
     assert "created" not in content.lower()
     assert "saved" in content.lower()
 
 
 def test_load_logs_that_the_study_was_accessed(tmp_path: Path) -> None:
-    Study(name="fomo", root=tmp_path).save()  # configures logging into fomo.log
+    study = Study(name="fomo", root=tmp_path)
+    study.save()  # configures logging for this writer
     Study.load(tmp_path)  # emits an access record to the still-active sink
 
     logger.remove()  # flush
-    content = (tmp_path / "fomo.log").read_text(encoding="utf-8")
+    content = study.read_log()
 
     assert "accessed" in content.lower()
 

@@ -301,7 +301,7 @@ wheels = [
 
 [[package]]
 name = "exporgo"
-version = "2.0.8"
+version = "2.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "loguru" },
@@ -344,7 +344,7 @@ requires-dist = [
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=5.1.0" },
     { name = "numpy", marker = "extra == 'datastore'" },
     { name = "polars", extras = ["numpy", "pyarrow"], marker = "extra == 'datastore'", specifier = ">=1.44.1" },
-    { name = "pyarrow", marker = "extra == 'datastore'", specifier = "==24.0.0" },
+    { name = "pyarrow", marker = "extra == 'datastore'", specifier = "<=24.0.0" },
     { name = "pydantic" },
     { name = "sphinx", marker = "extra == 'docs'" },
     { name = "sphinx-autodoc-typehints", marker = "extra == 'docs'" },

@@ -29,6 +29,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from exporgo._atomic import atomic_write_text
 from exporgo.study.identity import Identity, IdentitySchema, IdentityValue
 from exporgo.study.resources import ResourceSpec
 
@@ -200,7 +201,7 @@ class FileMap:
     def _save(self, document: _FileMapDocument) -> None:
         """Persist the sidecar document, creating the filemap directory if needed."""
         self.directory.mkdir(parents=True, exist_ok=True)
-        self.sidecar.write_text(document.model_dump_json(indent=2), encoding="utf-8")
+        atomic_write_text(self.sidecar, document.model_dump_json(indent=2))
 
     @staticmethod
     def _identity_key(identity: Identity) -> dict[str, str]:
@@ -432,7 +433,7 @@ class Dump:
     def _save(self, document: _DumpDocument) -> None:
         """Persist the sidecar document, creating the dump directory if needed."""
         self.directory.mkdir(parents=True, exist_ok=True)
-        self.sidecar.write_text(document.model_dump_json(indent=2), encoding="utf-8")
+        atomic_write_text(self.sidecar, document.model_dump_json(indent=2))
 
     def discover(
         self, directory: str | Path, *, pattern: str = "*", recursive: bool = True

@@ -6,7 +6,7 @@ validates; it never executes. Identity keys become the datastore's partition key
 :meth:`Study.validate` seeds the monitoring layer's derived status.
 
 Saving a study also wires up logging into its directory (see :meth:`Study.init_logging`),
-so every study automatically gets a ``<root>/<name>.log`` the logger writes to.
+so every study automatically gets logging (a per-writer log under ``<root>/.logs/``).
 """
 
 import tomllib
@@ -19,7 +19,8 @@ from typing import TYPE_CHECKING, Any, Self
 import tomli_w
 from loguru import logger
 
-from exporgo.log import LogLevel, init_logger
+from exporgo._atomic import atomic_write_text
+from exporgo.log import LogLevel, init_logger, read_log
 from exporgo.study.filemaps import Dump, FileMap
 from exporgo.study.identity import (
     Identity,
@@ -862,10 +863,11 @@ class Study:
         file. Called automatically by :meth:`save`; call it directly to start logging into
         the study before the first save (e.g. when resuming a study via :meth:`load`).
 
-        Writes ``<root>/<name>.log`` (INFO/WARNING) and
-        ``<root>/.logs/.<name>_exception.log`` (exceptions), and adds a colorized console
-        sink. Like :func:`~exporgo.log.init_logger` it resets existing sinks, so repeated
-        calls are safe and idempotent.
+        Writes into this writer's own directory ``<root>/.logs/<host>_<user>_<pid>/`` --
+        ``<name>.log`` (INFO/WARNING) and ``<name>.exception.log`` (exceptions) -- and adds a
+        colorized console sink. Concurrent writers each get their own directory, so they never
+        share a file; :meth:`read_log` merges them. Like :func:`~exporgo.log.init_logger` it
+        resets existing sinks, so repeated calls are safe and idempotent.
 
         Args:
             name: Loguru namespace to enable; ``None`` (the default) enables all
@@ -884,13 +886,30 @@ class Study:
             file_stem=self.name,
         )
 
+    def read_log(self, *, exceptions: bool = False) -> str:
+        """Return this study's log, merged across all writers in chronological order.
+
+        Each process that logs into the study writes its own file under ``<root>/.logs/``;
+        this reads them all and interleaves their records by timestamp (see
+        :func:`exporgo.log.read_log`), so you get one timeline even when several people logged
+        to the study at once.
+
+        Args:
+            exceptions: Read the exception logs instead of the primary logs.
+
+        Returns:
+            The merged log text (empty if nothing has been logged yet).
+        """
+        return read_log(self.root, file_stem=self.name, exceptions=exceptions)
+
     def save(self) -> Path:
         """Write the study's declaration to ``root/study.toml`` and return that path.
 
-        Also initializes logging into the study root (see :meth:`init_logging`), so a
-        saved study automatically has a ``<root>/<name>.log`` the logger writes to. The
-        **first** save (when ``study.toml`` does not yet exist) records a "created" line
-        with the creation date to that log; subsequent saves record a plain "saved" line.
+        Also initializes logging into the study root (see :meth:`init_logging`), so a saved
+        study automatically gets logging (a per-writer log under ``<root>/.logs/``, readable
+        merged via :meth:`read_log`). The **first** save (when ``study.toml`` does not yet
+        exist) records a "created" line with the creation date; subsequent saves record a
+        plain "saved" line.
         """
         data: dict[str, object] = {
             "name": self.name,
@@ -921,8 +940,7 @@ class Study:
         self.root.mkdir(parents=True, exist_ok=True)
         config_path = self.root / _CONFIG_NAME
         is_first_save = not config_path.exists()  # before we (over)write it below
-        with config_path.open("wb") as handle:
-            tomli_w.dump(data, handle)
+        atomic_write_text(config_path, tomli_w.dumps(data))
         for store_name in self._stores:
             self.store(store_name).write_schema()  # persist each store's schema anchor
         self.init_logging()

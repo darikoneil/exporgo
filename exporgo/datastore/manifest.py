@@ -16,6 +16,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
+from exporgo._atomic import atomic_write_text
+
 __all__ = ["FragmentEntry", "Manifest"]
 
 _LOG_GLOB = "*.json"
@@ -124,7 +126,4 @@ def append_manifest_log(
     """
     directory.mkdir(parents=True, exist_ok=True)
     log = _ManifestLog(added=added or [], removed=removed or [])
-    name = f"{uuid4().hex}.json"
-    temporary = directory / f"{name}.writing"
-    temporary.write_text(log.model_dump_json(indent=2), encoding="utf-8")
-    temporary.replace(directory / name)
+    atomic_write_text(directory / f"{uuid4().hex}.json", log.model_dump_json(indent=2))

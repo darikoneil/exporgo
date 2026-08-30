@@ -38,12 +38,12 @@ def test_specific_filter_uses_inclusive_minimum_level(make_record):  # noqa: ANN
 
 
 # ---------------------------------------------------------------------- sink builders
-def test_init_log_subdir_is_idempotent(tmp_path: Path) -> None:
-    expected = tmp_path / "nested" / ".logs"
+def test_writer_log_directory_is_per_writer_and_created(tmp_path: Path) -> None:
+    directory = sinks._writer_log_directory(tmp_path)
 
-    assert sinks._init_log_subdir(tmp_path / "nested") == expected
-    assert sinks._init_log_subdir(tmp_path / "nested") == expected
-    assert expected.is_dir()
+    assert directory.parent == tmp_path / ".logs"  # a per-writer subdir under .logs
+    assert directory.is_dir()
+    assert sinks._writer_log_directory(tmp_path) == directory  # stable for this writer
 
 
 def test_primary_log_sink_uses_stem_and_expected_options(
@@ -74,8 +74,7 @@ def test_exception_log_sink_uses_stem_and_expected_options(
     sinks._set_exceptions_log(tmp_path, "proj")
 
     sink, options = recording_logger.sinks[0]
-    assert sink == str(tmp_path / ".logs" / ".proj_exception.log")
-    assert (tmp_path / ".logs").is_dir()
+    assert sink == str(tmp_path / "proj.exception.log")
     assert options == {
         "enqueue": True,
         "level": LogLevel.ERROR.value,
@@ -97,7 +96,7 @@ def test_custom_log_sink_configuration_and_threshold_filter(
     sinks._set_custom_log(tmp_path, LogLevel.DEBUG, "proj", retention="2 days")
 
     sink, options = recording_logger.sinks[0]
-    assert sink == str(tmp_path / ".logs" / ".proj_DEBUG.log")
+    assert sink == str(tmp_path / "proj.DEBUG.log")
     assert options["enqueue"] is True
     assert options["level"] == LogLevel.DEBUG.value
     assert options["rotation"] == "100 MB"
@@ -141,6 +140,7 @@ def test_init_logger_configures_all_file_sinks_with_stem(
 ):  # noqa: ANN001
     calls: list[tuple] = []
     monkeypatch.setattr(sinks, "logger", recording_logger)
+    monkeypatch.setattr(sinks, "_writer_log_directory", lambda base: base)
     monkeypatch.setattr(
         sinks, "_set_primary_log", lambda base, stem: calls.append(("primary", base, stem))
     )
@@ -201,6 +201,28 @@ def test_init_logger_warns_for_custom_sink_without_directory(
         sinks.init_logger(log_level_custom=LogLevel.DEBUG)
 
     assert len(recording_logger.sinks) == 1
+
+
+# ----------------------------------------------------------------------------- read_log
+def test_read_log_merges_writers_chronologically(tmp_path: Path) -> None:
+    logs = tmp_path / ".logs"
+    (logs / "hostA_alice_1").mkdir(parents=True)
+    (logs / "hostB_bob_2").mkdir(parents=True)
+    (logs / "hostA_alice_1" / "study.log").write_text(
+        "2026-08-30 00:00:01.000\tINFO\n\tfrom A\n", encoding="utf-8"
+    )
+    (logs / "hostB_bob_2" / "study.log").write_text(
+        "2026-08-30 00:00:00.000\tINFO\n\tfrom B\n", encoding="utf-8"
+    )
+
+    merged = sinks.read_log(tmp_path, file_stem="study")
+
+    assert "from A" in merged
+    assert merged.index("from B") < merged.index("from A")  # B is earlier -> sorted first
+
+
+def test_read_log_is_empty_without_any_logs(tmp_path: Path) -> None:
+    assert sinks.read_log(tmp_path, file_stem="study") == ""
 
 
 # -------------------------------------------------------------------------- reset_tqdm

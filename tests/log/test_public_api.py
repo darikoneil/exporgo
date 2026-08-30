@@ -11,6 +11,7 @@ from exporgo.log import (
     log_class,
     log_function_call,
     log_major_function_call,
+    read_log,
     reset_tqdm,
 )
 
@@ -19,6 +20,7 @@ def test_public_names_are_exported() -> None:
     assert set(log.__all__) == {
         "LogLevel",
         "init_logger",
+        "read_log",
         "reset_tqdm",
         "log_function_call",
         "log_major_function_call",
@@ -32,6 +34,7 @@ def test_all_public_callables_are_importable() -> None:
     assert LogLevel.INFO == 20
     for symbol in (
         init_logger,
+        read_log,
         reset_tqdm,
         log_function_call,
         log_major_function_call,
