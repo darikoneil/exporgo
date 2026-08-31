@@ -4,7 +4,9 @@ Some files don't fit a store and aren't a single templated blob: a suite2p outpu
 `.npy` files across per-plane folders; raw acquisitions live anywhere on an external drive. A
 **file map** indexes those, per identity, keyed by each file's path **relative to that
 identity's root** — so `plane0/F.npy` and `plane1/F.npy` never collide. See [Resources, stores,
-and file maps](../explanation/components) for how it differs from the other two components.
+and file maps](../explanation/components) for how it differs from the other components, and
+[Choosing a component](../explanation/choosing-a-component) to confirm a file map is the right
+tool before you reach for one.
 
 A file map has one mode, fixed when you declare it:
 
@@ -84,6 +86,79 @@ of them are present — which is what {meth}`~exporgo.study.Study.validate` chec
 participates in validation and coverage exactly like a resource: it just indexes locations
 instead of deriving a single one. {meth}`~exporgo.study.FileMap.identities` lists the identities
 with at least one recorded file.
+
+## Two file maps in one study: templated and recorded together
+
+A study often needs both modes at once: predictable processing output *and* raw files that landed
+wherever the scope wrote them. Declare one file map of each kind — the modes are independent, and
+each identity is indexed separately in its own map.
+
+```python
+# Predictable: suite2p writes under {Subject}/{Session}/suite2p, so template the root.
+s2p = study.declare_filemap("suite2p", root_template="{Subject}/{Session}/suite2p")
+
+# Irregular: raw scope files live on an external drive under no fixed pattern.
+raw = study.declare_filemap("raw")
+
+for subject, session, scope_dir in [
+    ("m01", 1, "Z:/scope/2026-01-15/m01"),
+    ("m02", 1, "Z:/scope/2026-01-16/m02"),
+]:
+    raw.discover(scope_dir, pattern="*.tif", Subject=subject, Session=session)
+    s2p.discover(pattern="*.npy", Subject=subject, Session=session)
+```
+
+Each map answers for its own files, and both feed the same validation:
+
+```python
+raw.path("*_run1*", Subject="m01", Session=1)      # a raw acquisition, by glob
+s2p.path("plane0/F.npy", Subject="m01", Session=1)  # a suite2p trace, by exact key
+
+report = study.validate()   # checks every registered identity across BOTH file maps
+print(report.missing)       # (identity, "raw") or (identity, "suite2p") pairs, if any
+```
+
+A `(identity, "raw")` pair in `missing` means that session's raw files were never recorded or have
+gone missing; a `(identity, "suite2p")` pair means suite2p hasn't run (or its output moved). The
+component name in each pair tells you which map to look at.
+
+## Re-discover when files are added or moved
+
+`discover` **reconciles** — each call replaces an identity's recorded files with the folder's
+current contents. That makes it the tool for keeping a file map honest as data changes, not just
+for the first index.
+
+A templated map re-derives its own root, so re-indexing is a bare re-run:
+
+```python
+# suite2p was re-run and now writes a third plane; pick it up.
+s2p.discover(pattern="*.npy", Subject="m01", Session=1)
+print("plane2/F.npy" in s2p.paths(Subject="m01", Session=1))   # True
+```
+
+A recorded map remembers each identity's root from the first `discover`, so re-indexing the *same*
+folder also needs no path — but if the files **moved**, pass the new folder to repoint the root:
+
+```python
+# Same drive, new files dropped in: re-run with no directory to re-index the stored root.
+raw.discover(Subject="m01", Session=1)
+
+# Files were relocated to new storage: pass the new folder to update the root.
+raw.discover("/archive/2026/m01", Subject="m01", Session=1)
+```
+
+To find what reconciliation should catch before you run it, {meth}`~exporgo.study.Study.validate`
+flags any identity whose recorded files have since vanished:
+
+```python
+stale = [identity for identity, component in study.validate().missing if component == "raw"]
+for identity in stale:
+    raw.discover(Subject=identity["Subject"], Session=identity["Session"])
+```
+
+Because nothing is cached, the next `validate` reflects the reconciled state immediately — the
+filesystem stays the source of truth. If a whole registry needs rebuilding from data already on
+disk, see [Discover identities](discover-identities).
 
 ## Study-global files: a dump
 

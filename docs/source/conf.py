@@ -12,6 +12,7 @@ import importlib.metadata
 
 project = "exporgo"
 author = "Darik A. O'Neil"
+# noinspection PyShadowingBuiltins
 copyright = "2026, Darik A. O'Neil"
 
 # Pull the version from the installed distribution metadata (derived from pyproject.toml),
@@ -24,12 +25,15 @@ version = ".".join(release.split(".")[:2])
 extensions = [
     "myst_parser",
     "sphinx.ext.autodoc",
+    "sphinx.ext.autosectionlabel",
     "sphinx.ext.napoleon",
     "sphinx.ext.autosummary",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
     "sphinx_autodoc_typehints",
     "sphinxcontrib.autodoc_pydantic",
+    "sphinx.ext.coverage",
+    "sphinx.ext.todo"
 ]
 
 exclude_patterns = []
@@ -63,17 +67,25 @@ napoleon_google_docstring = True
 napoleon_numpy_docstring = False
 napoleon_include_init_with_doc = False
 
-always_document_param_types = False
+typehints_defaults = 'comma'
+always_document_param_types = True
+typehints_fully_qualified = False
+typehints_document_rtype = True
+always_use_bars_union = True
+simplify_optional_unions = False
+typehints_use_signature = False
+typehints_use_signature_return = False
 
 # -- autodoc_pydantic --------------------------------------------------------------------
 # Keep the rendered models focused on the fields and their constraints; suppress the noisier
 # JSON-schema, config, and validator dumps.
 
-autodoc_pydantic_model_show_json = False
-autodoc_pydantic_model_show_config_summary = False
-autodoc_pydantic_model_show_validator_summary = False
 autodoc_pydantic_model_show_field_summary = True
 autodoc_pydantic_field_list_validators = False
+autodoc_pydantic_model_show_json = True
+autodoc_pydantic_model_show_config_summary = True
+autodoc_pydantic_model_show_validator_members = True
+autodoc_pydantic_model_show_validator_summary = True
 
 # -- intersphinx -------------------------------------------------------------------------
 # Cross-references to the standard library and pydantic. Missing inventories degrade to a
@@ -83,4 +95,13 @@ autodoc_pydantic_field_list_validators = False
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "pydantic": ("https://docs.pydantic.dev/latest/", None),
+    "numpy": ('https://numpy.org/doc/1.24/', None),
+    "polars": ('https://pola.rs/docs/latest/', None),
 }
+
+pygments_style = "sphinx"
+typehints_use_signature = False
+typehints_use_signature_return = False
+todo_include_todos = True
+language = "en"
+coverage_show_missing_items = True
