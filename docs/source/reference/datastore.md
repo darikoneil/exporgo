@@ -40,6 +40,14 @@ writes each identity's array and coordinates and reassembles them into an
 {class}`xarray.DataArray` on {meth}`~exporgo.datastore.ArrayStore.load`. See
 [Store arrays with coordinates](../how-to/store-arrays).
 
+The declaration fixes the coordinate *structure*, not the coordinate *values*. Every array in
+the store shares the same dimension names, the same axis order, and the same set of labelled
+dimensions: that is `dims`, and it is declared once. The values are per-identity. Each write
+supplies its own coordinate vectors, and each array may have its own shape, so `m01` can be
+`[300 unit, 9000 time]` while `m02` is `[512 unit, 12000 time]`, each with its own unit indices
+and timestamps. The only length constraint is within a single array: a labelled dimension's
+coordinate vector must match that array's size on its axis.
+
 ```python
 store = study.array_store("neural")
 store.write(traces, coords={"unit": units, "time": timestamps}, Subject="m01", Session=1)

@@ -45,7 +45,11 @@ labelled {class}`xarray.DataArray`. *Not when* the identity has many independent
 map) or tabular rows (a tabular store). For example, a `neural` array store holds each session's
 calcium traces as a `[unit, time]` array with unit indices and frame timestamps as coordinates;
 {meth}`~exporgo.datastore.ArrayStore.load` returns it aligned and ready for
-`neural.sel(time=slice(0, 10))`.
+`neural.sel(time=slice(0, 10))`. The declaration fixes the coordinate *structure* (the dimension
+names, the axis order, and which axes are labelled), so every array in the store shares it. The
+coordinate *values* are per-identity: each write brings its own vectors, and each array its own
+shape, so one session can be `[300 unit, 9000 time]` and the next `[512 unit, 12000 time]`, each
+with its own unit indices and timestamps.
 
 **File map**: a per-identity index of many files, keyed by each file's path **relative to that
 identity's root**. Where a resource derives one path, a file map holds a whole folder's worth:
