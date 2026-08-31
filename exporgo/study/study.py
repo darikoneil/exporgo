@@ -33,6 +33,7 @@ from exporgo.study.resources import Resource, ResourceSpec
 if TYPE_CHECKING:
     import polars as pl
 
+    from exporgo.datastore.arrays import ArrayStore, ArrayStoreSpec
     from exporgo.datastore.spec import StoreSpec
     from exporgo.datastore.store import Store
 
@@ -213,12 +214,13 @@ class Study:
             identity: The identity keys (1-3), an :class:`IdentitySchema`, or ``None``
                 to default to ``["Subject"]``.
         """
-        self.name = name
-        self.root = Path(root)
+        self.name: str = name
+        self.root: Path = Path(root)
         self.identity = self._coerce_schema(identity)
         self._entities: list[Identity] = []
         self._resources: dict[str, ResourceSpec] = {}
         self._stores: dict[str, StoreSpec] = {}
+        self._array_stores: dict[str, ArrayStoreSpec] = {}
         self._filemaps: dict[str, str | None] = {}
         self._dumps: list[str] = []
 
@@ -249,7 +251,8 @@ class Study:
         return (
             f"Study {self.name!r} [{keys}]: {len(self._entities)} identities, "
             f"{len(self._resources)} resources, {len(self._stores)} stores, "
-            f"{len(self._filemaps)} filemaps, {len(self._dumps)} dumps"
+            f"{len(self._array_stores)} array stores, {len(self._filemaps)} filemaps, "
+            f"{len(self._dumps)} dumps"
         )
 
     def print(self) -> None:
@@ -260,18 +263,20 @@ class Study:
         """
         resources = ", ".join(sorted(self._resources)) or "(none)"
         stores = ", ".join(sorted(self._stores)) or "(none)"
+        array_stores = ", ".join(sorted(self._array_stores)) or "(none)"
         filemaps = ", ".join(sorted(self._filemaps)) or "(none)"
         dumps = ", ".join(sorted(self._dumps)) or "(none)"
         keys = ", ".join(self.identity.names)
         lines = [
             f"Study {self.name!r}",
-            f"  root:       {self.root}",
-            f"  identity:   {keys}",
-            f"  identities: {len(self._entities)} registered",
-            f"  resources:  {len(self._resources)} ({resources})",
-            f"  stores:     {len(self._stores)} ({stores})",
-            f"  filemaps:   {len(self._filemaps)} ({filemaps})",
-            f"  dumps:      {len(self._dumps)} ({dumps})",
+            f"  root:         {self.root}",
+            f"  identity:     {keys}",
+            f"  identities:   {len(self._entities)} registered",
+            f"  resources:    {len(self._resources)} ({resources})",
+            f"  stores:       {len(self._stores)} ({stores})",
+            f"  array stores: {len(self._array_stores)} ({array_stores})",
+            f"  filemaps:     {len(self._filemaps)} ({filemaps})",
+            f"  dumps:        {len(self._dumps)} ({dumps})",
         ]
         print("\n".join(lines))
 
@@ -289,6 +294,11 @@ class Study:
     def stores(self) -> dict[str, "StoreSpec"]:
         """The declared store specs, keyed by name (a copy; safe to mutate)."""
         return dict(self._stores)
+
+    @property
+    def array_stores(self) -> dict[str, "ArrayStoreSpec"]:
+        """The declared array-store specs, keyed by name (a copy; safe to mutate)."""
+        return dict(self._array_stores)
 
     @property
     def filemaps(self) -> dict[str, FileMap]:
@@ -478,6 +488,95 @@ class Study:
             raise KeyError(msg) from None
         return Store(self.root / name, spec)
 
+    def declare_array_store(
+        self,
+        name: str,
+        *,
+        dims: Mapping[str, Any],
+        dtype: Any,
+        partition_keys: Sequence[str] | None = None,
+        max_rows_per_file: int | None = 25_000_000,
+        max_rows_per_group: int | None = None,
+    ) -> "ArrayStore":
+        """Declare an array-store component (one N-D array per identity, loaded as xarray).
+
+        An array store holds a single dense array per identity as a NumPy ``.npy`` blob, paired
+        with a coordinate catalog. Partition keys default to the study's identity keys, so a
+        partition is an identity.
+
+        Args:
+            name: The array store's name (also its subdirectory under the study root).
+            dims: An ordered ``{dimension: coord dtype}`` mapping giving the array's axis order;
+                each value is the polars dtype of that dimension's coordinate vector, or ``None``
+                for a positional (unlabelled) dimension.
+            dtype: The array's element dtype (anything :func:`numpy.dtype` accepts, e.g.
+                ``numpy.float32``); the write casts to it.
+            partition_keys: Columns to partition by (1-3); defaults to the study's identity keys.
+            max_rows_per_file: Write-time cap on rows per coordinate-catalog fragment (``None`` =
+                no exporgo-imposed limit). Part of the declaration, so it survives save/load.
+            max_rows_per_group: Write-time cap on rows per coordinate-catalog row group
+                (``None`` = pyarrow's default). Part of the declaration, so it survives
+                save/load.
+
+        Returns:
+            The :class:`~exporgo.datastore.arrays.ArrayStore` bound to ``<root>/<name>``.
+        """
+        from exporgo.datastore.arrays import ArrayStoreSpec, coord_dtype_for_label
+
+        keys = (
+            tuple(partition_keys) if partition_keys is not None else self.identity.names
+        )
+        key_by_name = {key.name: key for key in self.identity.keys}
+        partition_dtypes = {
+            key: coord_dtype_for_label(
+                key_by_name[key].dtype if key in key_by_name else "str"
+            )
+            for key in keys
+        }
+        spec = ArrayStoreSpec(
+            name=name,
+            dims=dict(dims),
+            dtype=dtype,
+            partition_keys=keys,
+            partition_dtypes=partition_dtypes,
+            max_rows_per_file=max_rows_per_file,
+            max_rows_per_group=max_rows_per_group,
+        )
+        self._array_stores[name] = spec
+
+        msg = f"Declared the array store {name!r}"
+        logger.info(msg)
+
+        return self.array_store(name)
+
+    def array_store(self, name: str) -> "ArrayStore":
+        """Return the :class:`~exporgo.datastore.arrays.ArrayStore` for a declared component.
+
+        Binds the array store's declared spec to ``<root>/<name>`` so it can be written to and
+        loaded. The return type lives in the datastore extra, so it is imported lazily;
+        ``import exporgo.study`` alone does not pull in the datastore layer.
+
+        Args:
+            name: The name of a previously declared array store.
+
+        Returns:
+            The :class:`~exporgo.datastore.arrays.ArrayStore` bound to ``<root>/<name>``.
+
+        Raises:
+            KeyError: If no array store with that name has been declared.
+        """
+        from exporgo.datastore.arrays import ArrayStore
+
+        try:
+            spec = self._array_stores[name]
+        except KeyError:
+            msg = (
+                f"No array store named {name!r}; "
+                f"declared array stores: {sorted(self._array_stores)}"
+            )
+            raise KeyError(msg) from None
+        return ArrayStore(self.root / name, spec)
+
     def declare_filemap(
         self, name: str, *, root_template: str | None = None
     ) -> FileMap:
@@ -625,39 +724,55 @@ class Study:
         store: str | None = None,
         resource: str | None = None,
         filemap: str | None = None,
+        array_store: str | None = None,
     ) -> set[Identity]:
-        """Return the identities contained in one declared store, resource, or filemap.
+        """Return the identities in one declared store, array store, resource, or filemap.
 
-        Exactly one target must be given. A **store** and a **filemap** are reported
-        open-world (the store's manifest partitions / the filemap's recorded identities),
-        so they may include identities never registered in the study. A **resource** is
-        reported closed-world -- the registered identities whose resolved file exists on
-        disk (there is no scan for unregistered files; that is :meth:`discover`'s role).
+        Exactly one target must be given. A **store**, an **array store**, and a **filemap**
+        are reported open-world (their manifest partitions / the filemap's recorded
+        identities), so they may include identities never registered in the study. A
+        **resource** is reported closed-world -- the registered identities whose resolved file
+        exists on disk (there is no scan for unregistered files; that is :meth:`discover`'s
+        role).
 
         Args:
             store: The name of a declared store to inventory, or ``None``.
             resource: The name of a declared resource to inventory, or ``None``.
             filemap: The name of a declared filemap to inventory, or ``None``.
+            array_store: The name of a declared array store to inventory, or ``None``.
 
         Returns:
-            The contained :class:`~exporgo.study.identity.Identity` objects. Store
-            identities are built over the store's partition keys; resource identities are
-            the registered identities that are present; filemap identities are those with
-            at least one recorded file.
+            The contained :class:`~exporgo.study.identity.Identity` objects. Store and
+            array-store identities are built over the component's partition keys; resource
+            identities are the registered identities that are present; filemap identities are
+            those with at least one recorded file.
 
         Raises:
             ValueError: If not exactly one target is given.
-            KeyError: If no store/resource/filemap with that name has been declared.
+            KeyError: If no store/array store/resource/filemap with that name has been declared.
         """
-        provided = [name for name in (store, resource, filemap) if name is not None]
+        provided = [
+            name for name in (store, resource, filemap, array_store) if name is not None
+        ]
         if len(provided) != 1:
-            msg = "identities() requires exactly one of 'store', 'resource', 'filemap'."
+            msg = (
+                "identities() requires exactly one of 'store', 'resource', 'filemap', "
+                "'array_store'."
+            )
             raise ValueError(msg)
         if store is not None:
             component = self.store(store)
             return {
                 self._identity_from_partition(component.spec.partition_keys, partition)
                 for partition in component.manifest().partitions()
+            }
+        if array_store is not None:
+            array_component = self.array_store(array_store)
+            return {
+                self._identity_from_partition(
+                    array_component.spec.partition_keys, partition
+                )
+                for partition in array_component.manifest().partitions()
             }
         if resource is not None:
             handle = self.resource(resource)
@@ -713,18 +828,25 @@ class Study:
                 bucket = present if identity in contained else missing
                 bucket.append((identity, resource_name))
 
-        for store_name, spec in self._stores.items():
-            contained = self.identities(store=store_name)
+        store_like: list[tuple[str, tuple[str, ...], set[Identity]]] = [
+            (name, spec.partition_keys, self.identities(store=name))
+            for name, spec in self._stores.items()
+        ]
+        store_like.extend(
+            (name, spec.partition_keys, self.identities(array_store=name))
+            for name, spec in self._array_stores.items()
+        )
+        for component_name, partition_keys, contained in store_like:
             projected: set[Identity] = set()
             for identity in self._entities:
-                projection = self._project(identity, spec.partition_keys)
+                projection = self._project(identity, partition_keys)
                 if projection is None:
                     continue
                 projected.add(projection)
                 bucket = present if projection in contained else missing
-                bucket.append((identity, store_name))
+                bucket.append((identity, component_name))
             unregistered.extend(
-                (extra, store_name)
+                (extra, component_name)
                 for extra in sorted(contained - projected, key=Identity.as_path)
             )
 
@@ -807,11 +929,11 @@ class Study:
     def sync_registry(self) -> tuple[Identity, ...]:
         """Register every identity found in any declared component not yet registered.
 
-        Sweeps all three component types for the identities physically present -- resources
+        Sweeps every component type for the identities physically present -- resources
         (reverse-resolved from their templates, see
-        :meth:`~exporgo.study.resources.Resource.discover`), stores (their manifest
-        partitions), and filemaps (their recorded identities) -- and registers each one the
-        study does not already contain. Only **full-key** identities can be registered;
+        :meth:`~exporgo.study.resources.Resource.discover`), stores and array stores (their
+        manifest partitions), and filemaps (their recorded identities) -- and registers each
+        one the study does not already contain. Only **full-key** identities can be registered;
         subset-key partials are skipped. The sweep is idempotent: already-registered
         identities are left untouched and are not returned.
 
@@ -828,6 +950,8 @@ class Study:
             contained |= self.resource(resource_name).discover()
         for store_name in self._stores:
             contained |= self.identities(store=store_name)
+        for array_store_name in self._array_stores:
+            contained |= self.identities(array_store=array_store_name)
         for filemap_name in self._filemaps:
             contained |= self.identities(filemap=filemap_name)
 
@@ -932,6 +1056,16 @@ class Study:
                 entry["sort_column"] = spec.sort_column
             stores[store_name] = entry
         data["stores"] = stores
+        array_stores: dict[str, dict[str, object]] = {}
+        for array_store_name, array_spec in self._array_stores.items():
+            array_stores[array_store_name] = {
+                "dtype": str(array_spec.numpy_dtype),
+                "partition_keys": list(array_spec.partition_keys),
+                "dims": list(array_spec.dim_names),
+                "max_rows_per_file": _rows_to_toml(array_spec.max_rows_per_file),
+                "max_rows_per_group": _rows_to_toml(array_spec.max_rows_per_group),
+            }
+        data["array_stores"] = array_stores
         data["filemaps"] = {
             name: ({"root_template": template} if template is not None else {})
             for name, template in self._filemaps.items()
@@ -943,6 +1077,9 @@ class Study:
         atomic_write_text(config_path, tomli_w.dumps(data))
         for store_name in self._stores:
             self.store(store_name).write_schema()  # persist each store's schema anchor
+        for array_store_name in self._array_stores:
+            # persist each array store's coordinate-catalog schema anchor
+            self.array_store(array_store_name).write_schema()
         self.init_logging()
         if is_first_save:
             creation_date = datetime.now(UTC).isoformat(timespec="seconds")
@@ -991,6 +1128,31 @@ class Study:
                     Store.read_schema(root / store_name),
                     partition_keys=entry["partition_keys"],
                     sort_column=entry.get("sort_column"),
+                    max_rows_per_file=_rows_from_toml(
+                        entry.get("max_rows_per_file"), 25_000_000
+                    ),
+                    max_rows_per_group=_rows_from_toml(
+                        entry.get("max_rows_per_group"), None
+                    ),
+                )
+        array_stores_data = data.get("array_stores", {})
+        if array_stores_data:
+            from exporgo.datastore.store import Store
+
+            for array_store_name, entry in array_stores_data.items():
+                # The coordinate-catalog anchor is authoritative for each labelled
+                # dimension's coordinate dtype; study.toml fixes the axis order and which
+                # dimensions are positional (absent from the anchor).
+                coord_schema = Store.read_schema(root / array_store_name / "_coords")
+                dims = {
+                    dim: (coord_schema[dim].inner if dim in coord_schema else None)
+                    for dim in entry["dims"]
+                }
+                study.declare_array_store(
+                    array_store_name,
+                    dims=dims,
+                    dtype=entry["dtype"],
+                    partition_keys=entry["partition_keys"],
                     max_rows_per_file=_rows_from_toml(
                         entry.get("max_rows_per_file"), 25_000_000
                     ),

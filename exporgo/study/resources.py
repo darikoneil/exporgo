@@ -146,7 +146,7 @@ class Resource:
             schema: The study's identity schema, used to validate and coerce the identity
                 values passed to :meth:`path` / :meth:`exists`.
         """
-        self.root = Path(root)
+        self.root: Path = Path(root)
         self.spec = spec
         self.schema = schema
 

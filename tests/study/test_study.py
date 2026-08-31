@@ -369,7 +369,9 @@ def test_discover_register_leaves_subset_key_partials_unregistered(
 
     study.discover(register=True)
 
-    assert study.entities == ()  # a partial identity cannot form a full (Subject, Session)
+    assert (
+        study.entities == ()
+    )  # a partial identity cannot form a full (Subject, Session)
 
 
 def test_coverage_to_polars_is_a_tidy_long_frame(tmp_path: Path) -> None:
@@ -416,7 +418,9 @@ def test_coverage_str_groups_by_status(tmp_path: Path) -> None:
     assert "Subject=m02" in text
 
 
-def test_sync_registry_registers_resource_and_filemap_identities(tmp_path: Path) -> None:
+def test_sync_registry_registers_resource_and_filemap_identities(
+    tmp_path: Path,
+) -> None:
     study = Study(name="s", root=tmp_path, identity=["Subject"])
     study.declare_resource("beh", "{Subject}/behavior.csv")
     study.declare_filemap("raw")
@@ -488,3 +492,112 @@ def test_coverage_includes_filemaps(tmp_path: Path) -> None:
     assert (m01, "raw") in report.present
     assert (m02, "raw") in report.missing
     assert (m03, "raw") in report.unregistered
+
+
+def _write_array(study: Study, subject: str, session: int) -> None:
+    """Write a small labelled array for one identity into the ``neural`` array store."""
+    import numpy as np
+
+    study.array_store("neural").write(
+        np.zeros((3, 5), dtype=np.float32),
+        coords={"unit": np.arange(3), "time": np.arange(5.0)},
+        Subject=subject,
+        Session=session,
+    )
+
+
+def test_declare_and_use_an_array_store(tmp_path: Path) -> None:
+    import numpy as np
+    import polars as pl
+
+    study = Study(name="s", root=tmp_path, identity=["Subject", "Session"])
+    store = study.declare_array_store(
+        "neural", dims={"unit": pl.Int64, "time": pl.Float64}, dtype=np.float32
+    )
+
+    _write_array(study, "m01", 1)
+    loaded = store.load(Subject="m01", Session=1)
+
+    assert loaded.dims == ("unit", "time")
+    assert loaded.shape == (3, 5)
+    assert list(study.array_stores) == ["neural"]
+
+
+def test_identities_reports_array_store_partitions(tmp_path: Path) -> None:
+    import numpy as np
+    import polars as pl
+
+    study = Study(name="s", root=tmp_path, identity=["Subject", "Session"])
+    study.declare_array_store(
+        "neural", dims={"unit": pl.Int64, "time": pl.Float64}, dtype=np.float32
+    )
+    _write_array(study, "m01", 1)
+    _write_array(study, "m02", 2)
+
+    ids = study.identities(array_store="neural")
+
+    assert {identity.as_path() for identity in ids} == {
+        "Subject=m01/Session=1",
+        "Subject=m02/Session=2",
+    }
+
+
+def test_coverage_includes_array_stores(tmp_path: Path) -> None:
+    import numpy as np
+    import polars as pl
+
+    study = Study(name="s", root=tmp_path, identity=["Subject", "Session"])
+    study.declare_array_store(
+        "neural", dims={"unit": pl.Int64, "time": pl.Float64}, dtype=np.float32
+    )
+    study.register(Subject="m01", Session=1)  # registered + written -> present
+    study.register(Subject="m02", Session=2)  # registered, never written -> missing
+    _write_array(study, "m01", 1)
+    _write_array(study, "m03", 3)  # written but unregistered
+
+    report = study.coverage()
+    m01 = study.identity.identity(Subject="m01", Session=1)
+    m02 = study.identity.identity(Subject="m02", Session=2)
+    m03 = study.identity.identity(Subject="m03", Session=3)
+
+    assert (m01, "neural") in report.present
+    assert (m02, "neural") in report.missing
+    assert (m03, "neural") in report.unregistered
+
+
+def test_array_store_round_trips_through_save_and_load(tmp_path: Path) -> None:
+    import numpy as np
+    import polars as pl
+
+    study = Study(name="s", root=tmp_path, identity=["Subject", "Session"])
+    study.declare_array_store(
+        "neural", dims={"unit": pl.Int64, "time": pl.Float64}, dtype=np.float32
+    )
+    _write_array(study, "m01", 1)
+    study.save()
+
+    reloaded = Study.load(tmp_path)
+
+    spec = reloaded.array_stores["neural"]
+    assert spec.dim_names == ("unit", "time")
+    assert spec.dims["unit"] == pl.Int64
+    assert spec.dims["time"] == pl.Float64
+    assert spec.numpy_dtype == np.dtype("float32")
+    loaded = reloaded.array_store("neural").load(Subject="m01", Session=1)
+    assert loaded.shape == (3, 5)
+    np.testing.assert_allclose(loaded.coords["time"].to_numpy(), np.arange(5.0))
+
+
+def test_sync_registry_sweeps_array_stores(tmp_path: Path) -> None:
+    import numpy as np
+    import polars as pl
+
+    study = Study(name="s", root=tmp_path, identity=["Subject", "Session"])
+    study.declare_array_store(
+        "neural", dims={"unit": pl.Int64, "time": pl.Float64}, dtype=np.float32
+    )
+    _write_array(study, "m01", 1)
+
+    newly = study.sync_registry()
+
+    assert set(newly) == {study.identity.identity(Subject="m01", Session=1)}

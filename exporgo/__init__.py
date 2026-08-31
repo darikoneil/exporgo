@@ -25,4 +25,4 @@ logger.disable("exporgo")
 
 # Source the version from the installed distribution metadata (pyproject.toml), so it
 # cannot drift from the packaged version.
-__version__ = importlib.metadata.version("exporgo")
+__version__: str = importlib.metadata.version("exporgo")
