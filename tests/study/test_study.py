@@ -1,6 +1,7 @@
 """Tests for the Study container: identity, resources, validation, persistence."""
 
 import io
+import json
 import sys
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -157,7 +158,7 @@ def test_save_and_load_round_trip(tmp_path: Path) -> None:
     study.register(Subject="m02", Session=2)
 
     saved = study.save()
-    assert saved == tmp_path / "study.toml"
+    assert saved == tmp_path / "study.json"
 
     loaded = Study.load(tmp_path)
     assert loaded.name == "fomo"
@@ -165,6 +166,35 @@ def test_save_and_load_round_trip(tmp_path: Path) -> None:
     assert loaded.identity.keys[1].dtype == "int"
     assert loaded.entities == study.entities
     assert loaded.resources["beh"].template == "{Subject}/{Session}/behavior.csv"
+
+
+def test_save_writes_valid_json_with_entities_in_their_own_sidecar(
+    tmp_path: Path,
+) -> None:
+    study = Study(name="fomo", root=tmp_path, identity=["Subject"])
+    study.register(Subject="m01")
+    study.register(Subject="m02")
+
+    study.save()
+
+    config = json.loads((tmp_path / "study.json").read_text(encoding="utf-8"))
+    assert "entities" not in config
+
+    lines = (tmp_path / "entities.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(line) for line in lines] == [
+        {"Subject": "m01"},
+        {"Subject": "m02"},
+    ]
+
+
+def test_save_and_load_round_trip_with_no_entities(tmp_path: Path) -> None:
+    study = Study(name="fomo", root=tmp_path)
+
+    study.save()
+    loaded = Study.load(tmp_path)
+
+    assert loaded.entities == ()
+    assert not (tmp_path / "entities.jsonl").read_text(encoding="utf-8").strip()
 
 
 def test_repr_is_unambiguous() -> None:
@@ -219,12 +249,12 @@ def test_first_save_logs_the_creation_date(tmp_path: Path) -> None:
 
 def test_second_save_does_not_relog_created(tmp_path: Path) -> None:
     study = Study(name="fomo", root=tmp_path)
-    study.save()  # first save: study.toml is created -> logs "created"
+    study.save()  # first save: study.json is created -> logs "created"
     logger.remove()  # flush + close the file sink
     for log_file in (tmp_path / ".logs").glob("*/fomo.log"):
         log_file.unlink()  # isolate the second save's output
 
-    study.save()  # study.toml already exists -> plain "saved", no "created"
+    study.save()  # study.json already exists -> plain "saved", no "created"
     logger.remove()
     content = study.read_log()
 

@@ -9,14 +9,13 @@ Saving a study also wires up logging into its directory (see :meth:`Study.init_l
 so every study automatically gets logging (a per-writer log under ``<root>/.logs/``).
 """
 
-import tomllib
+import json
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
 
-import tomli_w
 from loguru import logger
 
 from exporgo._atomic import atomic_write_text
@@ -39,19 +38,8 @@ if TYPE_CHECKING:
 
 __all__ = ["CoverageReport", "Study", "ValidationReport"]
 
-_CONFIG_NAME = "study.toml"
-
-
-def _rows_to_toml(value: int | None) -> int:
-    """Encode a ``max_rows`` setting for ``study.toml`` (``None`` -> the 0 sentinel)."""
-    return 0 if value is None else value
-
-
-def _rows_from_toml(value: int | None, default: int | None) -> int | None:
-    """Decode a persisted ``max_rows`` value (absent -> default, 0 sentinel -> ``None``)."""
-    if value is None:
-        return default
-    return None if value == 0 else value
+_CONFIG_NAME = "study.json"
+_ENTITIES_NAME = "entities.jsonl"
 
 
 @dataclass(frozen=True)
@@ -218,6 +206,7 @@ class Study:
         self.root: Path = Path(root)
         self.identity = self._coerce_schema(identity)
         self._entities: list[Identity] = []
+        self._entity_index: set[Identity] = set()
         self._resources: dict[str, ResourceSpec] = {}
         self._stores: dict[str, StoreSpec] = {}
         self._array_stores: dict[str, ArrayStoreSpec] = {}
@@ -327,8 +316,9 @@ class Study:
             ValueError: If a key is missing or an unexpected key is supplied.
         """
         identity = self.identity.identity(**values)
-        if identity not in self._entities:
+        if identity not in self._entity_index:
             self._entities.append(identity)
+            self._entity_index.add(identity)
 
         msg = f"Registered {values} to {self.name}"
         logger.info(msg)
@@ -1027,11 +1017,16 @@ class Study:
         return read_log(self.root, file_stem=self.name, exceptions=exceptions)
 
     def save(self) -> Path:
-        """Write the study's declaration to ``root/study.toml`` and return that path.
+        """Write the study's declaration to ``root/study.json`` and return that path.
+
+        Registered entities are persisted separately, one JSON object per line, to
+        ``root/entities.jsonl`` -- entity counts can grow far larger than the rest of the
+        declaration, and keeping them out of ``study.json`` keeps that file small and its
+        parse cost independent of how many identities are registered.
 
         Also initializes logging into the study root (see :meth:`init_logging`), so a saved
         study automatically gets logging (a per-writer log under ``<root>/.logs/``, readable
-        merged via :meth:`read_log`). The **first** save (when ``study.toml`` does not yet
+        merged via :meth:`read_log`). The **first** save (when ``study.json`` does not yet
         exist) records a "created" line with the creation date; subsequent saves record a
         plain "saved" line.
         """
@@ -1043,14 +1038,13 @@ class Study:
             "resources": {
                 name: resource.template for name, resource in self._resources.items()
             },
-            "entities": [identity.to_dict() for identity in self._entities],
         }
         stores: dict[str, dict[str, object]] = {}
         for store_name, spec in self._stores.items():
             entry: dict[str, object] = {
                 "partition_keys": list(spec.partition_keys),
-                "max_rows_per_file": _rows_to_toml(spec.max_rows_per_file),
-                "max_rows_per_group": _rows_to_toml(spec.max_rows_per_group),
+                "max_rows_per_file": spec.max_rows_per_file,
+                "max_rows_per_group": spec.max_rows_per_group,
             }
             if spec.sort_column is not None:
                 entry["sort_column"] = spec.sort_column
@@ -1062,8 +1056,8 @@ class Study:
                 "dtype": str(array_spec.numpy_dtype),
                 "partition_keys": list(array_spec.partition_keys),
                 "dims": list(array_spec.dim_names),
-                "max_rows_per_file": _rows_to_toml(array_spec.max_rows_per_file),
-                "max_rows_per_group": _rows_to_toml(array_spec.max_rows_per_group),
+                "max_rows_per_file": array_spec.max_rows_per_file,
+                "max_rows_per_group": array_spec.max_rows_per_group,
             }
         data["array_stores"] = array_stores
         data["filemaps"] = {
@@ -1074,7 +1068,11 @@ class Study:
         self.root.mkdir(parents=True, exist_ok=True)
         config_path = self.root / _CONFIG_NAME
         is_first_save = not config_path.exists()  # before we (over)write it below
-        atomic_write_text(config_path, tomli_w.dumps(data))
+        atomic_write_text(config_path, json.dumps(data, indent=2))
+        entities_text = "".join(
+            f"{json.dumps(identity.to_dict())}\n" for identity in self._entities
+        )
+        atomic_write_text(self.root / _ENTITIES_NAME, entities_text)
         for store_name in self._stores:
             self.store(store_name).write_schema()  # persist each store's schema anchor
         for array_store_name in self._array_stores:
@@ -1093,27 +1091,27 @@ class Study:
 
     @classmethod
     def load(cls, root: str | Path) -> Self:
-        """Reconstruct a study from ``root/study.toml`` (the declaration only).
+        """Reconstruct a study from ``root/study.json`` (the declaration only).
 
         Restores the declared structure — identity keys, registered identities, resource
         templates, and store specs — but not the data or any derived status, which are
-        re-read from the filesystem on demand (filesystem = truth). Loading does *not*
-        reconfigure logging (it adds no sinks); it only emits an access log record, which
-        is captured if logging is already configured. Call :meth:`init_logging` to resume
-        logging into a loaded study.
+        re-read from the filesystem on demand (filesystem = truth). Registered entities are
+        read back from the ``root/entities.jsonl`` sidecar written by :meth:`save` (absent if
+        none were ever saved). Loading does *not* reconfigure logging (it adds no sinks); it
+        only emits an access log record, which is captured if logging is already configured.
+        Call :meth:`init_logging` to resume logging into a loaded study.
 
         Args:
-            root: The study root directory containing ``study.toml``.
+            root: The study root directory containing ``study.json``.
 
         Returns:
             The reconstructed :class:`Study`.
 
         Raises:
-            FileNotFoundError: If ``root/study.toml`` does not exist.
+            FileNotFoundError: If ``root/study.json`` does not exist.
         """
         root = Path(root)
-        with (root / _CONFIG_NAME).open("rb") as handle:
-            data = tomllib.load(handle)
+        data = json.loads((root / _CONFIG_NAME).read_text(encoding="utf-8"))
         keys = [IdentityKey.model_validate(spec) for spec in data["identity"]]
         study = cls(name=data["name"], root=root, identity=keys)
         for name, template in data.get("resources", {}).items():
@@ -1128,12 +1126,8 @@ class Study:
                     Store.read_schema(root / store_name),
                     partition_keys=entry["partition_keys"],
                     sort_column=entry.get("sort_column"),
-                    max_rows_per_file=_rows_from_toml(
-                        entry.get("max_rows_per_file"), 25_000_000
-                    ),
-                    max_rows_per_group=_rows_from_toml(
-                        entry.get("max_rows_per_group"), None
-                    ),
+                    max_rows_per_file=entry.get("max_rows_per_file", 25_000_000),
+                    max_rows_per_group=entry.get("max_rows_per_group"),
                 )
         array_stores_data = data.get("array_stores", {})
         if array_stores_data:
@@ -1141,7 +1135,7 @@ class Study:
 
             for array_store_name, entry in array_stores_data.items():
                 # The coordinate-catalog anchor is authoritative for each labelled
-                # dimension's coordinate dtype; study.toml fixes the axis order and which
+                # dimension's coordinate dtype; study.json fixes the axis order and which
                 # dimensions are positional (absent from the anchor).
                 coord_schema = Store.read_schema(root / array_store_name / "_coords")
                 dims = {
@@ -1153,12 +1147,8 @@ class Study:
                     dims=dims,
                     dtype=entry["dtype"],
                     partition_keys=entry["partition_keys"],
-                    max_rows_per_file=_rows_from_toml(
-                        entry.get("max_rows_per_file"), 25_000_000
-                    ),
-                    max_rows_per_group=_rows_from_toml(
-                        entry.get("max_rows_per_group"), None
-                    ),
+                    max_rows_per_file=entry.get("max_rows_per_file", 25_000_000),
+                    max_rows_per_group=entry.get("max_rows_per_group"),
                 )
         for filemap_name, filemap_config in data.get("filemaps", {}).items():
             study.declare_filemap(
@@ -1166,8 +1156,11 @@ class Study:
             )
         for dump_name in data.get("dumps", []):
             study.declare_dump(dump_name)
-        for entity in data.get("entities", []):
-            study.register(**entity)
+        entities_path = root / _ENTITIES_NAME
+        if entities_path.exists():
+            for line in entities_path.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    study.register(**json.loads(line))
         msg = f"Study {study.name!r} accessed (loaded from {root / _CONFIG_NAME})."
         logger.info(msg)
         return study

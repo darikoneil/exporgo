@@ -41,6 +41,27 @@ def test_discover_keys_by_relative_path(tmp_path: Path) -> None:
     assert dump.path("*ccf*") == src / "atlas" / "ccf.nrrd"
 
 
+def test_discover_defaults_to_its_own_directory(tmp_path: Path) -> None:
+    dump = _dump(tmp_path)
+    dump.directory.mkdir(parents=True)
+    (dump.directory / "ccf.nrrd").write_text("ccf", encoding="utf-8")
+
+    found = dump.discover()
+
+    assert set(found) == {"ccf.nrrd"}
+
+
+def test_discover_ignores_its_own_sidecar(tmp_path: Path) -> None:
+    dump = _dump(tmp_path)
+    dump.record("Z:/atlases/ccf.nrrd", name="atlas")
+    (dump.directory / "readme.md").write_text("readme", encoding="utf-8")
+
+    found = dump.discover()
+
+    assert "_dump.json" not in found
+    assert set(found) == {"readme.md"}
+
+
 def test_exists_reflects_the_filesystem(tmp_path: Path) -> None:
     dump = _dump(tmp_path)
     real = tmp_path / "atlas.nrrd"

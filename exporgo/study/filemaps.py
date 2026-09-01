@@ -40,7 +40,7 @@ _DUMP_NAME = "_dump.json"
 
 
 def _index_directory(
-    directory: Path, *, pattern: str, recursive: bool
+    directory: Path, *, pattern: str, recursive: bool, ignore: str
 ) -> dict[str, str]:
     """Index the files under ``directory``, keyed by their posix path relative to it.
 
@@ -48,6 +48,8 @@ def _index_directory(
         directory: The folder to scan (the identity's root).
         pattern: Glob selecting which files to include (``"*"`` for all).
         recursive: Whether to descend into subdirectories.
+        ignore: A filename to exclude, e.g. the component's own sidecar -- relevant when
+            ``directory`` is (or contains) the component's own directory.
 
     Returns:
         A ``{relative_key -> absolute_path}`` mapping, e.g.
@@ -64,7 +66,7 @@ def _index_directory(
     return {
         item.relative_to(directory).as_posix(): str(item)
         for item in sorted(globber(pattern))
-        if item.is_file()
+        if item.is_file() and item.name != ignore
     }
 
 
@@ -283,7 +285,9 @@ class FileMap:
         """
         identity = self.schema.identity(**values)
         root = self._discover_root(identity, directory)
-        found = _index_directory(root, pattern=pattern, recursive=recursive)
+        found = _index_directory(
+            root, pattern=pattern, recursive=recursive, ignore=_FILEMAP_NAME
+        )
         document = self._load()
         entry = self._entry(document, identity)
         if entry is None:
@@ -436,14 +440,19 @@ class Dump:
         atomic_write_text(self.sidecar, document.model_dump_json(indent=2))
 
     def discover(
-        self, directory: str | Path, *, pattern: str = "*", recursive: bool = True
+        self,
+        directory: str | Path | None = None,
+        *,
+        pattern: str = "*",
+        recursive: bool = True,
     ) -> dict[str, Path]:
         """Index ``directory``, keying each file by its posix path relative to it.
 
         Replaces the dump's recorded files with the folder's current contents.
 
         Args:
-            directory: The folder to index (the dump's root).
+            directory: The folder to index (the dump's root). Defaults to the dump's own
+                directory (``<study_root>/<name>``).
             pattern: Glob selecting which files to index (``"*"`` for all).
             recursive: Whether to descend into subdirectories.
 
@@ -453,8 +462,10 @@ class Dump:
         Raises:
             NotADirectoryError: If ``directory`` is not an existing directory.
         """
-        root = Path(directory)
-        found = _index_directory(root, pattern=pattern, recursive=recursive)
+        root = Path(directory) if directory is not None else self.directory
+        found = _index_directory(
+            root, pattern=pattern, recursive=recursive, ignore=_DUMP_NAME
+        )
         self._save(_DumpDocument(root=str(root), files=found))
         return {key: Path(value) for key, value in found.items()}
 
