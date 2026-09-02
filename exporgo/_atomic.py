@@ -5,7 +5,7 @@ target makes the write atomic on a single filesystem: a reader never sees a half
 and concurrent writers resolve to last-writer-wins rather than a torn result. The unique
 temporary name means two writers publishing the same target never collide on the scratch file.
 Used for the small metadata files exporgo maintains (``study.json``, the ``entities.jsonl``
-sidecar, filemap/dump sidecars, the store schema anchor and manifest log).
+sidecar, dump sidecars, the store schema anchor and manifest log).
 """
 
 from pathlib import Path

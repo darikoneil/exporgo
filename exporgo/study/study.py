@@ -1,8 +1,8 @@
 """The Study container: identities, resources, validation, and persistence.
 
 A :class:`Study` ties together an identity coordinate system, the identities it should
-contain, and the resources (files/folders) expected for each. It describes and
-validates; it never executes. Identity keys become the datastore's partition keys, and
+contain, and the components (resources, stores, array stores, dumps) expected for each. It
+describes and validates; it never executes. Identity keys become the datastore's partition keys, and
 :meth:`Study.validate` seeds the monitoring layer's derived status.
 
 Saving a study also wires up logging into its directory (see :meth:`Study.init_logging`),
@@ -20,14 +20,13 @@ from loguru import logger
 
 from exporgo._atomic import atomic_write_text
 from exporgo.log import LogLevel, init_logger, read_log
-from exporgo.study.filemaps import Dump, FileMap
 from exporgo.study.identity import (
     Identity,
     IdentityKey,
     IdentitySchema,
     IdentityValue,
 )
-from exporgo.study.resources import Resource, ResourceSpec
+from exporgo.study.resources import Dump, Resource, ResourceSpec
 
 if TYPE_CHECKING:
     import polars as pl
@@ -47,13 +46,12 @@ class ValidationReport:
     """Outcome of :meth:`Study.validate` — whether each identity's indicated files exist.
 
     A closed-world, existence-only snapshot: each registered identity's declared resources
-    and filemaps are bucketed by whether the file(s) they point at exist on disk. Holds no
-    live handles, so it is safe to store or diff across runs.
+    are bucketed by whether the file or folder they point at exists on disk. Holds no live
+    handles, so it is safe to store or diff across runs.
 
     Attributes:
-        present: ``(identity, component_name)`` pairs whose indicated file(s) exist.
-        missing: ``(identity, component_name)`` pairs whose indicated file(s) are absent
-            (for a filemap, this includes an identity with nothing recorded).
+        present: ``(identity, component_name)`` pairs whose indicated path exists.
+        missing: ``(identity, component_name)`` pairs whose indicated path is absent.
 
     Note:
         See the "Coverage and validation" explanation for the closed- vs open-world
@@ -65,7 +63,7 @@ class ValidationReport:
 
     @property
     def is_complete(self) -> bool:
-        """True when every registered identity's resources and filemaps exist on disk."""
+        """True when every registered identity's resources exist on disk."""
         return not self.missing
 
 
@@ -73,19 +71,20 @@ class ValidationReport:
 class CoverageReport:
     """Which identities each component (store/resource) contains, derived on demand.
 
-    Generalizes :class:`ValidationReport` across stores, resources, and filemaps.
+    Generalizes :class:`ValidationReport` across stores and resources -- the outcome of both
+    :meth:`Study.coverage` (stores and array stores) and :meth:`Study.discover` (resources).
 
     Attributes:
         present: ``(identity, component_name)`` pairs where the registered identity is
-            contained in that store/resource.
+            contained in that component.
         missing: ``(identity, component_name)`` pairs where a registered identity is
             absent from that component.
-        unregistered: ``(identity, store_name)`` pairs for identities physically present
-            in a store but not registered in the study (store-only drift).
+        unregistered: ``(identity, component_name)`` pairs for identities physically present
+            on disk but not registered in the study.
 
     Note:
         See the "Coverage and validation" explanation for closed- vs open-world reporting
-        (resources closed-world; stores/filemaps open-world, surfacing drift as
+        (resources closed-world; stores open-world, surfacing drift as
         ``unregistered``).
     """
 
@@ -186,7 +185,7 @@ class CoverageReport:
 
 
 class Study:
-    """A study: an identity coordinate system, registered identities, and resources."""
+    """A study: an identity coordinate system, registered identities, and their components."""
 
     def __init__(
         self,
@@ -210,7 +209,6 @@ class Study:
         self._resources: dict[str, ResourceSpec] = {}
         self._stores: dict[str, StoreSpec] = {}
         self._array_stores: dict[str, ArrayStoreSpec] = {}
-        self._filemaps: dict[str, str | None] = {}
         self._dumps: list[str] = []
 
     @staticmethod
@@ -240,20 +238,18 @@ class Study:
         return (
             f"Study {self.name!r} [{keys}]: {len(self._entities)} identities, "
             f"{len(self._resources)} resources, {len(self._stores)} stores, "
-            f"{len(self._array_stores)} array stores, {len(self._filemaps)} filemaps, "
-            f"{len(self._dumps)} dumps"
+            f"{len(self._array_stores)} array stores, {len(self._dumps)} dumps"
         )
 
     def print(self) -> None:
         """Print a multi-line summary of the study's declared contents to stdout.
 
         Reports the study name and root, its identity keys, and the counts (and names)
-        of registered identities, declared resources, stores, and filemaps.
+        of registered identities, declared resources, stores, array stores, and dumps.
         """
         resources = ", ".join(sorted(self._resources)) or "(none)"
         stores = ", ".join(sorted(self._stores)) or "(none)"
         array_stores = ", ".join(sorted(self._array_stores)) or "(none)"
-        filemaps = ", ".join(sorted(self._filemaps)) or "(none)"
         dumps = ", ".join(sorted(self._dumps)) or "(none)"
         keys = ", ".join(self.identity.names)
         lines = [
@@ -264,7 +260,6 @@ class Study:
             f"  resources:    {len(self._resources)} ({resources})",
             f"  stores:       {len(self._stores)} ({stores})",
             f"  array stores: {len(self._array_stores)} ({array_stores})",
-            f"  filemaps:     {len(self._filemaps)} ({filemaps})",
             f"  dumps:        {len(self._dumps)} ({dumps})",
         ]
         print("\n".join(lines))
@@ -288,15 +283,6 @@ class Study:
     def array_stores(self) -> dict[str, "ArrayStoreSpec"]:
         """The declared array-store specs, keyed by name (a copy; safe to mutate)."""
         return dict(self._array_stores)
-
-    @property
-    def filemaps(self) -> dict[str, FileMap]:
-        """The declared filemaps, keyed by name.
-
-        Returns the :class:`~exporgo.study.filemaps.FileMap` handles (a filemap has no
-        separate spec, so this returns the components themselves rather than declarations).
-        """
-        return {name: self.filemap(name) for name in self._filemaps}
 
     def register(self, **values: IdentityValue) -> Identity:
         """Register an identity the study should contain (a declared expectation).
@@ -567,83 +553,19 @@ class Study:
             raise KeyError(msg) from None
         return ArrayStore(self.root / name, spec)
 
-    def declare_filemap(
-        self, name: str, *, root_template: str | None = None
-    ) -> FileMap:
-        """Declare a filemap component and return its handle.
-
-        A filemap indexes the concrete location(s) of files for each identity, keyed by path
-        relative to the identity's root (see :class:`~exporgo.study.filemaps.FileMap`) -- the
-        third component type beside resources and stores. Its mode is fixed here: pass
-        ``root_template`` for a *templated* filemap (each identity's root folder is derived
-        from the template), or omit it for a *recorded* filemap. The recorded paths live in a
-        sidecar ``<root>/<name>/_filemap.json`` written by the handle.
-
-        Args:
-            name: The filemap's name (also its subdirectory under the study root).
-            root_template: An optional path template over the identity keys locating each
-                identity's root folder (e.g. ``"{Subject}/{Session}/suite2p"``). ``None``
-                makes the filemap recorded rather than templated.
-
-        Returns:
-            The :class:`~exporgo.study.filemaps.FileMap` handle bound to ``<root>/<name>``.
-
-        Raises:
-            ValueError: If ``root_template`` references keys not in the study's identity.
-        """
-        if root_template is not None:
-            spec = ResourceSpec(name=name, template=root_template)
-            unknown = [
-                key for key in spec.placeholders if key not in self.identity.names
-            ]
-            if unknown:
-                msg = (
-                    f"Filemap {name!r} root_template uses unknown identity keys {unknown}; "
-                    f"study identity keys are {list(self.identity.names)}."
-                )
-                raise ValueError(msg)
-        self._filemaps[name] = root_template
-
-        msg = f"Declared the filemap {name!r}"
-        logger.info(msg)
-
-        return self.filemap(name)
-
-    def filemap(self, name: str) -> FileMap:
-        """Return the :class:`~exporgo.study.filemaps.FileMap` handle for a component.
-
-        Args:
-            name: The name of a previously declared filemap.
-
-        Returns:
-            The :class:`~exporgo.study.filemaps.FileMap` bound to ``<root>/<name>``.
-
-        Raises:
-            KeyError: If no filemap with that name has been declared.
-        """
-        if name not in self._filemaps:
-            msg = (
-                f"No filemap named {name!r}; "
-                f"declared filemaps: {sorted(self._filemaps)}"
-            )
-            raise KeyError(msg)
-        return FileMap(
-            self.root, name, self.identity, root_template=self._filemaps[name]
-        )
-
     def declare_dump(self, name: str) -> Dump:
         """Declare a study-global dump component and return its handle.
 
-        A dump is an identity-less :class:`~exporgo.study.filemaps.FileMap`: one root and one
-        relative-path-keyed file set for the whole study, for assets that aren't per-identity
-        (an atlas, a README, a shared lookup table). The recorded paths live in a sidecar
-        ``<root>/<name>/_dump.json`` written by the handle.
+        A dump records one root and the files under it, keyed by each file's path relative
+        to that root -- for assets that belong to the whole study rather than to any one
+        identity (an atlas, a README, a shared lookup table). The recorded paths live in a
+        sidecar ``<root>/<name>/_dump.json`` written by the handle.
 
         Args:
             name: The dump's name (also its subdirectory under the study root).
 
         Returns:
-            The :class:`~exporgo.study.filemaps.Dump` handle bound to ``<root>/<name>``.
+            The :class:`~exporgo.study.resources.Dump` handle bound to ``<root>/<name>``.
         """
         if name not in self._dumps:
             self._dumps.append(name)
@@ -654,13 +576,13 @@ class Study:
         return self.dump(name)
 
     def dump(self, name: str) -> Dump:
-        """Return the :class:`~exporgo.study.filemaps.Dump` handle for a component.
+        """Return the :class:`~exporgo.study.resources.Dump` handle for a component.
 
         Args:
             name: The name of a previously declared dump.
 
         Returns:
-            The :class:`~exporgo.study.filemaps.Dump` bound to ``<root>/<name>``.
+            The :class:`~exporgo.study.resources.Dump` bound to ``<root>/<name>``.
 
         Raises:
             KeyError: If no dump with that name has been declared.
@@ -678,33 +600,26 @@ class Study:
     def validate(self) -> ValidationReport:
         """Check that each registered identity's indicated files still exist on disk.
 
-        For every registered identity, tests each declared **resource** (does its resolved
-        template path exist?) and each declared **filemap** (do its recorded files exist?),
-        bucketing the ``(identity, component)`` pair as ``present`` or ``missing``. Nothing
-        is cached, so the report always reflects the tree at call time. Stores are out of
-        scope; use :meth:`coverage` for store membership.
+        For every registered identity, tests each declared resource (does its resolved
+        template path exist?), bucketing the ``(identity, component)`` pair as ``present`` or
+        ``missing``. Nothing is cached, so the report always reflects the tree at call time.
+        Stores are out of scope; use :meth:`coverage` for store membership.
 
         Returns:
             A :class:`ValidationReport` partitioning the pairs into ``present`` and
             ``missing``.
 
         Note:
-            Existence-only (file contents are never read). A filemap counts as ``present``
-            for an identity only when it has at least one recorded file and all recorded
-            files exist. See the "Coverage and validation" explanation for validate vs
-            coverage.
+            Existence-only (file contents are never read). See the "Coverage and
+            validation" explanation for validate vs coverage.
         """
         present: list[tuple[Identity, str]] = []
         missing: list[tuple[Identity, str]] = []
         resources = {name: self.resource(name) for name in self._resources}
-        filemaps = {name: self.filemap(name) for name in self._filemaps}
         for identity in self._entities:
             values = identity.to_dict()
             for name, resource in resources.items():
                 bucket = present if resource.exists(**values) else missing
-                bucket.append((identity, name))
-            for name, filemap in filemaps.items():
-                bucket = present if filemap.exists(**values) else missing
                 bucket.append((identity, name))
         return ValidationReport(present=tuple(present), missing=tuple(missing))
 
@@ -713,42 +628,33 @@ class Study:
         *,
         store: str | None = None,
         resource: str | None = None,
-        filemap: str | None = None,
         array_store: str | None = None,
     ) -> set[Identity]:
-        """Return the identities in one declared store, array store, resource, or filemap.
+        """Return the identities in one declared store, array store, or resource.
 
-        Exactly one target must be given. A **store**, an **array store**, and a **filemap**
-        are reported open-world (their manifest partitions / the filemap's recorded
-        identities), so they may include identities never registered in the study. A
-        **resource** is reported closed-world -- the registered identities whose resolved file
-        exists on disk (there is no scan for unregistered files; that is :meth:`discover`'s
-        role).
+        Exactly one target must be given. A **store** and an **array store** are reported
+        open-world (their manifest partitions), so they may include identities never
+        registered in the study. A **resource** is reported closed-world -- the registered
+        identities whose resolved file exists on disk (there is no scan for unregistered
+        files; that is :meth:`discover`'s role).
 
         Args:
             store: The name of a declared store to inventory, or ``None``.
             resource: The name of a declared resource to inventory, or ``None``.
-            filemap: The name of a declared filemap to inventory, or ``None``.
             array_store: The name of a declared array store to inventory, or ``None``.
 
         Returns:
             The contained :class:`~exporgo.study.identity.Identity` objects. Store and
             array-store identities are built over the component's partition keys; resource
-            identities are the registered identities that are present; filemap identities are
-            those with at least one recorded file.
+            identities are the registered identities that are present.
 
         Raises:
             ValueError: If not exactly one target is given.
-            KeyError: If no store/array store/resource/filemap with that name has been declared.
+            KeyError: If no store/array store/resource with that name has been declared.
         """
-        provided = [
-            name for name in (store, resource, filemap, array_store) if name is not None
-        ]
+        provided = [name for name in (store, resource, array_store) if name is not None]
         if len(provided) != 1:
-            msg = (
-                "identities() requires exactly one of 'store', 'resource', 'filemap', "
-                "'array_store'."
-            )
+            msg = "identities() requires exactly one of 'store', 'resource', 'array_store'."
             raise ValueError(msg)
         if store is not None:
             component = self.store(store)
@@ -764,13 +670,11 @@ class Study:
                 )
                 for partition in array_component.manifest().partitions()
             }
-        if resource is not None:
-            handle = self.resource(resource)
-            return {
-                entity for entity in self._entities if handle.exists(**entity.to_dict())
-            }
-        assert filemap is not None  # the only remaining option after the guard above
-        return self.filemap(filemap).identities()
+        assert resource is not None  # the only remaining option after the guard above
+        handle = self.resource(resource)
+        return {
+            entity for entity in self._entities if handle.exists(**entity.to_dict())
+        }
 
     def _identity_from_partition(
         self, partition_keys: tuple[str, ...], partition: Mapping[str, str]
@@ -796,11 +700,12 @@ class Study:
     def coverage(self) -> CoverageReport:
         """Report which registered identities each declared store/resource contains.
 
-        Generalizes :meth:`validate` to cover resources (existence of the declared file),
-        stores (presence in the store's manifest), and filemaps (a recorded location for
-        the identity), classifying every ``(registered identity, component)`` pair as
-        present or missing. Identities present on disk but not registered are collected in
-        :attr:`CoverageReport.unregistered`.
+        Generalizes :meth:`validate` to cover resources (existence of the declared file) and
+        stores and array stores (presence in the manifest), classifying every
+        ``(registered identity, component)`` pair as present or missing. Identities present on
+        disk but not registered by a store or array store are collected in
+        :attr:`CoverageReport.unregistered` (a resource's on-disk-but-unregistered data is
+        surfaced separately, by :meth:`discover`).
 
         Returns:
             A :class:`CoverageReport` over registered identities and declared components.
@@ -840,17 +745,6 @@ class Study:
                 for extra in sorted(contained - projected, key=Identity.as_path)
             )
 
-        registered = set(self._entities)
-        for filemap_name in self._filemaps:
-            contained = self.identities(filemap=filemap_name)
-            for identity in self._entities:
-                bucket = present if identity in contained else missing
-                bucket.append((identity, filemap_name))
-            unregistered.extend(
-                (extra, filemap_name)
-                for extra in sorted(contained - registered, key=Identity.as_path)
-            )
-
         return CoverageReport(
             present=tuple(present),
             missing=tuple(missing),
@@ -877,7 +771,7 @@ class Study:
             as it stood *before* any bootstrapping.
 
         Note:
-            Constant-template resources are skipped; stores and filemaps are not scanned
+            Constant-template resources are skipped; stores are not scanned
             here. See the "Discover identities from an existing dataset" how-to.
         """
         present: list[tuple[Identity, str]] = []
@@ -919,13 +813,13 @@ class Study:
     def sync_registry(self) -> tuple[Identity, ...]:
         """Register every identity found in any declared component not yet registered.
 
-        Sweeps every component type for the identities physically present -- resources
-        (reverse-resolved from their templates, see
-        :meth:`~exporgo.study.resources.Resource.discover`), stores and array stores (their
-        manifest partitions), and filemaps (their recorded identities) -- and registers each
-        one the study does not already contain. Only **full-key** identities can be registered;
-        subset-key partials are skipped. The sweep is idempotent: already-registered
-        identities are left untouched and are not returned.
+        Sweeps every identity-bearing component for the identities physically present --
+        resources (reverse-resolved from their templates, see
+        :meth:`~exporgo.study.resources.Resource.discover`) plus stores and array stores
+        (their manifest partitions) -- and registers each one the study does not already
+        contain. Dumps have no identity and are never swept. Only **full-key** identities can
+        be registered; subset-key partials are skipped. The sweep is idempotent:
+        already-registered identities are left untouched and are not returned.
 
         Returns:
             The newly registered :class:`~exporgo.study.identity.Identity` objects, in
@@ -942,8 +836,6 @@ class Study:
             contained |= self.identities(store=store_name)
         for array_store_name in self._array_stores:
             contained |= self.identities(array_store=array_store_name)
-        for filemap_name in self._filemaps:
-            contained |= self.identities(filemap=filemap_name)
 
         full = set(self.identity.names)
         registered = set(self._entities)
@@ -1060,10 +952,6 @@ class Study:
                 "max_rows_per_group": array_spec.max_rows_per_group,
             }
         data["array_stores"] = array_stores
-        data["filemaps"] = {
-            name: ({"root_template": template} if template is not None else {})
-            for name, template in self._filemaps.items()
-        }
         data["dumps"] = list(self._dumps)
         self.root.mkdir(parents=True, exist_ok=True)
         config_path = self.root / _CONFIG_NAME
@@ -1150,10 +1038,6 @@ class Study:
                     max_rows_per_file=entry.get("max_rows_per_file", 25_000_000),
                     max_rows_per_group=entry.get("max_rows_per_group"),
                 )
-        for filemap_name, filemap_config in data.get("filemaps", {}).items():
-            study.declare_filemap(
-                filemap_name, root_template=filemap_config.get("root_template")
-            )
         for dump_name in data.get("dumps", []):
             study.declare_dump(dump_name)
         entities_path = root / _ENTITIES_NAME

@@ -85,28 +85,6 @@ def test_validate_reports_present_and_missing(tmp_path: Path) -> None:
     assert not report.is_complete
 
 
-def test_validate_checks_filemap_recorded_files_still_exist(tmp_path: Path) -> None:
-    study = Study(name="s", root=tmp_path, identity=["Subject"])
-    study.declare_filemap("raw")
-    study.register(Subject="m01")  # recorded file exists -> present
-    study.register(Subject="m02")  # recorded file was deleted -> missing
-    study.register(Subject="m03")  # nothing recorded at all -> missing
-    live = tmp_path / "a.tif"
-    live.write_text("x", encoding="utf-8")
-    study.filemap("raw").record(live, Subject="m01")
-    study.filemap("raw").record(tmp_path / "gone.tif", Subject="m02")  # never created
-
-    report = study.validate()
-    m01 = study.identity.identity(Subject="m01")
-    m02 = study.identity.identity(Subject="m02")
-    m03 = study.identity.identity(Subject="m03")
-
-    assert (m01, "raw") in report.present
-    assert (m02, "raw") in report.missing
-    assert (m03, "raw") in report.missing
-    assert not report.is_complete
-
-
 def test_save_initializes_logging(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -273,58 +251,6 @@ def test_load_logs_that_the_study_was_accessed(tmp_path: Path) -> None:
     assert "accessed" in content.lower()
 
 
-def test_declare_and_get_filemap(tmp_path: Path) -> None:
-    study = Study(name="s", root=tmp_path, identity=["Subject"])
-    study.declare_filemap("raw")
-
-    assert study.filemap("raw").name == "raw"
-    assert set(study.filemaps) == {"raw"}
-
-
-def test_filemap_unknown_name_raises(tmp_path: Path) -> None:
-    study = Study(name="s", root=tmp_path)
-    with pytest.raises(KeyError):
-        study.filemap("nope")
-
-
-def test_filemap_round_trips_through_save_load(tmp_path: Path) -> None:
-    study = Study(name="s", root=tmp_path, identity=["Subject"])
-    study.declare_filemap("raw")
-    study.filemap("raw").record("Z:/a.tif", name="a", Subject="m01")
-    study.save()
-
-    loaded = Study.load(tmp_path)
-
-    assert set(loaded.filemaps) == {"raw"}
-    assert loaded.filemap("raw").templated is False
-    assert loaded.filemap("raw").path("a", Subject="m01") == Path("Z:/a.tif")
-
-
-def test_identities_of_a_filemap(tmp_path: Path) -> None:
-    study = Study(name="s", root=tmp_path, identity=["Subject"])
-    study.declare_filemap("raw")
-    study.filemap("raw").record("Z:/a.tif", Subject="m01")
-
-    assert study.identities(filemap="raw") == {study.identity.identity(Subject="m01")}
-
-
-def test_declare_filemap_rejects_an_unknown_template_key(tmp_path: Path) -> None:
-    study = Study(name="s", root=tmp_path, identity=["Subject"])
-    with pytest.raises(ValueError, match="unknown identity keys"):
-        study.declare_filemap("s2p", root_template="{Session}/suite2p")
-
-
-def test_templated_filemap_round_trips_through_save_load(tmp_path: Path) -> None:
-    study = Study(name="s", root=tmp_path, identity=["Subject"])
-    study.declare_filemap("s2p", root_template="{Subject}/suite2p")
-    study.save()
-
-    handle = Study.load(tmp_path).filemap("s2p")
-
-    assert handle.templated is True
-    assert handle.root_template == "{Subject}/suite2p"
-
-
 def test_declare_and_get_dump(tmp_path: Path) -> None:
     study = Study(name="s", root=tmp_path, identity=["Subject"])
     study.declare_dump("reference")
@@ -448,15 +374,12 @@ def test_coverage_str_groups_by_status(tmp_path: Path) -> None:
     assert "Subject=m02" in text
 
 
-def test_sync_registry_registers_resource_and_filemap_identities(
-    tmp_path: Path,
-) -> None:
+def test_sync_registry_registers_resource_identities(tmp_path: Path) -> None:
     study = Study(name="s", root=tmp_path, identity=["Subject"])
     study.declare_resource("beh", "{Subject}/behavior.csv")
-    study.declare_filemap("raw")
-    (tmp_path / "m01").mkdir()  # resource on disk -> m01
-    (tmp_path / "m01" / "behavior.csv").write_text("x", encoding="utf-8")
-    study.filemap("raw").record("Z:/a.tif", Subject="m02")  # filemap recorded -> m02
+    for subject in ("m01", "m02"):  # both resources on disk, neither registered
+        (tmp_path / subject).mkdir()
+        (tmp_path / subject / "behavior.csv").write_text("x", encoding="utf-8")
 
     newly = study.sync_registry()
 
@@ -504,24 +427,6 @@ def test_sync_registry_skips_subset_key_partials(tmp_path: Path) -> None:
 
     assert newly == ()  # a partial identity cannot form a full (Subject, Session)
     assert study.entities == ()
-
-
-def test_coverage_includes_filemaps(tmp_path: Path) -> None:
-    study = Study(name="s", root=tmp_path, identity=["Subject"])
-    study.declare_filemap("raw")
-    study.register(Subject="m01")  # registered + recorded -> present
-    study.register(Subject="m02")  # registered, never recorded -> missing
-    study.filemap("raw").record("Z:/a.tif", Subject="m01")
-    study.filemap("raw").record("Z:/b.tif", Subject="m03")  # unregistered
-
-    report = study.coverage()
-    m01 = study.identity.identity(Subject="m01")
-    m02 = study.identity.identity(Subject="m02")
-    m03 = study.identity.identity(Subject="m03")
-
-    assert (m01, "raw") in report.present
-    assert (m02, "raw") in report.missing
-    assert (m03, "raw") in report.unregistered
 
 
 def _write_array(study: Study, subject: str, session: int) -> None:

@@ -2,16 +2,16 @@
 
 The Study & Identity model: the identity coordinate system
 ({class}`~exporgo.study.IdentitySchema`, {class}`~exporgo.study.IdentityKey`,
-{class}`~exporgo.study.Identity`), the resources and file maps a study expects, and the
+{class}`~exporgo.study.Identity`), the resources a study expects, and the
 {class}`~exporgo.study.Study` container that ties them together and validates them. Every name
 below is exported from `exporgo.study.__all__`.
 
 ## Study container
 
 The top-level object. A {class}`~exporgo.study.Study` declares an identity coordinate system,
-the identities it should contain, and the components (resources, stores, array stores, file maps,
-dumps) expected at each; it describes and validates but never runs your analysis. Declarations
-persist to `study.toml` via {meth}`~exporgo.study.Study.save` and reload with
+the identities it should contain, and the components (resources, stores, array stores, dumps)
+expected at each; it describes and validates but never runs your analysis. Declarations
+persist to `study.json` via {meth}`~exporgo.study.Study.save` and reload with
 {meth}`~exporgo.study.Study.load`.
 
 ```python
@@ -60,19 +60,15 @@ when the data is a single nameable path — see [Choosing a component](../explan
    :members:
 ```
 
-## File maps and dumps
+## Dumps
 
-A {class}`~exporgo.study.FileMap` indexes many files per identity, keyed by each file's path
-relative to that identity's root, so same-named files in different subfolders never collide. Its
-mode is fixed at declaration — *templated* (a `root_template` derives each identity's root) or
-*recorded* (you supply the folder, or pin loose files). A {class}`~exporgo.study.Dump` is the
-same index without the identity dimension: one study-global root for shared assets. Neither copies
-data; both persist to a JSON sidecar.
+A {class}`~exporgo.study.Dump` indexes many files under one study-global root, keyed by each
+file's path relative to that root, so same-named files in different subfolders never collide. It
+is for shared assets that belong to no single identity — an atlas, a README, a lookup table. It
+copies nothing; the index persists to a `_dump.json` sidecar in the dump's own directory under
+the study root, however far away the files themselves live.
 
 ```{eval-rst}
-.. autoclass:: exporgo.study.FileMap
-   :members:
-
 .. autoclass:: exporgo.study.Dump
    :members:
 ```
@@ -81,10 +77,10 @@ data; both persist to a JSON sidecar.
 
 Two frozen, handle-free snapshots. {class}`~exporgo.study.ValidationReport` is the outcome of
 {meth}`~exporgo.study.Study.validate`: a closed-world, existence-only check of whether each
-registered identity's resource and file-map files still exist.
+registered identity's resource files still exist.
 {class}`~exporgo.study.CoverageReport` is the outcome of {meth}`~exporgo.study.Study.coverage`
-and {meth}`~exporgo.study.Study.discover`: membership across stores, resources, and file maps,
-plus an open-world `unregistered` bucket for on-disk data that was never registered. See
+and {meth}`~exporgo.study.Study.discover`: membership across stores and resources, plus an
+open-world `unregistered` bucket for on-disk data that was never registered. See
 [Coverage and validation](../explanation/coverage-and-validation).
 
 ```{eval-rst}

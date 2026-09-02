@@ -94,9 +94,10 @@ autodoc_pydantic_model_show_validator_summary = True
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
-    "pydantic": ("https://docs.pydantic.dev/latest/", None),
+    "pydantic": ("https://pydantic.dev/docs/validation/latest/", None),
     "numpy": ('https://numpy.org/doc/1.24/', None),
-    "polars": ('https://pola.rs/docs/latest/', None),
+    "polars": ('https://docs.pola.rs/api/python/stable/', None),
+    "xarray": ('https://docs.xarray.dev/en/stable/', None),
 }
 
 pygments_style = "sphinx"

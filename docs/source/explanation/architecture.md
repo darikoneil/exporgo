@@ -22,7 +22,7 @@ file and exception sinks, and decorators that record calls, arguments, return va
 timing. It's the foundation the other layers log through, and it's useful on its own.
 
 **study**: also in the base install (it adds only `pydantic`). The Study & Identity model: the
-coordinate system, the resources and file maps a study expects, and file-existence validation.
+coordinate system, the resources a study expects, and file-existence validation.
 This is the shared foundation — the identity keys it defines become the datastore's partition
 keys, and its validation seeds what a monitoring layer would report.
 
@@ -48,8 +48,9 @@ without any coupling in code. Declare your keys once; the layers agree from ther
 
 ## Persistence
 
-A study persists its **declaration** (keys, registered identities, resource templates, store
-specs) to `study.toml`, and reloads with {meth}`~exporgo.study.Study.load`. It never persists
-data or derived status: those are re-read from the filesystem on demand, because the filesystem
-is the source of truth. A `study.toml` plus the tree it describes is enough to reconstruct the
-whole picture, which also makes a study straightforward for an agent to read and reason about.
+A study persists its **declaration** (keys, resource templates, store specs) to `study.json`,
+with registered identities kept separately in `entities.jsonl` so a large registry doesn't bloat
+the config file. {meth}`~exporgo.study.Study.load` reloads both. It never persists data or
+derived status: those are re-read from the filesystem on demand, because the filesystem is the
+source of truth. Those two files plus the tree they describe are enough to reconstruct the whole
+picture, which also makes a study straightforward for an agent to read and reason about.

@@ -3,7 +3,9 @@
 *Design record, 2026-08-23. Shaped through discussion; the shared foundation both the
 monitoring and datastore layers build on. **Built & verified 2026-08-24** (TDD;
 ruff/pyrefly clean). `discover()` for resources was **built 2026-08-27** (reverse-resolves
-templates to find on-disk identities; noted inline).*
+templates to find on-disk identities; noted inline). **`FileMap` was removed 2026-09-01** —
+see [Removing file maps](2026-09-01-removing-filemaps.md). The FileMap material below is kept
+as a record of what was designed and built, not as a description of the current API.*
 
 ## Context
 
@@ -81,8 +83,8 @@ datastore's `StoreSpec`/`Store`, and the `FileMap` (which has no separate spec):
 `study.resource(name).path(**identity)`; there is no store/filemap equivalent because a
 `Store`/`FileMap` is already the usable handle.
 
-**FileMap (built 2026-08-27) — recorded locations.** Where a `Resource` *derives* a path
-from a template and a `Store` *owns* the data, a `FileMap` *records* the concrete
+**FileMap (built 2026-08-27; removed 2026-09-01) — recorded locations.** Where a `Resource`
+*derives* a path from a template and a `Store` *owns* the data, a `FileMap` *records* the concrete
 location(s) of particular files per identity — typically raw acquisition files that live
 anywhere on disk (an external drive) and follow no naming pattern. Each identity maps to a
 `{name -> path}` set (name defaults to the file stem); paths are stored as-given (absolute,

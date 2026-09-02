@@ -37,9 +37,9 @@ complete. The three `unregistered` entries are what there is to act on.
 ## Seed the registry
 
 {meth}`~exporgo.study.Study.sync_registry` is the one-call bootstrap. It sweeps every declared
-component: resources (reverse-resolved), stores (their manifests), and file maps (their
-records). It registers each full-key identity that isn't registered yet, returning the ones
-it added in path order:
+component: resources (reverse-resolved) and stores and array stores (their manifests). It
+registers each full-key identity that isn't registered yet, returning the ones it added in path
+order:
 
 ```python
 print(study.sync_registry())
@@ -69,12 +69,13 @@ CoverageReport: 3 present, 0 missing, 0 unregistered (complete)
 
 Both bootstrap the registry; they differ in scope.
 
-- {meth}`~exporgo.study.Study.discover(register=True) <exporgo.study.Study.discover>` is
+- {meth}`Study.discover(register=True) <exporgo.study.Study.discover>` is
   **resource-only**. It builds the drift report, then registers the discovered full-key
   identities. Reach for it when you want the report *and* the bootstrap in one call, from
   resource templates.
-- {meth}`~exporgo.study.Study.sync_registry` is **all components**: resources, stores, and
-  file maps together. Reach for it to seed a registry from everything on disk at once.
+- {meth}`~exporgo.study.Study.sync_registry` sweeps **every identity-bearing component**:
+  resources, stores, and array stores together (dumps have no identity, so they're never
+  swept). Reach for it to seed a registry from everything on disk at once.
 
 Either way, only **full-key** identities are registered: a subset-key store or template yields a
 partial identity that can't form a complete address, so it's reported as drift but never

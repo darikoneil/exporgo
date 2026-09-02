@@ -12,7 +12,7 @@ The framework is layered, and you install only the layers you need:
 - **study**: the **Study & Identity** model, also in the base install. A study declares an
   identity coordinate system (one to three keys, default `Subject`), the resources it expects
   at each identity, and it validates their existence on disk. Declarations persist to
-  `study.toml` and reload with {meth}`~exporgo.study.Study.load`.
+  `study.json` and reload with {meth}`~exporgo.study.Study.load`.
 - **datastore** (`exporgo[datastore]`): fast, schema-enforced polars/Parquet component
   stores for a study's bulk data, Hive-partitioned on the identity keys, with lazy,
   partition-pruned retrieval.

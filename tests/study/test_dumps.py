@@ -87,3 +87,33 @@ def test_path_unknown_key_raises(tmp_path: Path) -> None:
 
     with pytest.raises(KeyError):
         dump.path("nope")
+
+
+def test_discover_non_directory_raises(tmp_path: Path) -> None:
+    dump = _dump(tmp_path)
+
+    with pytest.raises(NotADirectoryError):
+        dump.discover(tmp_path / "missing")
+
+
+def test_path_ambiguous_glob_raises(tmp_path: Path) -> None:
+    src = tmp_path / "shared"
+    for plane in ("plane0", "plane1"):
+        (src / plane).mkdir(parents=True)
+        (src / plane / "F.npy").write_text("F", encoding="utf-8")
+    dump = _dump(tmp_path)
+    dump.discover(src)
+
+    with pytest.raises(ValueError, match="ambiguous"):
+        dump.path("*/F.npy")  # plane0/F and plane1/F
+
+
+def test_path_glob_no_match_raises(tmp_path: Path) -> None:
+    src = tmp_path / "shared"
+    src.mkdir()
+    (src / "ccf.nrrd").write_text("ccf", encoding="utf-8")
+    dump = _dump(tmp_path)
+    dump.discover(src)
+
+    with pytest.raises(KeyError):
+        dump.path("*.mat")

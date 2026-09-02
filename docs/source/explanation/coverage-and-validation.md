@@ -15,16 +15,15 @@ contain) and checks each one. It can tell you an expected identity is *missing*,
 never surface data you never registered, because it never looks beyond the registry.
 
 An **open-world** view starts from the disk. It reads what's physically present (a store's
-manifest, a file map's records, a resource template reverse-resolved against the tree), and so
-it *can* surface identities that exist on disk but were never registered. That surplus is
-**drift**.
+manifest, or a resource template reverse-resolved against the tree), and so it *can* surface
+identities that exist on disk but were never registered. That surplus is **drift**.
 
 ## `validate`: liveness, closed-world
 
 {meth}`~exporgo.study.Study.validate` walks every registered identity and checks that the files
-it *points at* still exist: each declared resource (does its resolved path exist?) and each
-declared file map (are its recorded files present?). Every `(identity, component)` pair lands
-in `present` or `missing`. It's existence-only: file contents are never read.
+it *points at* still exist: for each declared resource, does its resolved path exist? Every
+`(identity, component)` pair lands in `present` or `missing`. It's existence-only: file contents
+are never read.
 
 It's closed-world by design. `validate` catches data that was expected, or once recorded, and
 has since been deleted or moved — the thing you want to know before a pipeline run. Stores are
@@ -34,10 +33,10 @@ diff across runs.
 
 ## `coverage`: membership plus drift
 
-{meth}`~exporgo.study.Study.coverage` generalizes `validate` across resources, stores, *and*
-file maps, and adds the open-world piece. It classifies every `(registered identity,
-component)` pair as `present` or `missing`, and it collects a third bucket, `unregistered`:
-identities physically present in a store or file map that were never registered.
+{meth}`~exporgo.study.Study.coverage` generalizes `validate` across resources, stores, and array
+stores, and adds the open-world piece. It classifies every `(registered identity, component)`
+pair as `present` or `missing`, and it collects a third bucket, `unregistered`: identities
+physically present in a store or array store that were never registered.
 
 ```text
 CoverageReport: 4 present, 2 missing, 0 unregistered (incomplete)
@@ -57,7 +56,7 @@ row per `(identity, component)`, the identity keys exploded into columns, plus `
 
 ## `discover`: the open-world view of resources
 
-A store and a file map are already open-world in `coverage`, because each keeps its own record
+A store or array store is already open-world in `coverage`, because each keeps its own record
 of what it contains. A resource has no such record — it only derives paths. That's what
 {meth}`~exporgo.study.Study.discover` is for: it reverse-resolves each resource template to
 find which identities physically match, so on-disk-but-unregistered resource data surfaces as

@@ -12,7 +12,7 @@ A study is organized along a small set of named axes. Three types express that:
 **{class}`~exporgo.study.IdentityKey`**: one named, typed axis. A key has a `name` (used both
 as the keyword when you address data and as the Hive partition key on disk) and a `dtype`, one
 of `"str"`, `"int"`, or `"bool"`. The dtype is stored as a string label so it round-trips
-through `study.toml`.
+through `study.json`.
 
 **{class}`~exporgo.study.IdentitySchema`**: an ordered set of one to three keys, the study's
 coordinate system. The bound is deliberate. One to three axes is enough to name a unit of data

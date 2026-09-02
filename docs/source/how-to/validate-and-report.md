@@ -8,7 +8,7 @@ validation](../explanation/coverage-and-validation).
 ## Quick liveness check
 
 {meth}`~exporgo.study.Study.validate` checks that every registered identity's *indicated* files
-(its resources and file maps) still exist on disk:
+(its resources) still exist on disk:
 
 ```python
 report = study.validate()
@@ -27,8 +27,9 @@ contents are never read. Stores are out of scope (use `coverage` for those).
 
 ## The full report
 
-{meth}`~exporgo.study.Study.coverage` reports every registered identity against every component
-(resources, stores, and file maps) and adds anything on disk that was never registered:
+{meth}`~exporgo.study.Study.coverage` reports every registered identity against every
+identity-bearing component (resources, stores, and array stores; dumps have no identity and are
+excluded) and adds anything on disk that was never registered:
 
 ```python
 print(study.coverage())
@@ -89,12 +90,12 @@ To ask which identities one component contains, {meth}`~exporgo.study.Study.iden
 exactly one target:
 
 ```python
-study.identities(store="behavior")    # open-world: the store's manifest partitions
-study.identities(resource="raw")      # closed-world: registered identities whose file exists
-study.identities(filemap="acquisition")
+study.identities(store="behavior")          # open-world: the store's manifest partitions
+study.identities(array_store="traces")      # open-world: the array store's partitions
+study.identities(resource="raw")            # closed-world: registered identities whose file exists
 ```
 
-A store and a file map report **open-world** (whatever's on disk, including unregistered
+A store and an array store report **open-world** (whatever's on disk, including unregistered
 identities); a resource reports **closed-world** (registered identities whose file exists). To
 find unregistered *resource* data, use {meth}`~exporgo.study.Study.discover` (see [Discover
 identities](discover-identities)).

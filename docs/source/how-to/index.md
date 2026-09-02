@@ -11,6 +11,5 @@ discover-identities
 write-to-a-store
 store-arrays
 validate-and-report
-record-external-files
 configure-logging
 ```

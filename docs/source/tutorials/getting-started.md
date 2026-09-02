@@ -3,7 +3,7 @@
 This tutorial builds a small study end to end: you'll declare an identity coordinate system,
 register the subjects and sessions the study should contain, point at raw files on disk,
 store some behavioral data, and ask exporgo what's present and what's missing. By the end
-you'll have a `study.toml` you can reload, and a clear picture of how the pieces fit.
+you'll have a `study.json` you can reload, and a clear picture of how the pieces fit.
 
 It assumes the base install (`uv add exporgo`) plus the datastore extra for the storage step:
 
@@ -31,7 +31,7 @@ print(study)
 ```
 
 ```text
-Study 'mouse_study' [Subject, Session]: 0 identities, 0 resources, 0 stores, 0 filemaps
+Study 'mouse_study' [Subject, Session]: 0 identities, 0 resources, 0 stores, 0 array stores, 0 dumps
 ```
 
 A bare string like `"Subject"` becomes a string-typed key; wrap it in
@@ -218,9 +218,10 @@ shape: (6, 4)
 
 ## Save and reload
 
-{meth}`~exporgo.study.Study.save` writes the study's *declaration* (its keys, registered
-identities, resource templates, and store specs) to `study.toml`. It also wires logging into
-the study root, so from here on a `mouse_study.log` records what happens.
+{meth}`~exporgo.study.Study.save` writes the study's *declaration* (its keys, resource
+templates, and store specs) to `study.json`, with registered identities kept separately in
+`entities.jsonl`. It also wires logging into the study root, so from here on a
+`mouse_study.log` records what happens.
 
 ```python
 study.save()
@@ -229,7 +230,7 @@ print(reloaded)
 ```
 
 ```text
-Study 'mouse_study' [Subject, Session]: 3 identities, 1 resources, 1 stores, 0 filemaps
+Study 'mouse_study' [Subject, Session]: 3 identities, 1 resources, 1 stores, 0 array stores, 0 dumps
 ```
 
 The reload restores the declaration, not the data — data and status are always re-read from
