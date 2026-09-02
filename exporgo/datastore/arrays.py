@@ -25,7 +25,7 @@ import polars as pl
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from exporgo.datastore import _partition
+import exporgo.datastore._partition as _partition
 from exporgo.datastore.manifest import FragmentEntry, Manifest, append_manifest_log
 from exporgo.datastore.spec import StoreSpec
 from exporgo.datastore.store import Store

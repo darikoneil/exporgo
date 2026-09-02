@@ -9,7 +9,7 @@ import polars as pl
 import pyarrow.dataset as ds
 from loguru import logger
 
-from exporgo.datastore import _partition
+import exporgo.datastore._partition as _partition
 from exporgo.datastore.manifest import FragmentEntry, Manifest, append_manifest_log
 from exporgo.datastore.spec import StoreSpec
 
