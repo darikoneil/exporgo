@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from loguru import logger
 
-from exporgo.study import IdentityKey, ResourceSpec, Study
+from exporgo.study import IdentityKey, Resource, ResourceSpec, Study
 
 
 def test_study_defaults_identity_to_subject() -> None:
@@ -34,6 +34,13 @@ def test_declare_resource_rejects_unknown_identity_key() -> None:
     study = Study(name="s", root="D:/data", identity=["Subject"])
     with pytest.raises(ValueError, match="Session"):
         study.declare_resource("beh", "{Subject}/{Session}/behavior.csv")
+
+
+def test_declare_resource_returns_a_bound_handle() -> None:
+    study = Study(name="s", root="D:/data", identity=["Subject"])
+    handle = study.declare_resource("beh", "{Subject}/behavior.csv")
+    assert isinstance(handle, Resource)
+    assert handle.path(Subject="m01") == study.path("beh", Subject="m01")
 
 
 def test_path_resolves_a_declared_resource() -> None:

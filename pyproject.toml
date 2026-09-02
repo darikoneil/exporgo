@@ -40,7 +40,9 @@ monitor = []
 datastore = [
     "numpy",
     "polars[numpy,pyarrow]>=1.44.1",
-    "pyarrow<=24.0.0", # We have weird shit going on somewhere between 25 and here
+    # Pinned <=24: pyarrow 25.x's _compute.pyd is blocked by Windows Smart App Control
+    # (see docs/design/2026-08-23-datastore-design.md).
+    "pyarrow<=24.0.0",
     "xarray>=2026.7.0",
 ]
 docs = [

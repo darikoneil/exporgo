@@ -311,7 +311,7 @@ class Study:
 
         return identity
 
-    def declare_resource(self, name: str, template: str) -> ResourceSpec:
+    def declare_resource(self, name: str, template: str) -> Resource:
         """Declare a named resource located by a path template over the identity keys.
 
         A resource is a file/folder the study expects at each identity (e.g. ``"raw"``,
@@ -325,7 +325,9 @@ class Study:
                 ``"{Subject}/{Session}/behavior.csv"``.
 
         Returns:
-            The declared :class:`~exporgo.study.resources.ResourceSpec`.
+            The root-bound :class:`~exporgo.study.resources.Resource` handle, ready to
+            resolve paths and check existence (the declared spec is available via
+            :attr:`resources`).
 
         Raises:
             ValueError: If the template references keys not in the study's identity.
@@ -343,7 +345,7 @@ class Study:
         msg = f"Declared the resource {spec}"
         logger.info(msg)
 
-        return spec
+        return self.resource(name)
 
     def resource(self, name: str) -> Resource:
         """Return the root-bound :class:`~exporgo.study.resources.Resource` handle.
@@ -401,7 +403,7 @@ class Study:
         sort_column: str | None = None,
         max_rows_per_file: int | None = 25_000_000,
         max_rows_per_group: int | None = None,
-    ) -> "StoreSpec":
+    ) -> "Store":
         """Declare a datastore component; partition keys default to the identity keys.
 
         Args:
@@ -417,7 +419,8 @@ class Study:
                 default). Part of the declaration, so it survives save/load.
 
         Returns:
-            The created :class:`~exporgo.datastore.spec.StoreSpec`.
+            The :class:`~exporgo.datastore.store.Store` bound to ``<root>/<name>``, ready
+            to write and scan (the declared spec is available via :attr:`stores`).
         """
         from exporgo.datastore.spec import StoreSpec
 
@@ -437,7 +440,7 @@ class Study:
         msg = f"Declared the store {spec}"
         logger.info(msg)
 
-        return spec
+        return self.store(name)
 
     def store(self, name: str) -> "Store":
         """Return the :class:`~exporgo.datastore.store.Store` for a declared component.
@@ -613,15 +616,11 @@ class Study:
             Existence-only (file contents are never read). See the "Coverage and
             validation" explanation for validate vs coverage.
         """
-        present: list[tuple[Identity, str]] = []
-        missing: list[tuple[Identity, str]] = []
-        resources = {name: self.resource(name) for name in self._resources}
-        for identity in self._entities:
-            values = identity.to_dict()
-            for name, resource in resources.items():
-                bucket = present if resource.exists(**values) else missing
-                bucket.append((identity, name))
-        return ValidationReport(present=tuple(present), missing=tuple(missing))
+        report = self._reconcile(
+            (name, self.identity.names, self.identities(resource=name))
+            for name in self._resources
+        )
+        return ValidationReport(present=report.present, missing=report.missing)
 
     def identities(
         self,
@@ -697,6 +696,84 @@ class Study:
             return None
         return Identity(keys=tuple(keys), values=values)
 
+    def _reconcile(
+        self,
+        components: Iterable[tuple[str, tuple[str, ...], set[Identity]]],
+    ) -> CoverageReport:
+        """Bucket the registered identities against each component's contained set.
+
+        The shared engine behind :meth:`validate`, :meth:`coverage`, and :meth:`discover`.
+        For each ``(name, keys, contained)`` triple, every registered identity is projected
+        onto ``keys`` (skipping identities that lack one of them) and classified as
+        ``present`` or ``missing`` against ``contained``; any contained identity no
+        registered identity projects onto is surfaced as ``unregistered`` drift, in
+        ``as_path`` order.
+
+        Args:
+            components: ``(component_name, partition/placeholder keys, contained
+                identities)`` triples. ``contained`` is sourced open- or closed-world by
+                the caller (a store manifest, a resource existence check, or a reverse-
+                resolved template).
+
+        Returns:
+            A :class:`CoverageReport` over the supplied components.
+        """
+        present: list[tuple[Identity, str]] = []
+        missing: list[tuple[Identity, str]] = []
+        unregistered: list[tuple[Identity, str]] = []
+        for name, keys, contained in components:
+            projected: set[Identity] = set()
+            for identity in self._entities:
+                projection = self._project(identity, keys)
+                if projection is None:
+                    continue
+                projected.add(projection)
+                bucket = present if projection in contained else missing
+                bucket.append((identity, name))
+            unregistered.extend(
+                (extra, name)
+                for extra in sorted(contained - projected, key=Identity.as_path)
+            )
+        return CoverageReport(
+            present=tuple(present),
+            missing=tuple(missing),
+            unregistered=tuple(unregistered),
+        )
+
+    def _collect_contained(self) -> set[Identity]:
+        """Union of identities physically present across every identity-bearing component.
+
+        Sweeps resources (reverse-resolved from their templates) plus stores and array
+        stores (their manifest partitions). Dumps have no identity and are not swept.
+        """
+        contained: set[Identity] = set()
+        for resource_name in self._resources:
+            contained |= self.resource(resource_name).discover()
+        for store_name in self._stores:
+            contained |= self.identities(store=store_name)
+        for array_store_name in self._array_stores:
+            contained |= self.identities(array_store=array_store_name)
+        return contained
+
+    def _register_full_key(self, identities: Iterable[Identity]) -> list[Identity]:
+        """Register each not-yet-registered full-key identity; return the new ones.
+
+        Subset-key partials (from a subset-key store or resource) cannot be registered and
+        are skipped. Idempotent: already-registered identities are left untouched and
+        omitted from the result, which is ordered by ``as_path``.
+        """
+        full = set(self.identity.names)
+        newly: list[Identity] = []
+        for identity in sorted(identities, key=Identity.as_path):
+            if set(identity.keys) != full:
+                continue  # partial identity (subset-key store/resource); cannot register
+            canonical = self.identity.identity(**identity.to_dict())
+            if canonical in self._entity_index:
+                continue
+            self.register(**identity.to_dict())
+            newly.append(canonical)
+        return newly
+
     def coverage(self) -> CoverageReport:
         """Report which registered identities each declared store/resource contains.
 
@@ -713,43 +790,19 @@ class Study:
         Note:
             See the "Coverage and validation" explanation for closed- vs open-world drift.
         """
-        present: list[tuple[Identity, str]] = []
-        missing: list[tuple[Identity, str]] = []
-        unregistered: list[tuple[Identity, str]] = []
-
-        for resource_name in self._resources:
-            contained = self.identities(resource=resource_name)
-            for identity in self._entities:
-                bucket = present if identity in contained else missing
-                bucket.append((identity, resource_name))
-
-        store_like: list[tuple[str, tuple[str, ...], set[Identity]]] = [
+        components: list[tuple[str, tuple[str, ...], set[Identity]]] = [
+            (name, self.identity.names, self.identities(resource=name))
+            for name in self._resources
+        ]
+        components.extend(
             (name, spec.partition_keys, self.identities(store=name))
             for name, spec in self._stores.items()
-        ]
-        store_like.extend(
+        )
+        components.extend(
             (name, spec.partition_keys, self.identities(array_store=name))
             for name, spec in self._array_stores.items()
         )
-        for component_name, partition_keys, contained in store_like:
-            projected: set[Identity] = set()
-            for identity in self._entities:
-                projection = self._project(identity, partition_keys)
-                if projection is None:
-                    continue
-                projected.add(projection)
-                bucket = present if projection in contained else missing
-                bucket.append((identity, component_name))
-            unregistered.extend(
-                (extra, component_name)
-                for extra in sorted(contained - projected, key=Identity.as_path)
-            )
-
-        return CoverageReport(
-            present=tuple(present),
-            missing=tuple(missing),
-            unregistered=tuple(unregistered),
-        )
+        return self._reconcile(components)
 
     def discover(self, *, register: bool = False) -> CoverageReport:
         """Scan the filesystem for resource identities and report the drift.
@@ -774,40 +827,18 @@ class Study:
             Constant-template resources are skipped; stores are not scanned
             here. See the "Discover identities from an existing dataset" how-to.
         """
-        present: list[tuple[Identity, str]] = []
-        missing: list[tuple[Identity, str]] = []
-        unregistered: list[tuple[Identity, str]] = []
-        discovered: list[Identity] = []
-
+        components: list[tuple[str, tuple[str, ...], set[Identity]]] = []
+        discovered: set[Identity] = set()
         for resource_name, spec in self._resources.items():
             keys = spec.placeholders
             if not keys:  # constant template: no identity to reverse-resolve
                 continue
             contained = self.resource(resource_name).discover()
-            discovered.extend(contained)
-            projected: set[Identity] = set()
-            for identity in self._entities:
-                projection = self._project(identity, keys)
-                if projection is None:
-                    continue
-                projected.add(projection)
-                bucket = present if projection in contained else missing
-                bucket.append((identity, resource_name))
-            unregistered.extend(
-                (extra, resource_name)
-                for extra in sorted(contained - projected, key=Identity.as_path)
-            )
-
-        report = CoverageReport(
-            present=tuple(present),
-            missing=tuple(missing),
-            unregistered=tuple(unregistered),
-        )
+            discovered |= contained
+            components.append((resource_name, keys, contained))
+        report = self._reconcile(components)
         if register:
-            full = set(self.identity.names)
-            for identity in discovered:
-                if set(identity.keys) == full:
-                    self.register(**identity.to_dict())
+            self._register_full_key(discovered)
         return report
 
     def sync_registry(self) -> tuple[Identity, ...]:
@@ -829,27 +860,7 @@ class Study:
             The bulk, all-component companion to :meth:`discover`. See the "Discover
             identities from an existing dataset" how-to.
         """
-        contained: set[Identity] = set()
-        for resource_name in self._resources:
-            contained |= self.resource(resource_name).discover()
-        for store_name in self._stores:
-            contained |= self.identities(store=store_name)
-        for array_store_name in self._array_stores:
-            contained |= self.identities(array_store=array_store_name)
-
-        full = set(self.identity.names)
-        registered = set(self._entities)
-        newly: list[Identity] = []
-        for identity in sorted(contained, key=Identity.as_path):
-            if set(identity.keys) != full:
-                continue  # partial identity (subset-key store/resource); cannot register
-            canonical = self.identity.identity(**identity.to_dict())
-            if canonical in registered:
-                continue
-            self.register(**identity.to_dict())
-            registered.add(canonical)
-            newly.append(canonical)
-
+        newly = self._register_full_key(self._collect_contained())
         msg = f"Auto-registered {len(newly)} new identities to {self.name}."
         logger.info(msg)
         return tuple(newly)

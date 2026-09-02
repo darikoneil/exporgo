@@ -18,8 +18,9 @@ BEHAVIOR = {
 
 def test_declare_store_defaults_partition_keys_to_identity(tmp_path: Path) -> None:
     study = Study(name="s", root=tmp_path, identity=["Subject", "Session"])
-    spec = study.declare_store("behavior", BEHAVIOR)
-    assert spec.partition_keys == ("Subject", "Session")
+    store = study.declare_store("behavior", BEHAVIOR)
+    assert isinstance(store, Store)
+    assert store.spec.partition_keys == ("Subject", "Session")
 
 
 def test_store_returns_a_store_rooted_under_the_study(tmp_path: Path) -> None:
@@ -38,10 +39,10 @@ def test_store_unknown_name_raises(tmp_path: Path) -> None:
 
 def test_stores_property_exposes_declared_specs(tmp_path: Path) -> None:
     study = Study(name="s", root=tmp_path, identity=["Subject", "Session"])
-    spec = study.declare_store("behavior", BEHAVIOR)
+    study.declare_store("behavior", BEHAVIOR)
 
     stores = study.stores
-    assert stores["behavior"] is spec
+    assert stores["behavior"].partition_keys == ("Subject", "Session")
 
     stores.clear()  # returned mapping is a copy; mutating it must not affect the study
     assert "behavior" in study.stores

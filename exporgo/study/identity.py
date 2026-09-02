@@ -3,9 +3,9 @@
 A study is organized along a small set of named axes — its :class:`IdentitySchema`,
 an ordered 1-3 :class:`IdentityKey`s (default ``["Subject"]``). A concrete point in
 that system is an :class:`Identity` (e.g. ``Subject="m01", Session=1``), which the
-datastore uses as its partition path and the monitoring layer tracks. Note that we
-don't care about narrowing conversions of integers because you'd have to be nuts to
-partition something across where that would actually matter.
+datastore uses as its partition path and the monitoring layer tracks. Narrowing
+conversions of integer keys are not a concern: identity keys are low-cardinality
+partition axes, never values large enough for the narrowing to matter.
 """
 
 from collections.abc import Callable

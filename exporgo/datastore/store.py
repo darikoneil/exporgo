@@ -9,6 +9,7 @@ import polars as pl
 import pyarrow.dataset as ds
 from loguru import logger
 
+from exporgo.datastore import _partition
 from exporgo.datastore.manifest import FragmentEntry, Manifest, append_manifest_log
 from exporgo.datastore.spec import StoreSpec
 
@@ -201,36 +202,25 @@ class Store:
             relative = raw
         return FragmentEntry(
             path=relative.as_posix(),
-            partition=self._partition_from_path(relative),
+            partition=_partition.from_path(relative),
             rows=written_file.metadata.num_rows,
             written=timestamp,
         )
 
-    @staticmethod
-    def _partition_from_path(relative: Path) -> dict[str, str]:
-        """Parse Hive ``key=value`` segments from a fragment's relative path."""
-        partition: dict[str, str] = {}
-        for segment in relative.parts[:-1]:
-            key, separator, value = segment.partition("=")
-            if separator:
-                partition[key] = value
-        return partition
-
     def _incoming_partitions(self, frame: pl.DataFrame) -> set[tuple[str, ...]]:
         """Distinct partition-key tuples in ``frame``, path-encoded as strings."""
-        keys = list(self.spec.partition_keys)
-        distinct = frame.select(keys).unique()
+        keys = self.spec.partition_keys
+        distinct = frame.select(list(keys)).unique()
         return {
-            tuple(str(row[key]) for key in keys)
+            _partition.tuple_of_identity(keys, row)
             for row in distinct.iter_rows(named=True)
         }
 
     def _existing_partitions(self) -> set[tuple[str, ...]]:
         """The partition-key tuples already present in the store, from the manifest."""
-        return {
-            self._partition_tuple(partition)
-            for partition in self.manifest().partitions()
-        }
+        return _partition.existing(
+            self.spec.partition_keys, self.manifest().partitions()
+        )
 
     def _reject_existing_partitions(self, frame: pl.DataFrame) -> None:
         """Raise if ``frame`` carries any identity (partition) the store already contains."""
@@ -248,14 +238,11 @@ class Store:
 
     def _remove_partitions(self, targets: set[tuple[str, ...]]) -> None:
         """Delete the target partitions' data files and tombstone them in the manifest log."""
+        keys = self.spec.partition_keys
         removed: list[str] = []
         for fragment in self.manifest().fragments:
-            if self._partition_tuple(fragment.partition) in targets:
+            if _partition.tuple_of_partition(keys, fragment.partition) in targets:
                 (self.root / fragment.path).unlink(missing_ok=True)
                 removed.append(fragment.path)
         if removed:
             append_manifest_log(self.root / _MANIFEST_DIR, removed=removed)
-
-    def _partition_tuple(self, partition: dict[str, str]) -> tuple[str, ...]:
-        """Order a fragment's partition dict by the spec's partition keys."""
-        return tuple(partition.get(key, "") for key in self.spec.partition_keys)

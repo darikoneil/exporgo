@@ -6,6 +6,12 @@ and concurrent writers resolve to last-writer-wins rather than a torn result. Th
 temporary name means two writers publishing the same target never collide on the scratch file.
 Used for the small metadata files exporgo maintains (``study.json``, the ``entities.jsonl``
 sidecar, dump sidecars, the store schema anchor and manifest log).
+
+The last-writer-wins guarantee is POSIX semantics; on Windows two ``os.replace`` calls racing
+onto the *same* target can instead raise ``PermissionError``. exporgo does not rely on
+same-target concurrency -- multi-writer paths (the manifest log, per-writer logs) each write a
+unique file, and same-target writes are single-process config saves -- so this does not arise
+in practice.
 """
 
 from pathlib import Path

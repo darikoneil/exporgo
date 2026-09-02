@@ -1,4 +1,4 @@
-# exporgo (2.0)
+# exporgo
 
 Experiment organization, logging, and analysis monitoring for scientific studies.
 The successor to the original `exporgo`, rebuilt as a layered framework.
@@ -14,8 +14,9 @@ leaving orchestration to your code or an LLM agent.
 - **study** (base install, adds `pydantic`) — the Study & Identity model: a
   study's identity coordinate system (1–3 keys, default `Subject`), the resources
   (files/folders) it expects at each identity, and file-existence self-validation.
-  Declarations persist to `study.toml` and reload via `Study.load(root)`. Saving a
-  study also auto-creates a `<root>/<name>.log` the logger writes to, so every study
+  Declarations persist to `study.json` (with registered identities in an
+  `entities.jsonl` sidecar) and reload via `Study.load(root)`. Saving a study also wires
+  up logging into `<root>/.logs/` (a per-writer log, merged on read), so every study
   gets logging for free.
 - **datastore** (`exporgo[datastore]`, adds `polars`/`pyarrow`/`numpy`) — fast,
   schema-enforced polars/Parquet component stores for a study's bulk data

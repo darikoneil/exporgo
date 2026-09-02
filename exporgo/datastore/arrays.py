@@ -25,6 +25,7 @@ import polars as pl
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from exporgo.datastore import _partition
 from exporgo.datastore.manifest import FragmentEntry, Manifest, append_manifest_log
 from exporgo.datastore.spec import StoreSpec
 from exporgo.datastore.store import Store
@@ -258,7 +259,7 @@ class ArrayStore:
         supplied = coords or {}
         self._validate_coords(supplied, array.shape)
         self.root.mkdir(parents=True, exist_ok=True)
-        target = self._partition_tuple(identity)
+        target = _partition.tuple_of_identity(self.spec.partition_keys, identity)
         if mode == "unique" and target in self._existing_partitions():
             pretty = dict(zip(self.spec.partition_keys, target, strict=True))
             msg = (
@@ -272,14 +273,15 @@ class ArrayStore:
         relative = self._write_array(identity, array)
         entry = FragmentEntry(
             path=relative,
-            partition=self._partition_dict(identity),
+            partition=_partition.dict_of_identity(self.spec.partition_keys, identity),
             rows=int(array.size),
             written=datetime.now(UTC).isoformat(),
         )
         append_manifest_log(self.root / _MANIFEST_DIR, added=[entry])
+        pretty = _partition.dict_of_identity(self.spec.partition_keys, identity)
         msg = (
             f"Wrote a {array.shape} {array.dtype} array for identity "
-            f"{self._partition_dict(identity)} to array store {self.spec.name!r} ({mode})."
+            f"{pretty} to array store {self.spec.name!r} ({mode})."
         )
         logger.info(msg)
 
@@ -312,7 +314,7 @@ class ArrayStore:
         self._validate_identity(identity)
         relative = self._fragment_path(identity)
         if relative is None:
-            pretty = self._partition_dict(identity)
+            pretty = _partition.dict_of_identity(self.spec.partition_keys, identity)
             msg = (
                 f"Array store {self.spec.name!r} holds no array for identity {pretty}."
             )
@@ -428,7 +430,9 @@ class ArrayStore:
         """
         if not self.spec.labelled_dims:
             return {}
-        partition_directory = self._coords.root / self._partition_subpath(identity)
+        partition_directory = self._coords.root / _partition.subpath(
+            self.spec.partition_keys, identity
+        )
         fragments = sorted(partition_directory.glob("part-*.parquet"))
         if not fragments:
             return {}
@@ -444,7 +448,7 @@ class ArrayStore:
 
     def _write_array(self, identity: dict[str, Any], array: np.ndarray) -> str:
         """Write one identity's array as a uniquely-named ``.npy`` blob, atomically."""
-        directory = self.root / self._partition_subpath(identity)
+        directory = self.root / _partition.subpath(self.spec.partition_keys, identity)
         directory.mkdir(parents=True, exist_ok=True)
         name = f"{_DATA_PREFIX}{uuid4().hex}.npy"
         target = directory / name
@@ -454,43 +458,28 @@ class ArrayStore:
         temporary.replace(target)
         return target.relative_to(self.root).as_posix()
 
-    def _partition_subpath(self, identity: dict[str, Any]) -> str:
-        """Render an identity as its Hive partition sub-path (``key=value/...``)."""
-        return "/".join(f"{key}={identity[key]}" for key in self.spec.partition_keys)
-
-    def _partition_dict(self, identity: dict[str, Any]) -> dict[str, str]:
-        """Render an identity as a stringified Hive ``{key: value}`` mapping."""
-        return {key: str(identity[key]) for key in self.spec.partition_keys}
-
-    def _partition_tuple(self, identity: dict[str, Any]) -> tuple[str, ...]:
-        """Render an identity as its stringified partition-value tuple."""
-        return tuple(str(identity[key]) for key in self.spec.partition_keys)
-
-    def _partition_tuple_of(self, partition: dict[str, str]) -> tuple[str, ...]:
-        """Order a manifest partition dict by the spec's partition keys."""
-        return tuple(partition.get(key, "") for key in self.spec.partition_keys)
-
     def _existing_partitions(self) -> set[tuple[str, ...]]:
         """The partition-value tuples already present, from the array manifest."""
-        return {
-            self._partition_tuple_of(partition)
-            for partition in self.manifest().partitions()
-        }
+        return _partition.existing(
+            self.spec.partition_keys, self.manifest().partitions()
+        )
 
     def _fragment_path(self, identity: dict[str, Any]) -> str | None:
         """Return the live fragment path for an identity, or ``None`` if absent."""
-        target = self._partition_tuple(identity)
+        keys = self.spec.partition_keys
+        target = _partition.tuple_of_identity(keys, identity)
         found: str | None = None
         for fragment in self.manifest().fragments:
-            if self._partition_tuple_of(fragment.partition) == target:
+            if _partition.tuple_of_partition(keys, fragment.partition) == target:
                 found = fragment.path
         return found
 
     def _remove_identity(self, target: tuple[str, ...]) -> None:
         """Delete an identity's array file(s) and tombstone them in the manifest log."""
+        keys = self.spec.partition_keys
         removed: list[str] = []
         for fragment in self.manifest().fragments:
-            if self._partition_tuple_of(fragment.partition) == target:
+            if _partition.tuple_of_partition(keys, fragment.partition) == target:
                 (self.root / fragment.path).unlink(missing_ok=True)
                 removed.append(fragment.path)
         if removed:
