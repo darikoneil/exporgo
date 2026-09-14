@@ -1,0 +1,34 @@
+[package]
+name = "exporgo"
+version = "2.3.0"
+edition = "2024"
+description = "Stamp and maintain science-project workspaces from an embedded template"
+license = "MIT"
+default-run = "exporgo"
+
+[features]
+default = ["cli"]
+# A future GUI depends on the library with default-features = false.
+cli = ["dep:clap", "dep:dialoguer"]
+
+[[bin]]
+name = "exporgo"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[dependencies]
+thiserror = "2.0.17"
+include_dir = "0.7"
+serde = { version = "1", features = ["derive"] }
+toml = "0.9"
+jiff = "0.2"
+filetime = "0.2"
+clap = { version = "4", features = ["derive"], optional = true }
+dialoguer = { version = "0.12", optional = true }
+
+[dev-dependencies]
+pretty_assertions = "1.4.1"
+rstest = "0.26.1"
+tempfile = "3"
+assert_cmd = "2"
+predicates = "3"

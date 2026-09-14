@@ -26,6 +26,21 @@ leaving orchestration to your code or an LLM agent.
   (declared outputs' existence/freshness), rendered into an agent-readable map.
   *(Planned; not yet implemented.)*
 
+## Workspace CLI (Rust)
+
+Alongside the Python package, this repo carries a **Rust CLI** (crate at the repo root,
+`src/` + `Cargo.toml`) that stamps and maintains *project workspaces* from the template in
+[`template/this_project/`](template/this_project/README.md). The template is embedded in the
+binary at build time, so the crate version is the template version and no network or toolchain
+is needed on lab machines — install a binary from GitHub Releases.
+
+```bash
+exporgo new "Grid Cell Remapping" --aim "..." --data-root "\\ktdata\snlkt\..."   # stamp a project
+exporgo check    # report drift from this binary's template
+exporgo update   # refresh exporgo-owned files; never touches project content
+exporgo sync     # two-hop non-destructive data sync (paths from exporgo.toml [sync])
+```
+
 ## Installation
 
 For development, using [uv](https://docs.astral.sh/uv/):

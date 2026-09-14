@@ -1,0 +1,4 @@
+# Deterministic template embeds: the Rust binary embeds template/ at build time,
+# so all checkouts (dev machines, CI runners) must see identical bytes.
+template/** text=auto eol=lf
+*.png binary
