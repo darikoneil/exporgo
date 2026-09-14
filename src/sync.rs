@@ -17,24 +17,30 @@
 //! stable. Exclusion patterns match file *names* (robocopy `/XF` style, `*`
 //! wildcards, ASCII case-insensitive).
 
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use crate::error::Error;
 
 /// Which way the two hops run.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Direction {
+pub enum Direction
+{
     /// Source -> Intermediate -> Destination.
     Forward,
     /// Destination -> Intermediate -> Source.
     Reverse,
 }
 
-impl Direction {
-    pub fn as_str(self) -> &'static str {
-        match self {
+impl Direction
+{
+    pub fn as_str(self) -> &'static str
+    {
+        match self
+        {
             Direction::Forward => "Forward",
             Direction::Reverse => "Reverse",
         }
@@ -55,8 +61,10 @@ pub const DETAIL_LOG: &str = "_sync_detail.log";
 /// Appended each run with one summary line — the audit trail.
 pub const HISTORY_LOG: &str = "_sync_history.log";
 
-/// Fully resolved inputs for [`sync`] (the CLI merges manifest config and flags).
-pub struct SyncOptions {
+/// Fully resolved inputs for [`sync`] (the CLI merges manifest config and
+/// flags).
+pub struct SyncOptions
+{
     pub source: PathBuf,
     pub intermediate: PathBuf,
     pub destination: PathBuf,
@@ -72,14 +80,16 @@ pub struct SyncOptions {
 }
 
 /// What one hop did.
-pub struct HopReport {
+pub struct HopReport
+{
     pub label: String,
     pub copied: usize,
     pub deleted: usize,
 }
 
 /// What the whole run did.
-pub struct SyncReport {
+pub struct SyncReport
+{
     pub hops: Vec<HopReport>,
     /// The one-line summary appended to the history log.
     pub summary: String,
@@ -88,8 +98,10 @@ pub struct SyncReport {
 }
 
 /// Runs both hops, writing the detail and history logs.
-pub fn sync(options: &SyncOptions) -> Result<SyncReport, Error> {
-    let hops: [(&Path, &Path, &str); 2] = match options.direction {
+pub fn sync(options: &SyncOptions) -> Result<SyncReport, Error>
+{
+    let hops: [(&Path, &Path, &str); 2] = match options.direction
+    {
         Direction::Forward => [
             (
                 &options.source,
@@ -133,8 +145,10 @@ pub fn sync(options: &SyncOptions) -> Result<SyncReport, Error> {
     excludes.extend(options.exclude.iter().cloned());
 
     let mut reports = Vec::new();
-    for (index, (from, to, label)) in hops.iter().enumerate() {
-        if !from.is_dir() && options.dry_run && index == 1 {
+    for (index, (from, to, label)) in hops.iter().enumerate()
+    {
+        if !from.is_dir() && options.dry_run && index == 1
+        {
             // Hop 1 would have created the intermediate; without it hop 2
             // cannot be planned, which is expected in a dry run.
             let _ = writeln!(
@@ -148,7 +162,8 @@ pub fn sync(options: &SyncOptions) -> Result<SyncReport, Error> {
             });
             continue;
         }
-        if !from.is_dir() {
+        if !from.is_dir()
+        {
             let summary = format!(
                 "[{stamp}] {}  {label}: source not found '{}'  => FAIL (aborted{})",
                 options.direction.as_str(),
@@ -171,15 +186,19 @@ pub fn sync(options: &SyncOptions) -> Result<SyncReport, Error> {
             deleted: 0,
         };
         copy_tree(from, to, &excludes, options.dry_run, &mut hop, &mut detail)?;
-        if options.mirror {
+        if options.mirror
+        {
             delete_extras(from, to, &excludes, options.dry_run, &mut hop, &mut detail)?;
         }
         reports.push(hop);
     }
 
-    let verb = if options.dry_run {
+    let verb = if options.dry_run
+    {
         "would copy"
-    } else {
+    }
+    else
+    {
         "copied"
     };
     let summary = format!(
@@ -188,9 +207,12 @@ pub fn sync(options: &SyncOptions) -> Result<SyncReport, Error> {
         reports
             .iter()
             .map(|h| {
-                let deletions = if h.deleted > 0 {
+                let deletions = if h.deleted > 0
+                {
                     format!(", deleted {}", h.deleted)
-                } else {
+                }
+                else
+                {
                     String::new()
                 };
                 format!("{}: {verb} {}{deletions}", h.label, h.copied)
@@ -209,7 +231,8 @@ pub fn sync(options: &SyncOptions) -> Result<SyncReport, Error> {
     })
 }
 
-fn append_history(path: &Path, line: &str) -> Result<(), Error> {
+fn append_history(path: &Path, line: &str) -> Result<(), Error>
+{
     let mut file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -218,7 +241,8 @@ fn append_history(path: &Path, line: &str) -> Result<(), Error> {
     writeln!(file, "{line}").map_err(Error::io(path.to_path_buf()))
 }
 
-/// Copies new and newer files from `from` into `to`, recursively. Never deletes.
+/// Copies new and newer files from `from` into `to`, recursively. Never
+/// deletes.
 fn copy_tree(
     from: &Path,
     to: &Path,
@@ -226,30 +250,41 @@ fn copy_tree(
     dry_run: bool,
     hop: &mut HopReport,
     detail: &mut std::fs::File,
-) -> Result<(), Error> {
-    if !dry_run {
+) -> Result<(), Error>
+{
+    if !dry_run
+    {
         std::fs::create_dir_all(to).map_err(Error::io(to.to_path_buf()))?;
     }
-    for entry in std::fs::read_dir(from).map_err(Error::io(from.to_path_buf()))? {
+    for entry in std::fs::read_dir(from).map_err(Error::io(from.to_path_buf()))?
+    {
         let entry = entry.map_err(Error::io(from.to_path_buf()))?;
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
         let file_type = entry.file_type().map_err(Error::io(entry.path()))?;
-        // Symlinks are skipped: following one could copy or delete outside the tree.
-        if file_type.is_symlink() {
+        // Symlinks are skipped: following one could copy or delete outside the
+        // tree.
+        if file_type.is_symlink()
+        {
             let _ = writeln!(detail, "skip symlink {}", entry.path().display());
             continue;
         }
         let target = to.join(&name);
-        if file_type.is_dir() {
+        if file_type.is_dir()
+        {
             copy_tree(&entry.path(), &target, excludes, dry_run, hop, detail)?;
-        } else {
-            if excluded(&name_str, excludes) {
+        }
+        else
+        {
+            if excluded(&name_str, excludes)
+            {
                 continue;
             }
-            if needs_copy(&entry.path(), &target)? {
+            if needs_copy(&entry.path(), &target)?
+            {
                 let _ = writeln!(detail, "copy {}", target.display());
-                if !dry_run {
+                if !dry_run
+                {
                     copy_with_retry(&entry.path(), &target)?;
                 }
                 hop.copied += 1;
@@ -267,30 +302,41 @@ fn delete_extras(
     dry_run: bool,
     hop: &mut HopReport,
     detail: &mut std::fs::File,
-) -> Result<(), Error> {
-    if !to.is_dir() {
+) -> Result<(), Error>
+{
+    if !to.is_dir()
+    {
         return Ok(());
     }
-    for entry in std::fs::read_dir(to).map_err(Error::io(to.to_path_buf()))? {
+    for entry in std::fs::read_dir(to).map_err(Error::io(to.to_path_buf()))?
+    {
         let entry = entry.map_err(Error::io(to.to_path_buf()))?;
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
-        if excluded(&name_str, excludes) {
+        if excluded(&name_str, excludes)
+        {
             continue;
         }
         let counterpart = from.join(&name);
         let file_type = entry.file_type().map_err(Error::io(entry.path()))?;
-        if !counterpart.exists() && !counterpart.is_symlink() {
+        if !counterpart.exists() && !counterpart.is_symlink()
+        {
             let _ = writeln!(detail, "delete {}", entry.path().display());
-            if !dry_run {
-                if file_type.is_dir() {
+            if !dry_run
+            {
+                if file_type.is_dir()
+                {
                     std::fs::remove_dir_all(entry.path()).map_err(Error::io(entry.path()))?;
-                } else {
+                }
+                else
+                {
                     std::fs::remove_file(entry.path()).map_err(Error::io(entry.path()))?;
                 }
             }
             hop.deleted += 1;
-        } else if file_type.is_dir() {
+        }
+        else if file_type.is_dir()
+        {
             delete_extras(&counterpart, &entry.path(), excludes, dry_run, hop, detail)?;
         }
     }
@@ -299,9 +345,11 @@ fn delete_extras(
 
 /// Copy if the target is missing, or the source is more than 2 seconds newer
 /// (FAT and cloud mounts round modification times).
-fn needs_copy(source: &Path, target: &Path) -> Result<bool, Error> {
+fn needs_copy(source: &Path, target: &Path) -> Result<bool, Error>
+{
     let source_meta = std::fs::metadata(source).map_err(Error::io(source.to_path_buf()))?;
-    let target_meta = match std::fs::metadata(target) {
+    let target_meta = match std::fs::metadata(target)
+    {
         Ok(meta) => meta,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(true),
         Err(e) => return Err(Error::io(target.to_path_buf())(e)),
@@ -313,13 +361,17 @@ fn needs_copy(source: &Path, target: &Path) -> Result<bool, Error> {
 
 /// Copies one file, preserving its modification time, with two retries
 /// (transient share/mount hiccups — robocopy's /R:2 /W:5, shortened).
-fn copy_with_retry(source: &Path, target: &Path) -> Result<(), Error> {
+fn copy_with_retry(source: &Path, target: &Path) -> Result<(), Error>
+{
     let mut attempts = 0;
-    loop {
+    loop
+    {
         attempts += 1;
-        match std::fs::copy(source, target) {
+        match std::fs::copy(source, target)
+        {
             Ok(_) => break,
-            Err(e) if attempts <= 2 => {
+            Err(e) if attempts <= 2 =>
+            {
                 let _ = e;
                 std::thread::sleep(Duration::from_secs(2));
             }
@@ -334,15 +386,20 @@ fn copy_with_retry(source: &Path, target: &Path) -> Result<(), Error> {
 
 /// robocopy `/XF`-style match: file names only, `*` wildcards, ASCII
 /// case-insensitive.
-fn excluded(name: &str, patterns: &[String]) -> bool {
+fn excluded(name: &str, patterns: &[String]) -> bool
+{
     patterns.iter().any(|p| wildcard_match(p, name))
 }
 
-fn wildcard_match(pattern: &str, name: &str) -> bool {
-    fn inner(pattern: &[u8], name: &[u8]) -> bool {
-        match (pattern.first(), name.first()) {
+fn wildcard_match(pattern: &str, name: &str) -> bool
+{
+    fn inner(pattern: &[u8], name: &[u8]) -> bool
+    {
+        match (pattern.first(), name.first())
+        {
             (None, None) => true,
-            (Some(b'*'), _) => {
+            (Some(b'*'), _) =>
+            {
                 inner(&pattern[1..], name) || (!name.is_empty() && inner(pattern, &name[1..]))
             }
             (Some(p), Some(n)) => p.eq_ignore_ascii_case(n) && inner(&pattern[1..], &name[1..]),
@@ -353,7 +410,8 @@ fn wildcard_match(pattern: &str, name: &str) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
+mod tests
+{
     use rstest::rstest;
 
     use super::*;
@@ -366,7 +424,8 @@ mod tests {
     #[case("~$*", "~$draft.docx", true)]
     #[case("*", "anything", true)]
     #[case("data.csv", "data.csv.old", false)]
-    fn wildcard_cases(#[case] pattern: &str, #[case] name: &str, #[case] expected: bool) {
+    fn wildcard_cases(#[case] pattern: &str, #[case] name: &str, #[case] expected: bool)
+    {
         assert_eq!(
             wildcard_match(pattern, name),
             expected,

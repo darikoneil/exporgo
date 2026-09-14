@@ -1,27 +1,32 @@
-//! Ownership zones: the single source of truth for what `exporgo update` may touch.
+//! Ownership zones: the single source of truth for what `exporgo update` may
+//! touch.
 //!
-//! Owned paths belong to the template and are freely overwritten on update. Everything
-//! else is user territory and is never written after stamping — notably `context.md`,
-//! `.claude/local.md`, `.claude/skills/local/`, `exporgo.toml`, real experiments, and
-//! `plans/`. Update is additive: files are created or overwritten, never deleted.
+//! Owned paths belong to the template and are freely overwritten on update.
+//! Everything else is user territory and is never written after stamping —
+//! notably `context.md`, `.claude/local.md`, `.claude/skills/local/`,
+//! `exporgo.toml`, real experiments, and `plans/`. Update is additive: files
+//! are created or overwritten, never deleted.
 
 /// Whether a project-relative path belongs to the template or to the user.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Zone {
+pub enum Zone
+{
     Owned(OwnedArea),
     User,
 }
 
 /// The owned areas, used to scope `--skills-only`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum OwnedArea {
+pub enum OwnedArea
+{
     SkillsExporgo,
     RootDoc,
     Templates,
     ExperimentTemplate,
 }
 
-enum MatchKind {
+enum MatchKind
+{
     Exact,
     Prefix,
 }
@@ -44,13 +49,17 @@ const OWNED_RULES: &[(&str, OwnedArea, MatchKind)] = &[
 ];
 
 /// Classifies a `/`-separated project-relative path.
-pub fn classify(rel_unix: &str) -> Zone {
-    for (pattern, area, kind) in OWNED_RULES {
-        let matches = match kind {
+pub fn classify(rel_unix: &str) -> Zone
+{
+    for (pattern, area, kind) in OWNED_RULES
+    {
+        let matches = match kind
+        {
             MatchKind::Exact => rel_unix == *pattern,
             MatchKind::Prefix => rel_unix.starts_with(pattern),
         };
-        if matches {
+        if matches
+        {
             return Zone::Owned(*area);
         }
     }
@@ -58,7 +67,8 @@ pub fn classify(rel_unix: &str) -> Zone {
 }
 
 #[cfg(test)]
-mod tests {
+mod tests
+{
     use rstest::rstest;
 
     use super::*;
@@ -89,7 +99,8 @@ mod tests {
     #[case("plans/README.md", Zone::User)]
     #[case(".gitignore", Zone::User)]
     #[case("visuals/vibes/pseudopop.png", Zone::User)]
-    fn classification(#[case] rel: &str, #[case] expected: Zone) {
+    fn classification(#[case] rel: &str, #[case] expected: Zone)
+    {
         assert_eq!(classify(rel), expected);
     }
 }

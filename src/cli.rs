@@ -1,29 +1,31 @@
 //! The `exporgo` command-line interface. All interactivity (flags, prompts,
 //! printing) lives here so the library stays UI-free.
-
-use std::io::IsTerminal;
-use std::path::PathBuf;
-use std::process::ExitCode;
+use std::{io::IsTerminal, path::PathBuf, process::ExitCode};
 
 use clap::{Parser, Subcommand, ValueEnum};
 
-use crate::check::check;
-use crate::plan::{ChangeKind, PlannedChange};
-use crate::stamp::{NewOptions, stamp};
-use crate::tokens::{Token, TokenValues};
-use crate::update::{UpdateOptions, update};
+use crate::{
+    check::check,
+    plan::{ChangeKind, PlannedChange},
+    stamp::{NewOptions, stamp},
+    tokens::{Token, TokenValues},
+    update::{UpdateOptions, update},
+};
 
 #[derive(Parser)]
 #[command(version, about = "Stamp and maintain science-project workspaces")]
-struct Cli {
+struct Cli
+{
     #[command(subcommand)]
     command: Command,
 }
 
 #[derive(Subcommand)]
-enum Command {
+enum Command
+{
     /// Create a new project from the embedded template
-    New {
+    New
+    {
         /// Human project name; the folder name is its slug
         name: String,
         /// Parent directory to create the project in
@@ -58,23 +60,28 @@ enum Command {
         force: bool,
     },
     /// Report a project's drift from this binary's template
-    Check {
+    Check
+    {
         /// Project root (default: current directory)
         path: Option<PathBuf>,
     },
     /// Refresh a project's exporgo-owned files from this binary's template
-    Update {
+    Update
+    {
         /// Project root (default: current directory)
         path: Option<PathBuf>,
         /// Show what would change without writing anything
         #[arg(long)]
         dry_run: bool,
-        /// Only refresh .claude/skills/exporgo/ (leaves the manifest version alone)
+        /// Only refresh .claude/skills/exporgo/ (leaves the manifest version
+        /// alone)
         #[arg(long)]
         skills_only: bool,
     },
-    /// Two-hop, non-destructive folder sync (source <-> intermediate <-> destination)
-    Sync {
+    /// Two-hop, non-destructive folder sync (source <-> intermediate <->
+    /// destination)
+    Sync
+    {
         /// Project root whose exporgo.toml [sync] section supplies defaults
         /// (default: current directory)
         path: Option<PathBuf>,
@@ -87,7 +94,8 @@ enum Command {
         /// Sync destination folder (overrides the manifest)
         #[arg(long)]
         destination: Option<PathBuf>,
-        /// Forward: source -> intermediate -> destination; reverse runs the other way
+        /// Forward: source -> intermediate -> destination; reverse runs the
+        /// other way
         #[arg(long, value_enum, default_value_t = DirectionArg::Forward)]
         direction: DirectionArg,
         /// Extra file-name patterns to exclude (repeatable; * wildcards)
@@ -106,13 +114,15 @@ enum Command {
 }
 
 #[derive(Clone, Copy, ValueEnum)]
-enum DirectionArg {
+enum DirectionArg
+{
     Forward,
     Reverse,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
-enum Status {
+enum Status
+{
     Planning,
     Active,
     Analysis,
@@ -120,7 +130,8 @@ enum Status {
     Archived,
 }
 
-impl Status {
+impl Status
+{
     const ALL: [Status; 5] = [
         Status::Planning,
         Status::Active,
@@ -129,8 +140,10 @@ impl Status {
         Status::Archived,
     ];
 
-    fn as_str(self) -> &'static str {
-        match self {
+    fn as_str(self) -> &'static str
+    {
+        match self
+        {
             Status::Planning => "planning",
             Status::Active => "active",
             Status::Analysis => "analysis",
@@ -140,10 +153,13 @@ impl Status {
     }
 }
 
-/// Parses arguments, runs the command, prints the outcome, returns the exit code.
-pub fn run() -> ExitCode {
+/// Parses arguments, runs the command, prints the outcome, returns the exit
+/// code.
+pub fn run() -> ExitCode
+{
     let cli = Cli::parse();
-    let result = match cli.command {
+    let result = match cli.command
+    {
         Command::New {
             name,
             path,
@@ -203,18 +219,21 @@ pub fn run() -> ExitCode {
             log_dir,
         }),
     };
-    match result {
+    match result
+    {
         Ok(code) => code,
-        Err(e) => {
+        Err(e) =>
+        {
             eprintln!("error: {e}");
-            // Exit 2 for genuine errors, so scripts can tell "check found drift"
-            // (exit 1) from "the command itself failed".
+            // Exit 2 for genuine errors, so scripts can tell "check found
+            // drift" (exit 1) from "the command itself failed".
             ExitCode::from(2)
         }
     }
 }
 
-struct NewArgs {
+struct NewArgs
+{
     name: String,
     path: PathBuf,
     aim: Option<String>,
@@ -228,7 +247,8 @@ struct NewArgs {
     force: bool,
 }
 
-fn run_new(args: NewArgs) -> Result<ExitCode, crate::Error> {
+fn run_new(args: NewArgs) -> Result<ExitCode, crate::Error>
+{
     let values = resolve_tokens(&args);
     let report = stamp(&NewOptions {
         name: args.name,
@@ -243,13 +263,15 @@ fn run_new(args: NewArgs) -> Result<ExitCode, crate::Error> {
         report.files_written,
         report.dirs_created
     );
-    if !report.unfilled.is_empty() {
+    if !report.unfilled.is_empty()
+    {
         println!(
             "Unfilled tokens in context.md (fill by hand or leave for later): {}",
             report.unfilled.join(", ")
         );
     }
-    if let Some(warning) = report.git_warning {
+    if let Some(warning) = report.git_warning
+    {
         eprintln!("warning: {warning}");
     }
     Ok(ExitCode::SUCCESS)
@@ -257,7 +279,8 @@ fn run_new(args: NewArgs) -> Result<ExitCode, crate::Error> {
 
 /// Flags first; anything missing is prompted for unless prompting is disabled
 /// (`--no-input`, or stdin is not a terminal). Empty answers skip the token.
-fn resolve_tokens(args: &NewArgs) -> TokenValues {
+fn resolve_tokens(args: &NewArgs) -> TokenValues
+{
     let mut values = TokenValues::new();
     let from_flags = [
         (Token::OneLineAim, &args.aim),
@@ -266,17 +289,21 @@ fn resolve_tokens(args: &NewArgs) -> TokenValues {
         (Token::Owner, &args.owner),
         (Token::OwnerEmail, &args.email),
     ];
-    for (token, value) in from_flags {
-        if let Some(value) = value {
+    for (token, value) in from_flags
+    {
+        if let Some(value) = value
+        {
             values.insert(token, value.clone());
         }
     }
-    if let Some(status) = args.status {
+    if let Some(status) = args.status
+    {
         values.insert(Token::Status, status.as_str().to_string());
     }
 
     let interactive = !args.no_input && std::io::stdin().is_terminal();
-    if !interactive {
+    if !interactive
+    {
         return values;
     }
 
@@ -289,24 +316,30 @@ fn resolve_tokens(args: &NewArgs) -> TokenValues {
     values
 }
 
-fn prompt_text(values: &mut TokenValues, token: Token, label: &str) {
-    if values.contains_key(&token) {
+fn prompt_text(values: &mut TokenValues, token: Token, label: &str)
+{
+    if values.contains_key(&token)
+    {
         return;
     }
     let answer: Result<String, _> = dialoguer::Input::new()
         .with_prompt(format!("{label} (Enter to skip)"))
         .allow_empty(true)
         .interact_text();
-    if let Ok(answer) = answer {
+    if let Ok(answer) = answer
+    {
         let answer = answer.trim().to_string();
-        if !answer.is_empty() {
+        if !answer.is_empty()
+        {
             values.insert(token, answer);
         }
     }
 }
 
-fn prompt_status(values: &mut TokenValues) {
-    if values.contains_key(&Token::Status) {
+fn prompt_status(values: &mut TokenValues)
+{
+    if values.contains_key(&Token::Status)
+    {
         return;
     }
     let mut items: Vec<&str> = Status::ALL.iter().map(|s| s.as_str()).collect();
@@ -322,7 +355,8 @@ fn prompt_status(values: &mut TokenValues) {
     }
 }
 
-struct SyncArgs {
+struct SyncArgs
+{
     path: PathBuf,
     source: Option<PathBuf>,
     intermediate: Option<PathBuf>,
@@ -334,10 +368,14 @@ struct SyncArgs {
     log_dir: Option<PathBuf>,
 }
 
-/// Merges flags over the manifest's optional `[sync]` section; flags win per field.
-fn run_sync(args: SyncArgs) -> Result<ExitCode, crate::Error> {
-    use crate::manifest::Manifest;
-    use crate::sync::{Direction, SyncOptions, sync};
+/// Merges flags over the manifest's optional `[sync]` section; flags win per
+/// field.
+fn run_sync(args: SyncArgs) -> Result<ExitCode, crate::Error>
+{
+    use crate::{
+        manifest::Manifest,
+        sync::{Direction, SyncOptions, sync},
+    };
 
     let manifest = Manifest::load(&args.path).ok();
     let config = manifest.as_ref().and_then(|m| m.sync.as_ref());
@@ -358,7 +396,8 @@ fn run_sync(args: SyncArgs) -> Result<ExitCode, crate::Error> {
     .filter(|(_, absent)| *absent)
     .map(|(name, _)| *name)
     .collect();
-    if !missing.is_empty() {
+    if !missing.is_empty()
+    {
         return Err(crate::Error::SyncUnconfigured(missing.join(", ")));
     }
 
@@ -369,7 +408,8 @@ fn run_sync(args: SyncArgs) -> Result<ExitCode, crate::Error> {
         source: source.expect("checked above"),
         intermediate: intermediate.expect("checked above"),
         destination: destination.expect("checked above"),
-        direction: match args.direction {
+        direction: match args.direction
+        {
             DirectionArg::Forward => Direction::Forward,
             DirectionArg::Reverse => Direction::Reverse,
         },
@@ -379,13 +419,15 @@ fn run_sync(args: SyncArgs) -> Result<ExitCode, crate::Error> {
         log_dir: args.log_dir.unwrap_or_else(|| args.path.clone()),
     };
 
-    if options.mirror && !options.dry_run {
+    if options.mirror && !options.dry_run
+    {
         eprintln!("warning: --mirror DELETES files at the target that are absent from the source");
     }
 
     let report = sync(&options)?;
     println!("{}", report.summary);
-    if matches!(options.direction, Direction::Reverse) {
+    if matches!(options.direction, Direction::Reverse)
+    {
         println!("Reverse done: a cloud-drive client will now upload the source-side changes.");
     }
     println!("History: {}", report.history_log.display());
@@ -393,62 +435,83 @@ fn run_sync(args: SyncArgs) -> Result<ExitCode, crate::Error> {
     Ok(ExitCode::SUCCESS)
 }
 
-fn run_check(path: PathBuf) -> Result<ExitCode, crate::Error> {
+fn run_check(path: PathBuf) -> Result<ExitCode, crate::Error>
+{
     let report = check(&path)?;
-    if report.project_version == report.binary_version {
+    if report.project_version == report.binary_version
+    {
         println!("Template version: {} (current)", report.project_version);
-    } else if report.project_version > report.binary_version {
+    }
+    else if report.project_version > report.binary_version
+    {
         println!(
             "Template version: project {} is NEWER than this binary {} — download a newer release",
             report.project_version, report.binary_version
         );
-    } else {
+    }
+    else
+    {
         println!(
             "Template version: project {} → binary {}",
             report.project_version, report.binary_version
         );
     }
     print_changes("Update would apply", &report.changes);
-    if !report.unfilled_tokens.is_empty() {
+    if !report.unfilled_tokens.is_empty()
+    {
         println!(
             "Unfilled tokens in context.md: {}",
             report.unfilled_tokens.join(", ")
         );
     }
-    if !report.missing_dirs.is_empty() {
+    if !report.missing_dirs.is_empty()
+    {
         println!(
             "Missing standard directories: {}",
             report.missing_dirs.join(", ")
         );
     }
-    if report.is_clean() {
+    if report.is_clean()
+    {
         println!("Project is up to date.");
         Ok(ExitCode::SUCCESS)
-    } else {
+    }
+    else
+    {
         Ok(ExitCode::FAILURE)
     }
 }
 
-fn run_update(path: PathBuf, options: UpdateOptions) -> Result<ExitCode, crate::Error> {
+fn run_update(path: PathBuf, options: UpdateOptions) -> Result<ExitCode, crate::Error>
+{
     let dry_run = options.dry_run;
     let changes = update(&path, &options)?;
-    if dry_run {
+    if dry_run
+    {
         print_changes("Would apply", &changes);
-    } else if changes.is_empty() {
+    }
+    else if changes.is_empty()
+    {
         println!("Already up to date.");
-    } else {
+    }
+    else
+    {
         print_changes("Applied", &changes);
     }
     Ok(ExitCode::SUCCESS)
 }
 
-fn print_changes(heading: &str, changes: &[PlannedChange]) {
-    if changes.is_empty() {
+fn print_changes(heading: &str, changes: &[PlannedChange])
+{
+    if changes.is_empty()
+    {
         return;
     }
     println!("{heading} ({} files):", changes.len());
-    for change in changes {
-        let kind = match change.kind {
+    for change in changes
+    {
+        let kind = match change.kind
+        {
             ChangeKind::Create => "create",
             ChangeKind::Overwrite => "overwrite",
         };

@@ -4,7 +4,8 @@
 use assert_cmd::Command;
 
 #[test]
-fn version_prints_crate_version() {
+fn version_prints_crate_version()
+{
     Command::cargo_bin("exporgo")
         .unwrap()
         .arg("--version")
@@ -14,7 +15,8 @@ fn version_prints_crate_version() {
 }
 
 #[test]
-fn new_no_input_stamps_a_project() {
+fn new_no_input_stamps_a_project()
+{
     let dir = tempfile::tempdir().unwrap();
     Command::cargo_bin("exporgo")
         .unwrap()
@@ -27,7 +29,8 @@ fn new_no_input_stamps_a_project() {
 }
 
 #[test]
-fn update_outside_a_project_fails_with_message() {
+fn update_outside_a_project_fails_with_message()
+{
     let dir = tempfile::tempdir().unwrap();
     Command::cargo_bin("exporgo")
         .unwrap()
@@ -39,7 +42,8 @@ fn update_outside_a_project_fails_with_message() {
 }
 
 #[test]
-fn check_is_quietly_scriptable() {
+fn check_is_quietly_scriptable()
+{
     let dir = tempfile::tempdir().unwrap();
     Command::cargo_bin("exporgo")
         .unwrap()
@@ -47,7 +51,8 @@ fn check_is_quietly_scriptable() {
         .args(["--path", dir.path().to_str().unwrap()])
         .assert()
         .success();
-    // Fresh project has unfilled tokens, so check reports (exit 1) without erroring.
+    // Fresh project has unfilled tokens, so check reports (exit 1) without
+    // erroring.
     Command::cargo_bin("exporgo")
         .unwrap()
         .arg("check")

@@ -2,15 +2,17 @@
 
 use std::path::Path;
 
-use crate::error::Error;
-use crate::manifest::{Manifest, Version};
-use crate::plan::{PlannedChange, plan};
-use crate::template;
-use crate::tokens;
+use crate::{
+    error::Error,
+    manifest::{Manifest, Version},
+    plan::{PlannedChange, plan},
+    template, tokens,
+};
 
 /// Everything `check` found. Empty `changes`/`unfilled_tokens`/`missing_dirs`
 /// with matching versions means the project is clean.
-pub struct CheckReport {
+pub struct CheckReport
+{
     pub project_version: Version,
     pub binary_version: Version,
     /// Owned files `exporgo update` would create or overwrite.
@@ -21,9 +23,11 @@ pub struct CheckReport {
     pub missing_dirs: Vec<String>,
 }
 
-impl CheckReport {
+impl CheckReport
+{
     /// Whether there is nothing to report.
-    pub fn is_clean(&self) -> bool {
+    pub fn is_clean(&self) -> bool
+    {
         self.project_version == self.binary_version
             && self.changes.is_empty()
             && self.unfilled_tokens.is_empty()
@@ -31,12 +35,15 @@ impl CheckReport {
     }
 }
 
-/// Checks the project at `project_root`; errors if it is not an exporgo project.
-pub fn check(project_root: &Path) -> Result<CheckReport, Error> {
+/// Checks the project at `project_root`; errors if it is not an exporgo
+/// project.
+pub fn check(project_root: &Path) -> Result<CheckReport, Error>
+{
     let manifest = Manifest::load(project_root)?;
 
     let context_path = template::dest_path(project_root, template::CONTEXT_FILE);
-    let unfilled_tokens = match std::fs::read_to_string(&context_path) {
+    let unfilled_tokens = match std::fs::read_to_string(&context_path)
+    {
         Ok(text) => tokens::unfilled(&text),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
         Err(e) => return Err(Error::io(context_path)(e)),

@@ -1,14 +1,12 @@
 //! The project manifest, `exporgo.toml`.
 //!
 //! Its presence is what marks a directory as an exporgo project. It records the
-//! project name, the stamp date, the template version the project is on, and the
-//! token values that were filled at stamp time. The file belongs to exporgo:
-//! `update` rewrites it (bumping `template_version`), and hand-written comments
-//! are not preserved.
+//! project name, the stamp date, the template version the project is on, and
+//! the token values that were filled at stamp time. The file belongs to
+//! exporgo: `update` rewrites it (bumping `template_version`), and hand-written
+//! comments are not preserved.
 
-use std::fmt;
-use std::path::Path;
-use std::str::FromStr;
+use std::{fmt, path::Path, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
@@ -23,25 +21,31 @@ pub const FILE_NAME: &str = "exporgo.toml";
 #[serde(try_from = "String", into = "String")]
 pub struct Version(pub u64, pub u64, pub u64);
 
-impl Version {
+impl Version
+{
     /// The version this binary carries (== the embedded template's version).
-    pub fn current() -> Version {
+    pub fn current() -> Version
+    {
         crate::template::VERSION
             .parse()
             .expect("CARGO_PKG_VERSION is a valid x.y.z version")
     }
 }
 
-impl fmt::Display for Version {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for Version
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
         write!(f, "{}.{}.{}", self.0, self.1, self.2)
     }
 }
 
-impl FromStr for Version {
+impl FromStr for Version
+{
     type Err = String;
 
-    fn from_str(s: &str) -> Result<Version, String> {
+    fn from_str(s: &str) -> Result<Version, String>
+    {
         let mut parts = s.split('.');
         let mut component = |name: &str| -> Result<u64, String> {
             parts
@@ -55,37 +59,44 @@ impl FromStr for Version {
             component("minor")?,
             component("patch")?,
         );
-        if parts.next().is_some() {
+        if parts.next().is_some()
+        {
             return Err(format!("too many components in version '{s}'"));
         }
         Ok(version)
     }
 }
 
-impl TryFrom<String> for Version {
+impl TryFrom<String> for Version
+{
     type Error = String;
 
-    fn try_from(s: String) -> Result<Version, String> {
+    fn try_from(s: String) -> Result<Version, String>
+    {
         s.parse()
     }
 }
 
-impl From<Version> for String {
-    fn from(v: Version) -> String {
+impl From<Version> for String
+{
+    fn from(v: Version) -> String
+    {
         v.to_string()
     }
 }
 
 /// The contents of `exporgo.toml`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Manifest {
+pub struct Manifest
+{
     /// The project name as given to `exporgo new` (not the slug).
     pub project: String,
     /// Stamp date, `YYYY-MM-DD`, local time.
     pub created: String,
     /// The template version the project's owned files are on.
     pub template_version: Version,
-    /// Token values filled at stamp time, keyed by [`crate::tokens::Token::manifest_key`].
+    /// Token values filled at stamp time, keyed by
+    /// [`crate::tokens::Token::manifest_key`].
     #[serde(default)]
     pub tokens: std::collections::BTreeMap<String, String>,
     /// Optional standing configuration for `exporgo sync`, so a project can be
@@ -97,7 +108,8 @@ pub struct Manifest {
 /// The `[sync]` table of `exporgo.toml`: the three paths (and extra excludes)
 /// `exporgo sync` uses when flags don't override them.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SyncConfig {
+pub struct SyncConfig
+{
     pub source: String,
     pub intermediate: String,
     pub destination: String,
@@ -105,13 +117,18 @@ pub struct SyncConfig {
     pub exclude: Vec<String>,
 }
 
-impl Manifest {
-    /// Loads the manifest from `project_root`, or [`Error::NotAProject`] when absent.
-    pub fn load(project_root: &Path) -> Result<Manifest, Error> {
+impl Manifest
+{
+    /// Loads the manifest from `project_root`, or [`Error::NotAProject`] when
+    /// absent.
+    pub fn load(project_root: &Path) -> Result<Manifest, Error>
+    {
         let path = project_root.join(FILE_NAME);
-        let text = match std::fs::read_to_string(&path) {
+        let text = match std::fs::read_to_string(&path)
+        {
             Ok(text) => text,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound =>
+            {
                 return Err(Error::NotAProject(project_root.to_path_buf()));
             }
             Err(e) => return Err(Error::io(path)(e)),
@@ -123,7 +140,8 @@ impl Manifest {
     }
 
     /// Writes the manifest to `project_root`, replacing any existing file.
-    pub fn save(&self, project_root: &Path) -> Result<(), Error> {
+    pub fn save(&self, project_root: &Path) -> Result<(), Error>
+    {
         let path = project_root.join(FILE_NAME);
         let text = toml::to_string_pretty(self).map_err(|e| Error::Manifest {
             path: path.clone(),
@@ -133,13 +151,15 @@ impl Manifest {
     }
 
     /// Whether `path` contains a manifest file (cheap existence check).
-    pub fn exists(project_root: &Path) -> bool {
+    pub fn exists(project_root: &Path) -> bool
+    {
         project_root.join(FILE_NAME).is_file()
     }
 }
 
 #[cfg(test)]
-mod tests {
+mod tests
+{
     use pretty_assertions::assert_eq;
     use rstest::rstest;
 
@@ -152,24 +172,28 @@ mod tests {
     #[case("2.3.0.1", Err(()))]
     #[case("2.x.0", Err(()))]
     #[case("", Err(()))]
-    fn version_parsing(#[case] text: &str, #[case] expected: Result<Version, ()>) {
+    fn version_parsing(#[case] text: &str, #[case] expected: Result<Version, ()>)
+    {
         assert_eq!(text.parse::<Version>().map_err(|_| ()), expected);
     }
 
     #[test]
-    fn version_ordering_is_numeric_not_lexical() {
+    fn version_ordering_is_numeric_not_lexical()
+    {
         assert!(Version(2, 3, 0) < Version(2, 10, 0));
         assert!(Version(2, 3, 0) < Version(10, 0, 0));
         assert!(Version(2, 3, 1) > Version(2, 3, 0));
     }
 
     #[test]
-    fn current_version_parses() {
+    fn current_version_parses()
+    {
         assert_eq!(Version::current().to_string(), crate::template::VERSION);
     }
 
     #[test]
-    fn manifest_roundtrips_through_toml() {
+    fn manifest_roundtrips_through_toml()
+    {
         let manifest = Manifest {
             project: "Grid Cell Remapping".to_string(),
             created: "2026-09-13".to_string(),
@@ -189,7 +213,8 @@ mod tests {
     }
 
     #[test]
-    fn manifest_without_sync_section_loads_and_omits_it_on_save() {
+    fn manifest_without_sync_section_loads_and_omits_it_on_save()
+    {
         let manifest = Manifest {
             project: "Pilot".to_string(),
             created: "2026-09-13".to_string(),
@@ -205,7 +230,8 @@ mod tests {
     }
 
     #[test]
-    fn missing_manifest_is_not_a_project() {
+    fn missing_manifest_is_not_a_project()
+    {
         let dir = tempfile::tempdir().expect("tempdir");
         assert!(matches!(
             Manifest::load(dir.path()),
@@ -215,7 +241,8 @@ mod tests {
     }
 
     #[test]
-    fn garbage_manifest_is_a_manifest_error_not_not_a_project() {
+    fn garbage_manifest_is_a_manifest_error_not_not_a_project()
+    {
         let dir = tempfile::tempdir().expect("tempdir");
         std::fs::write(dir.path().join(FILE_NAME), "not = [valid").expect("write");
         assert!(matches!(

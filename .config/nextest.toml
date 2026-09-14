@@ -1,0 +1,27 @@
+[profile.standard]
+fail-fast = true
+#default-filter = "not test(integration)"
+retries = 0
+test-threads = 3
+threads-required = 3
+
+[profile.coverage]
+fail-fast = false
+#default-filter = "not test(integration)"
+retries = 0
+test-threads = 3
+threads-required = 3
+
+#[profile.integration]
+#fail-fast = true
+#default-filter = "test(integration"
+#retries = 0
+#test-threads = 3
+#threads-required = 3
+#
+#[profile.fuzzing]
+#fail-fast = true
+#default-filter = "test(fuzzing"
+#retries = 0
+#test-threads = 3
+#threads-required = 3

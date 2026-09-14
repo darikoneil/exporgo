@@ -1,12 +1,16 @@
-//! End-to-end tests for `exporgo sync`: two-hop copies through temp directories.
+//! End-to-end tests for `exporgo sync`: two-hop copies through temp
+//! directories.
 
 use std::path::{Path, PathBuf};
 
-use exporgo::error::Error;
-use exporgo::sync::{Direction, SyncOptions, sync};
+use exporgo::{
+    error::Error,
+    sync::{Direction, SyncOptions, sync},
+};
 use pretty_assertions::assert_eq;
 
-struct Fixture {
+struct Fixture
+{
     _dir: tempfile::TempDir,
     source: PathBuf,
     intermediate: PathBuf,
@@ -14,7 +18,8 @@ struct Fixture {
     logs: PathBuf,
 }
 
-fn fixture() -> Fixture {
+fn fixture() -> Fixture
+{
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().to_path_buf();
     let fixture = Fixture {
@@ -31,7 +36,8 @@ fn fixture() -> Fixture {
     fixture
 }
 
-fn options(f: &Fixture) -> SyncOptions {
+fn options(f: &Fixture) -> SyncOptions
+{
     SyncOptions {
         source: f.source.clone(),
         intermediate: f.intermediate.clone(),
@@ -45,11 +51,13 @@ fn options(f: &Fixture) -> SyncOptions {
 }
 
 #[test]
-fn forward_sync_copies_through_both_hops_and_skips_cruft() {
+fn forward_sync_copies_through_both_hops_and_skips_cruft()
+{
     let f = fixture();
     let report = sync(&options(&f)).expect("sync succeeds");
 
-    for root in [&f.intermediate, &f.destination] {
+    for root in [&f.intermediate, &f.destination]
+    {
         assert_eq!(
             std::fs::read_to_string(root.join("data.csv")).unwrap(),
             "a,b\n1,2\n"
@@ -66,7 +74,8 @@ fn forward_sync_copies_through_both_hops_and_skips_cruft() {
 }
 
 #[test]
-fn rerun_copies_nothing_and_newer_target_is_not_overwritten() {
+fn rerun_copies_nothing_and_newer_target_is_not_overwritten()
+{
     let f = fixture();
     sync(&options(&f)).unwrap();
 
@@ -87,7 +96,8 @@ fn rerun_copies_nothing_and_newer_target_is_not_overwritten() {
 }
 
 #[test]
-fn non_destructive_by_default_but_mirror_deletes_extras() {
+fn non_destructive_by_default_but_mirror_deletes_extras()
+{
     let f = fixture();
     sync(&options(&f)).unwrap();
 
@@ -105,7 +115,8 @@ fn non_destructive_by_default_but_mirror_deletes_extras() {
 }
 
 #[test]
-fn dry_run_changes_nothing() {
+fn dry_run_changes_nothing()
+{
     let f = fixture();
     let mut opts = options(&f);
     opts.dry_run = true;
@@ -116,14 +127,16 @@ fn dry_run_changes_nothing() {
     assert!(report.summary.contains("(dry run)"));
 }
 
-fn dir_is_empty(path: &Path) -> bool {
+fn dir_is_empty(path: &Path) -> bool
+{
     std::fs::read_dir(path)
         .map(|mut d| d.next().is_none())
         .unwrap_or(true)
 }
 
 #[test]
-fn missing_source_aborts_before_second_hop() {
+fn missing_source_aborts_before_second_hop()
+{
     let f = fixture();
     sync(&options(&f)).unwrap();
     let destination_before = std::fs::read_to_string(f.destination.join("data.csv")).unwrap();
@@ -143,7 +156,8 @@ fn missing_source_aborts_before_second_hop() {
 }
 
 #[test]
-fn reverse_direction_pulls_destination_back_to_source() {
+fn reverse_direction_pulls_destination_back_to_source()
+{
     let f = fixture();
     sync(&options(&f)).unwrap();
     std::fs::write(f.destination.join("from-dest.txt"), "made remotely").unwrap();
@@ -158,7 +172,8 @@ fn reverse_direction_pulls_destination_back_to_source() {
 }
 
 #[test]
-fn custom_excludes_apply() {
+fn custom_excludes_apply()
+{
     let f = fixture();
     std::fs::write(f.source.join("scratch.tmp"), "x").unwrap();
     let mut opts = options(&f);

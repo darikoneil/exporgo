@@ -1,17 +1,22 @@
-//! End-to-end library tests: stamp a project into a temp dir, mutate it, update it.
+//! End-to-end library tests: stamp a project into a temp dir, mutate it, update
+//! it.
 
 use std::path::{Path, PathBuf};
 
-use exporgo::error::Error;
-use exporgo::manifest::{Manifest, Version};
-use exporgo::plan::ChangeKind;
-use exporgo::stamp::{NewOptions, stamp};
-use exporgo::tokens::{Token, TokenValues};
-use exporgo::update::{UpdateOptions, update};
-use exporgo::{check, template};
+use exporgo::{
+    check,
+    error::Error,
+    manifest::{Manifest, Version},
+    plan::ChangeKind,
+    stamp::{NewOptions, stamp},
+    template,
+    tokens::{Token, TokenValues},
+    update::{UpdateOptions, update},
+};
 use pretty_assertions::assert_eq;
 
-fn options(name: &str, parent: &Path) -> NewOptions {
+fn options(name: &str, parent: &Path) -> NewOptions
+{
     let mut values = TokenValues::new();
     values.insert(Token::OneLineAim, "Does it remap?".to_string());
     values.insert(Token::Status, "active".to_string());
@@ -24,14 +29,16 @@ fn options(name: &str, parent: &Path) -> NewOptions {
     }
 }
 
-fn stamp_fresh(parent: &Path) -> PathBuf {
+fn stamp_fresh(parent: &Path) -> PathBuf
+{
     stamp(&options("Grid Cell Remapping", parent))
         .expect("stamp succeeds")
         .root
 }
 
 #[test]
-fn stamp_creates_a_complete_project() {
+fn stamp_creates_a_complete_project()
+{
     let dir = tempfile::tempdir().unwrap();
     let report = stamp(&options("Grid Cell Remapping", dir.path())).expect("stamp succeeds");
 
@@ -46,7 +53,8 @@ fn stamp_creates_a_complete_project() {
         Some("active")
     );
 
-    for standard_dir in template::STANDARD_DIRS {
+    for standard_dir in template::STANDARD_DIRS
+    {
         assert!(
             template::dest_path(&report.root, standard_dir).is_dir(),
             "missing standard dir {standard_dir}"
@@ -66,13 +74,15 @@ fn stamp_creates_a_complete_project() {
     for forbidden in [
         "HANDOFF.md",
         ".claude/skills/exporgo/code/agents/references",
-    ] {
+    ]
+    {
         assert!(!template::dest_path(&report.root, forbidden).exists());
     }
 }
 
 #[test]
-fn stamp_guards_against_collisions() {
+fn stamp_guards_against_collisions()
+{
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().join("grid-cell-remapping");
     std::fs::create_dir_all(&root).unwrap();
@@ -93,7 +103,8 @@ fn stamp_guards_against_collisions() {
 }
 
 #[test]
-fn update_restores_owned_and_leaves_user_files_alone() {
+fn update_restores_owned_and_leaves_user_files_alone()
+{
     let dir = tempfile::tempdir().unwrap();
     let root = stamp_fresh(dir.path());
 
@@ -129,7 +140,8 @@ fn update_restores_owned_and_leaves_user_files_alone() {
 }
 
 #[test]
-fn dry_run_and_skills_only_scope_correctly() {
+fn dry_run_and_skills_only_scope_correctly()
+{
     let dir = tempfile::tempdir().unwrap();
     let root = stamp_fresh(dir.path());
 
@@ -172,9 +184,11 @@ fn dry_run_and_skills_only_scope_correctly() {
 }
 
 #[test]
-fn stamp_rejects_bad_and_reserved_names() {
+fn stamp_rejects_bad_and_reserved_names()
+{
     let dir = tempfile::tempdir().unwrap();
-    for name in ["!!!", "CON", "lpt7"] {
+    for name in ["!!!", "CON", "lpt7"]
+    {
         let refused = stamp(&options(name, dir.path()));
         assert!(
             matches!(refused, Err(Error::BadSlug(_))),
@@ -184,7 +198,8 @@ fn stamp_rejects_bad_and_reserved_names() {
 }
 
 #[test]
-fn update_bumps_an_older_version_and_skills_only_does_not() {
+fn update_bumps_an_older_version_and_skills_only_does_not()
+{
     let dir = tempfile::tempdir().unwrap();
     let root = stamp_fresh(dir.path());
 
@@ -223,15 +238,19 @@ fn update_bumps_an_older_version_and_skills_only_does_not() {
 }
 
 #[test]
-fn check_ignores_line_ending_differences() {
+fn check_ignores_line_ending_differences()
+{
     let dir = tempfile::tempdir().unwrap();
     let root = stamp_fresh(dir.path());
 
     // Rewrite an owned file with the opposite line endings from the embed.
     let embedded = std::str::from_utf8(template::file_contents("CLAUDE.md").unwrap()).unwrap();
-    let flipped = if embedded.contains("\r\n") {
+    let flipped = if embedded.contains("\r\n")
+    {
         embedded.replace("\r\n", "\n")
-    } else {
+    }
+    else
+    {
         embedded.replace('\n', "\r\n")
     };
     std::fs::write(root.join("CLAUDE.md"), flipped).unwrap();
@@ -245,7 +264,8 @@ fn check_ignores_line_ending_differences() {
 }
 
 #[test]
-fn update_refuses_project_from_a_newer_template() {
+fn update_refuses_project_from_a_newer_template()
+{
     let dir = tempfile::tempdir().unwrap();
     let root = stamp_fresh(dir.path());
 
@@ -264,7 +284,8 @@ fn update_refuses_project_from_a_newer_template() {
 }
 
 #[test]
-fn update_outside_a_project_is_refused() {
+fn update_outside_a_project_is_refused()
+{
     let dir = tempfile::tempdir().unwrap();
     let refused = update(
         dir.path(),
@@ -277,7 +298,8 @@ fn update_outside_a_project_is_refused() {
 }
 
 #[test]
-fn check_reports_drift_and_cleanliness() {
+fn check_reports_drift_and_cleanliness()
+{
     let dir = tempfile::tempdir().unwrap();
     let root = stamp_fresh(dir.path());
 
@@ -285,7 +307,8 @@ fn check_reports_drift_and_cleanliness() {
     assert!(fresh.changes.is_empty());
     assert!(fresh.missing_dirs.is_empty());
     assert_eq!(fresh.project_version, fresh.binary_version);
-    // REPO_URL etc. were skipped at stamp time, so a fresh project is not "clean".
+    // REPO_URL etc. were skipped at stamp time, so a fresh project is not
+    // "clean".
     assert!(!fresh.unfilled_tokens.is_empty());
     assert!(!fresh.is_clean());
 

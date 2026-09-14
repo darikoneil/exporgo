@@ -7,12 +7,15 @@
 
 use std::path::Path;
 
-use crate::error::Error;
-use crate::template;
-use crate::zones::{OwnedArea, Zone, classify};
+use crate::{
+    error::Error,
+    template,
+    zones::{OwnedArea, Zone, classify},
+};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum ChangeKind {
+pub enum ChangeKind
+{
     /// The file does not exist in the project yet.
     Create,
     /// The project's copy differs from the embedded template's.
@@ -20,7 +23,8 @@ pub enum ChangeKind {
 }
 
 #[derive(Clone, Debug)]
-pub struct PlannedChange {
+pub struct PlannedChange
+{
     /// Project-relative, `/`-separated path.
     pub rel: String,
     pub kind: ChangeKind,
@@ -29,19 +33,24 @@ pub struct PlannedChange {
 /// Diffs the embedded owned-zone files against the project.
 ///
 /// `skills_only` restricts the plan to `.claude/skills/exporgo/`.
-pub fn plan(project_root: &Path, skills_only: bool) -> Result<Vec<PlannedChange>, Error> {
+pub fn plan(project_root: &Path, skills_only: bool) -> Result<Vec<PlannedChange>, Error>
+{
     let mut changes = Vec::new();
-    for (rel, embedded) in template::files() {
-        let in_scope = match classify(rel) {
+    for (rel, embedded) in template::files()
+    {
+        let in_scope = match classify(rel)
+        {
             Zone::Owned(OwnedArea::SkillsExporgo) => true,
             Zone::Owned(_) => !skills_only,
             Zone::User => false,
         };
-        if !in_scope {
+        if !in_scope
+        {
             continue;
         }
         let destination = template::dest_path(project_root, rel);
-        let kind = match std::fs::read(&destination) {
+        let kind = match std::fs::read(&destination)
+        {
             Ok(existing) if normalized_eq(embedded, &existing) => continue,
             Ok(_) => ChangeKind::Overwrite,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => ChangeKind::Create,
@@ -58,9 +67,12 @@ pub fn plan(project_root: &Path, skills_only: bool) -> Result<Vec<PlannedChange>
 /// Content equality that ignores CRLF/LF differences on text, so a binary built
 /// from a LF checkout never flags a Windows-stamped project as changed.
 /// Non-UTF-8 content (images) is compared byte-for-byte.
-pub fn normalized_eq(a: &[u8], b: &[u8]) -> bool {
-    match (std::str::from_utf8(a), std::str::from_utf8(b)) {
-        (Ok(a), Ok(b)) => {
+pub fn normalized_eq(a: &[u8], b: &[u8]) -> bool
+{
+    match (std::str::from_utf8(a), std::str::from_utf8(b))
+    {
+        (Ok(a), Ok(b)) =>
+        {
             let a = a.replace("\r\n", "\n");
             let b = b.replace("\r\n", "\n");
             a == b
@@ -70,7 +82,8 @@ pub fn normalized_eq(a: &[u8], b: &[u8]) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
+mod tests
+{
     use rstest::rstest;
 
     use super::*;
@@ -81,7 +94,8 @@ mod tests {
     #[case(b"a\nb\n", b"a\nc\n", false)]
     #[case(&[0xFF, 0x0A], &[0xFF, 0x0A], true)]
     #[case(&[0xFF, 0x0D, 0x0A], &[0xFF, 0x0A], false)]
-    fn normalized_equality(#[case] a: &[u8], #[case] b: &[u8], #[case] expected: bool) {
+    fn normalized_equality(#[case] a: &[u8], #[case] b: &[u8], #[case] expected: bool)
+    {
         assert_eq!(normalized_eq(a, b), expected);
     }
 }
