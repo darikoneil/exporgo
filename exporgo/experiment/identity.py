@@ -1,6 +1,6 @@
-"""A study's coordinate system and its concrete addresses.
+"""An experiment's coordinate system and its concrete addresses.
 
-A study is organized along a small set of named axes — its :class:`IdentitySchema`,
+An experiment is organized along a small set of named axes — its :class:`IdentitySchema`,
 an ordered 1-3 :class:`IdentityKey`s (default ``["Subject"]``). A concrete point in
 that system is an :class:`Identity` (e.g. ``Subject="m01", Session=1``), which the
 datastore uses as its partition path and the monitoring layer tracks. Narrowing
@@ -26,22 +26,56 @@ type IdentityValue = str | int | bool
 type DType = Literal["str", "int", "bool"]
 """Allowed identity-key dtype labels (strings, so they round-trip through config)."""
 
+_BOOL_TEXT: dict[str, bool] = {"true": True, "1": True, "false": False, "0": False}
+"""Text spellings accepted for a ``bool`` identity value (lowercased before lookup)."""
+
+
+def _coerce_bool(value: IdentityValue) -> bool:
+    """Parse a value as a boolean identity value.
+
+    Actual booleans pass through; anything else is matched textually,
+    case-insensitively, against ``{"true", "1"}`` -> ``True`` and
+    ``{"false", "0"}`` -> ``False`` (so the string ``"False"`` parses as ``False``,
+    unlike Python's ``bool()`` builtin, for which any non-empty string is truthy).
+
+    Args:
+        value: The value to parse (a ``bool``, or something with a boolean spelling,
+            e.g. the string ``"false"`` read back from a partition path or the int ``0``).
+
+    Returns:
+        The parsed boolean.
+
+    Raises:
+        ValueError: If the value has no recognized boolean spelling.
+    """
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in _BOOL_TEXT:
+        return _BOOL_TEXT[text]
+    msg = (
+        f"Cannot parse {value!r} as a bool identity value; expected a bool or one of "
+        f"'true'/'false'/'1'/'0' (case-insensitive)."
+    )
+    raise ValueError(msg)
+
+
 _COERCERS: dict[str, Callable[..., IdentityValue]] = {
     "str": str,
     "int": int,
-    "bool": bool,
+    "bool": _coerce_bool,
 }
 """Maps each dtype label to the callable that coerces a value to it."""
 
 
 class IdentityKey(BaseModel):
-    """A named, typed axis of a study's identity (e.g. ``Subject``, ``Session``).
+    """A named, typed axis of an experiment's identity (e.g. ``Subject``, ``Session``).
 
     Attributes:
         name: The axis name, used as the keyword when addressing an identity and as the
             Hive partition key on disk.
         dtype: The value type — one of ``"str"``, ``"int"``, ``"bool"``; stored as a
-            string label so it round-trips through ``study.json``.
+            string label so it round-trips through ``experiment.json``.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -66,7 +100,7 @@ class IdentityKey(BaseModel):
 
 
 class IdentitySchema(BaseModel):
-    """An ordered set of 1-3 identity keys — a study's coordinate system."""
+    """An ordered set of 1-3 identity keys — an experiment's coordinate system."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
@@ -93,7 +127,7 @@ class IdentitySchema(BaseModel):
         """Enforce the 1-3 key bound and unique key names."""
         count = len(self.keys)
         if not _MIN_KEYS <= count <= _MAX_KEYS:
-            msg = f"A study needs {_MIN_KEYS}-{_MAX_KEYS} identity keys, got {count}."
+            msg = f"An experiment needs {_MIN_KEYS}-{_MAX_KEYS} identity keys, got {count}."
             raise ValueError(msg)
         names = [key.name for key in self.keys]
         if len(set(names)) != len(names):
@@ -145,11 +179,11 @@ class IdentitySchema(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class Identity:
-    """One concrete address in a study's identity coordinate system.
+    """One concrete address in an experiment's identity coordinate system.
 
     Immutable and hashable, so an identity can index dictionaries and sets. Its
     :meth:`as_path` rendering *is* the datastore partition path, so the identity you
-    register, query, and attach data to lines up across the study and datastore layers.
+    register, query, and attach data to lines up across the experiment and datastore layers.
 
     Attributes:
         keys: The identity key names, in schema order.
@@ -166,8 +200,10 @@ class Identity:
     def as_path(self) -> str:
         """Render as a Hive-style partition path fragment (``key=value/…``).
 
-        This is exactly the sub-path the datastore partitions on, so resource paths and
-        store partitions for the same identity line up on disk.
+        This is the sub-path the datastore partitions on, so resource paths and store
+        partitions for the same identity line up on disk. Values render raw (as the
+        user wrote them); on disk the datastore percent-encodes special characters
+        (spaces, ``#``, ``%``, ...) the way pyarrow's Hive writer does.
 
         Returns:
             The path fragment, e.g. ``"Subject=m01/Session=1"``.

@@ -1,17 +1,17 @@
-"""Resources and dumps: the files a study reads but does not own.
+"""Resources and dumps: the files an experiment reads but does not own.
 
 Two components sit here. They differ in how many paths each one answers for, and in how
 it learns them.
 
 A :class:`ResourceSpec` declares a kind of data on disk (``"raw"``, ``"suite2p"``,
 ``"behavior"``) and carries a path template over the identity keys (using any subset of
-them). A :class:`Resource` binds such a spec to a study root and identity schema so
+them). A :class:`Resource` binds such a spec to an experiment root and identity schema so
 callers can resolve concrete paths and check their existence for given identity values --
 one *derived* path per identity, a file or a folder.
 
-A :class:`Dump` instead *records* many paths: one study-global root and the files under it,
+A :class:`Dump` instead *records* many paths: one experiment-global root and the files under it,
 keyed by each file's path relative to that root (``atlas/annotation.nrrd``), for assets that
-belong to the whole study rather than to any one identity -- an atlas, a README, a shared
+belong to the whole experiment rather than to any one identity -- an atlas, a README, a shared
 lookup table. Nothing is copied or created on disk; the index persists to a sidecar JSON in
 the dump's own directory. Files are looked up by an exact relative-path key or a glob: any
 selector containing ``*`` is treated as an :mod:`fnmatch` pattern (where ``*`` crosses ``/``,
@@ -34,7 +34,7 @@ from typing import ClassVar
 from pydantic import BaseModel, ConfigDict, Field
 
 from exporgo._atomic import atomic_write_text
-from exporgo.study.identity import Identity, IdentitySchema, IdentityValue
+from exporgo.experiment.identity import Identity, IdentitySchema, IdentityValue
 
 __all__ = ["Dump", "Resource", "ResourceSpec"]
 
@@ -95,10 +95,10 @@ def _template_to_regex(template: str) -> re.Pattern[str]:
 class ResourceSpec(BaseModel):
     """A named file/folder expected at each identity, located by a path template.
 
-    The template uses ``{KeyName}`` placeholders drawn from the study's identity keys
+    The template uses ``{KeyName}`` placeholders drawn from the experiment's identity keys
     (any subset), e.g. ``"{Subject}/{Session}/suite2p/plane0/F.npy"``. A template with
     no placeholders resolves to the same path for every identity. This is the resource
-    *declaration*; bind it to a study root with :class:`Resource` to resolve paths.
+    *declaration*; bind it to an experiment root with :class:`Resource` to resolve paths.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -120,7 +120,7 @@ class ResourceSpec(BaseModel):
         """Resolve this resource to a concrete path under ``root`` for ``identity``.
 
         Args:
-            root: The study root directory.
+            root: The experiment root directory.
             identity: The identity supplying values for the template placeholders.
 
         Returns:
@@ -142,12 +142,12 @@ class ResourceSpec(BaseModel):
 
 
 class Resource:
-    """A resource declaration bound to a study root and identity schema.
+    """A resource declaration bound to an experiment root and identity schema.
 
-    Pairs a :class:`ResourceSpec` with the study root and identity schema needed to turn
+    Pairs a :class:`ResourceSpec` with the experiment root and identity schema needed to turn
     identity values into concrete paths, so it is the resource counterpart of the
     datastore's :class:`~exporgo.datastore.store.Store`. Obtain one via
-    :meth:`~exporgo.study.study.Study.resource`; the study supplies the root and schema.
+    :meth:`~exporgo.experiment.experiment.Experiment.resource`; the experiment supplies the root and schema.
     """
 
     def __init__(
@@ -155,18 +155,24 @@ class Resource:
         root: str | Path,
         spec: ResourceSpec,
         schema: IdentitySchema,
+        *,
+        exclude: frozenset[str] = frozenset(),
     ) -> None:
-        """Bind a resource spec to a study root and identity schema.
+        """Bind a resource spec to an experiment root and identity schema.
 
         Args:
-            root: The study root directory the template resolves against.
+            root: The experiment root directory the template resolves against.
             spec: The resource declaration (name + path template).
-            schema: The study's identity schema, used to validate and coerce the identity
+            schema: The experiment's identity schema, used to validate and coerce the identity
                 values passed to :meth:`path` / :meth:`exists`.
+            exclude: Top-level names under ``root`` that belong to the experiment itself (its
+                manifest JSON, entity sidecar, log directory, and declared store/dump
+                directories); :meth:`discover` never treats them as identity candidates.
         """
         self.root: Path = Path(root)
         self.spec = spec
         self.schema = schema
+        self.exclude = exclude
 
     def path(self, **values: IdentityValue) -> Path:
         """Resolve this resource's on-disk path for the given identity values.
@@ -176,7 +182,7 @@ class Resource:
                 ``Subject="m01", Session=1``); each is coerced to its key's dtype.
 
         Returns:
-            The resolved path under the study root, returned whether or not it exists.
+            The resolved path under the experiment root, returned whether or not it exists.
 
         Raises:
             ValueError: If a key is missing or an unexpected key is supplied.
@@ -200,11 +206,13 @@ class Resource:
     def discover(self) -> set[Identity]:
         """Reverse-resolve the template to find which identities exist on disk.
 
-        The inverse of :meth:`path`: scans the study root for paths matching the template
+        The inverse of :meth:`path`: scans the experiment root for paths matching the template
         and reads each placeholder's value back out, yielding an open-world inventory of
         what is physically present (including unregistered identities). A subset-key
         template yields **partial** identities; a constant template yields an empty set.
-        Captured segments are coerced to their key's dtype via the schema.
+        Captured segments are coerced to their key's dtype via the schema; a candidate
+        whose captured segment cannot coerce (e.g. ``"notes"`` for an ``int`` key) is
+        not that identity and is skipped rather than raising.
 
         Returns:
             The identities physically present on disk, one per matching path (files and
@@ -223,12 +231,20 @@ class Resource:
         found: set[Identity] = set()
         for candidate in self.root.glob(_template_to_glob(self.spec.template)):
             relative = candidate.relative_to(self.root).as_posix()
+            first_segment, _, _ = relative.partition("/")
+            if first_segment in self.exclude:
+                continue  # the experiment's own file/directory, never an identity
             match = pattern.fullmatch(relative)
             if match is None:
                 continue
-            values = tuple(
-                key_by_name[name].coerce(match.group(name)) for name in placeholders
-            )
+            try:
+                values = tuple(
+                    key_by_name[name].coerce(match.group(name)) for name in placeholders
+                )
+            except ValueError:
+                # A captured segment that cannot coerce to its key's dtype (e.g. "notes"
+                # for an int Session) is not that identity -- skip the candidate.
+                continue
             found.add(Identity(keys=placeholders, values=values))
         return found
 
@@ -334,26 +350,26 @@ def _all_present(files: Mapping[str, str]) -> bool:
 
 
 class _DumpDocument(BaseModel):
-    """The persisted content of a dump: a study-global root and its relative-path-keyed files."""
+    """The persisted content of a dump: an experiment-global root and its relative-path-keyed files."""
 
     root: str | None = None
     files: dict[str, str] = Field(default_factory=dict)
 
 
 class Dump:
-    """A study-global index of files, keyed by path relative to a single root.
+    """An experiment-global index of files, keyed by path relative to a single root.
 
     Where a :class:`Resource` derives one path per identity, a dump records many paths that
     belong to no identity at all: one root and one relative-path-keyed file set for the whole
-    study, for assets that are shared rather than per-subject (an atlas, a README, a shared
-    lookup table). Obtain one via :meth:`~exporgo.study.study.Study.dump`.
+    experiment, for assets that are shared rather than per-subject (an atlas, a README, a shared
+    lookup table). Obtain one via :meth:`~exporgo.experiment.experiment.Experiment.dump`.
     """
 
     def __init__(self, directory: str | Path, name: str) -> None:
         """Bind a dump to its directory and name.
 
         Args:
-            directory: The dump's directory (``<study_root>/<name>``); its sidecar
+            directory: The dump's directory (``<experiment_root>/<name>``); its sidecar
                 ``_dump.json`` lives here.
             name: The dump's name.
         """
@@ -391,7 +407,7 @@ class Dump:
 
         Args:
             directory: The folder to index (the dump's root). Defaults to the dump's own
-                directory (``<study_root>/<name>``).
+                directory (``<experiment_root>/<name>``).
             pattern: Glob selecting which files to index (``"*"`` for all).
             recursive: Whether to descend into subdirectories.
 
@@ -409,7 +425,7 @@ class Dump:
         return {key: Path(value) for key, value in found.items()}
 
     def record(self, path: str | Path, *, name: str | None = None) -> Path:
-        """Pin a single study-global file under an explicit key.
+        """Pin a single experiment-global file under an explicit key.
 
         Args:
             path: The file's location (stored as-given; not required to exist; never copied).

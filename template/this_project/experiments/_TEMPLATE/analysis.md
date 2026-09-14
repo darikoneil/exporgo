@@ -1,4 +1,4 @@
-# Analysis / pipeline: <experiment name>
+# Analysis / pipeline: {{EXPERIMENT_NAME}}
 
 How raw data becomes a result. Describe the pipeline an agent should follow or reproduce — the
 shape and the decisions, not the code itself (code lives in the repo, see `resources.md`).

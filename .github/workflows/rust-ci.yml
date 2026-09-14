@@ -32,11 +32,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      # rustfmt.toml uses nightly-only options (brace_style = "AlwaysNextLine"),
+      # so formatting is checked on nightly; clippy and tests stay on stable.
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
+          components: clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --check
+      - run: cargo +nightly fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
       # The library must stay buildable without the CLI (for a future GUI).

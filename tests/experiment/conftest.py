@@ -1,6 +1,6 @@
-"""Shared fixtures for the study tests.
+"""Shared fixtures for the experiment tests.
 
-Study logging attaches real loguru sinks (via ``init_logger``) to the process-global
+Experiment logging attaches real loguru sinks (via ``init_logger``) to the process-global
 logger; this fixture resets that global state around every test so sinks created by one
 test never leak into another or keep pointing at a deleted temporary directory.
 """

@@ -11,15 +11,18 @@ leaving orchestration to your code or an LLM agent.
 - **logging** (base install, `loguru` only) — a reusable logging framework:
   parameterized console + rotating file/exception sinks and logging decorators
   that any project can drive via `init_logger(name="my_project", ...)`.
-- **study** (base install, adds `pydantic`) — the Study & Identity model: a
-  study's identity coordinate system (1–3 keys, default `Subject`), the resources
-  (files/folders) it expects at each identity, and file-existence self-validation.
-  Declarations persist to `study.json` (with registered identities in an
-  `entities.jsonl` sidecar) and reload via `Study.load(root)`. Saving a study also wires
-  up logging into `<root>/.logs/` (a per-writer log, merged on read), so every study
-  gets logging for free.
+- **experiment** (base install, adds `pydantic`) — the Experiment & Identity model.
+  An experiment is the data-side unit living at the data root on the lab server:
+  one root, one identity coordinate system (1–3 keys, default `Subject`), one
+  store catalog, plus the resources (files/folders) it expects at each identity
+  and file-existence self-validation. Declarations persist to `experiment.json`
+  (with registered identities in an `entities.jsonl` sidecar) and reload via
+  `Experiment.load(root)`. Saving an experiment also wires up logging into
+  `<root>/.logs/` (a per-writer log, merged on read), so every experiment gets
+  logging for free. A workspace's `experiments/<name>/` folder (Rust CLI side)
+  merely points at that data root.
 - **datastore** (`exporgo[datastore]`, adds `polars`/`pyarrow`/`numpy`) — fast,
-  schema-enforced polars/Parquet component stores for a study's bulk data
+  schema-enforced polars/Parquet component stores for an experiment's bulk data
   (behavior, neural, …), Hive-partitioned on the identity keys, with lazy,
   partition-pruned retrieval and append / overwrite-by-key writes.
 - **monitoring** (`exporgo[monitor]`) — progress *derived* from the filesystem
@@ -39,6 +42,7 @@ exporgo new "Grid Cell Remapping" --aim "..." --data-root "\\ktdata\snlkt\..."  
 exporgo check    # report drift from this binary's template
 exporgo update   # refresh exporgo-owned files; never touches project content
 exporgo sync     # two-hop non-destructive data sync (paths from exporgo.toml [sync])
+exporgo experiment new "Remap Pilot"   # stamp experiments/_TEMPLATE/, derive the data-root pointer
 ```
 
 ## Installation
@@ -49,7 +53,7 @@ For development, using [uv](https://docs.astral.sh/uv/):
 uv sync
 ```
 
-The base install includes the study layer. Add the datastore extra as needed:
+The base install includes the experiment layer. Add the datastore extra as needed:
 
 ```bash
 uv add "exporgo[datastore]"  # polars/Parquet datastore

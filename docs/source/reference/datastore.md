@@ -18,7 +18,7 @@ partition-prunable {class}`polars.LazyFrame`. Reach for one for rows you want to
 identities — see [Write to a store](../how-to/write-to-a-store).
 
 ```python
-store = study.store("behavior")
+store = experiment.store("behavior")
 store.write(frame, mode="unique")
 store.scan().filter(pl.col("Subject") == "m01").collect()
 ```
@@ -49,7 +49,7 @@ and timestamps. The only length constraint is within a single array: a labelled 
 coordinate vector must match that array's size on its axis.
 
 ```python
-store = study.array_store("neural")
+store = experiment.array_store("neural")
 store.write(traces, coords={"unit": units, "time": timestamps}, Subject="m01", Session=1)
 neural = store.load(Subject="m01", Session=1)   # an xarray.DataArray
 ```

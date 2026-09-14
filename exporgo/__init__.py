@@ -3,11 +3,11 @@
 The successor to the original ``exporgo``. This version is layered:
 
 - **logging** (base install): a reusable :mod:`loguru`-based logging framework.
-- **study** (base install): the Study & Identity model — a study's identity
+- **experiment** (base install): the Experiment & Identity model — an experiment's identity
   coordinate system (1-3 keys, default ``Subject``), the resources it expects at each
   identity, and file-existence self-validation.
 - **datastore** (``exporgo[datastore]``): fast, schema-enforced polars/Parquet
-  component stores for a study's bulk data, Hive-partitioned on the identity keys.
+  component stores for an experiment's bulk data, Hive-partitioned on the identity keys.
 - **monitoring** (``exporgo[monitor]``): progress *derived* from the filesystem,
   rendered into an agent-readable map (planned).
 

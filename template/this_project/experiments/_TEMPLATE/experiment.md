@@ -1,4 +1,4 @@
-# Experiment: <name>
+# Experiment: {{EXPERIMENT_NAME}}
 
 The scientific core of this experiment. Keep it self-contained: someone (or an agent) should be
 able to read this one file and know what the experiment asks and why.

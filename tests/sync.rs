@@ -86,7 +86,8 @@ fn rerun_copies_nothing_and_newer_target_is_not_overwritten()
     // A target file *newer* than the source must be left alone (robocopy /XO).
     let dest_file = f.destination.join("data.csv");
     std::fs::write(&dest_file, "newer content").unwrap();
-    let future = filetime::FileTime::from_unix_time(filetime::FileTime::now().seconds() + 3600, 0);
+    let future =
+        filetime::FileTime::from_unix_time(filetime::FileTime::now().unix_seconds() + 3600, 0);
     filetime::set_file_mtime(&dest_file, future).unwrap();
     sync(&options(&f)).unwrap();
     assert_eq!(
@@ -168,6 +169,130 @@ fn reverse_direction_pulls_destination_back_to_source()
     assert_eq!(
         std::fs::read_to_string(f.source.join("from-dest.txt")).unwrap(),
         "made remotely"
+    );
+}
+
+#[test]
+fn newer_source_files_propagate()
+{
+    let f = fixture();
+    sync(&options(&f)).unwrap();
+
+    // Update the source and push its mtime clearly past the 2-second slack.
+    let source_file = f.source.join("data.csv");
+    std::fs::write(&source_file, "a,b\n9,9\n").unwrap();
+    let dest_time = filetime::FileTime::from_last_modification_time(
+        &std::fs::metadata(f.destination.join("data.csv")).unwrap(),
+    );
+    filetime::set_file_mtime(
+        &source_file,
+        filetime::FileTime::from_unix_time(dest_time.unix_seconds() + 10, 0),
+    )
+    .unwrap();
+
+    let report = sync(&options(&f)).unwrap();
+    assert_eq!(report.hops[0].copied, 1);
+    assert_eq!(report.hops[1].copied, 1);
+    assert_eq!(
+        std::fs::read_to_string(f.destination.join("data.csv")).unwrap(),
+        "a,b\n9,9\n"
+    );
+}
+
+#[test]
+fn copies_preserve_source_mtime()
+{
+    let f = fixture();
+    sync(&options(&f)).unwrap();
+    let source_time = filetime::FileTime::from_last_modification_time(
+        &std::fs::metadata(f.source.join("data.csv")).unwrap(),
+    );
+    for root in [&f.intermediate, &f.destination]
+    {
+        let copied_time = filetime::FileTime::from_last_modification_time(
+            &std::fs::metadata(root.join("data.csv")).unwrap(),
+        );
+        assert_eq!(copied_time, source_time, "mtime must survive the copy");
+    }
+}
+
+#[test]
+fn two_second_slack_is_respected()
+{
+    let f = fixture();
+    sync(&options(&f)).unwrap();
+    let source_file = f.source.join("data.csv");
+    let target_time = filetime::FileTime::from_last_modification_time(
+        &std::fs::metadata(f.intermediate.join("data.csv")).unwrap(),
+    );
+
+    // 1 second newer: within slack, must not copy.
+    filetime::set_file_mtime(
+        &source_file,
+        filetime::FileTime::from_unix_time(target_time.unix_seconds() + 1, 0),
+    )
+    .unwrap();
+    let report = sync(&options(&f)).unwrap();
+    let detail = std::fs::read_to_string(f.logs.join("_sync_detail.log")).unwrap();
+    assert_eq!(
+        report.hops[0].copied, 0,
+        "within-slack change must be skipped; detail log:\n{detail}"
+    );
+
+    // 5 seconds newer: past slack, must copy.
+    filetime::set_file_mtime(
+        &source_file,
+        filetime::FileTime::from_unix_time(target_time.unix_seconds() + 5, 0),
+    )
+    .unwrap();
+    let report = sync(&options(&f)).unwrap();
+    assert_eq!(report.hops[0].copied, 1, "past-slack change must be copied");
+}
+
+#[test]
+fn overlapping_paths_are_rejected()
+{
+    let f = fixture();
+
+    let mut nested = options(&f);
+    nested.intermediate = f.source.join("_mirror");
+    assert!(matches!(sync(&nested), Err(Error::SyncPathsOverlap { .. })));
+    assert!(!f.source.join("_mirror").exists(), "nothing was created");
+
+    let mut same = options(&f);
+    same.destination = f.source.clone();
+    assert!(matches!(sync(&same), Err(Error::SyncPathsOverlap { .. })));
+}
+
+#[test]
+fn failed_run_still_writes_a_history_line()
+{
+    let f = fixture();
+    std::fs::remove_dir_all(&f.source).unwrap();
+    let refused = sync(&options(&f));
+    assert!(matches!(refused, Err(Error::SyncSourceMissing(_))));
+    let history = std::fs::read_to_string(f.logs.join("_sync_history.log")).unwrap();
+    assert!(
+        history.contains("FAIL"),
+        "audit trail must record failed runs: {history}"
+    );
+}
+
+#[test]
+fn mirror_never_deletes_the_log_directory()
+{
+    let f = fixture();
+    let mut opts = options(&f);
+    // Logs live inside the destination — the case where a mirror pass would
+    // otherwise see them as extras and delete the open log directory.
+    opts.log_dir = f.destination.join("_logs");
+    opts.mirror = true;
+    sync(&opts).unwrap();
+    let report = sync(&opts).unwrap();
+    assert!(opts.log_dir.join("_sync_history.log").is_file());
+    assert_eq!(
+        report.hops[1].deleted, 0,
+        "log dir must not count as an extra"
     );
 }
 

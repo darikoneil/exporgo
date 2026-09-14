@@ -111,6 +111,36 @@ enum Command
         #[arg(long)]
         log_dir: Option<PathBuf>,
     },
+    /// Manage documented experiments inside a project
+    Experiment
+    {
+        #[command(subcommand)]
+        command: ExperimentCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum ExperimentCommand
+{
+    /// Stamp experiments/_TEMPLATE/ into experiments/<slug>/ and fill its
+    /// tokens
+    New
+    {
+        /// Human experiment name; the folder name is its slug
+        name: String,
+        /// Project root (default: current directory)
+        #[arg(long, default_value = ".")]
+        path: PathBuf,
+        /// Raw data root (default: derived as <project data_root>/<slug>)
+        #[arg(long)]
+        data_root: Option<String>,
+        /// Processed data root (never derived — labs lay these out differently)
+        #[arg(long)]
+        processed_root: Option<String>,
+        /// Never prompt; unset values stay as {{TOKENS}} in the stamped files
+        #[arg(long)]
+        no_input: bool,
+    },
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -218,6 +248,16 @@ pub fn run() -> ExitCode
             dry_run,
             log_dir,
         }),
+        Command::Experiment {
+            command:
+                ExperimentCommand::New {
+                    name,
+                    path,
+                    data_root,
+                    processed_root,
+                    no_input,
+                },
+        } => run_experiment_new(name, path, data_root, processed_root, no_input),
     };
     match result
     {
@@ -377,7 +417,15 @@ fn run_sync(args: SyncArgs) -> Result<ExitCode, crate::Error>
         sync::{Direction, SyncOptions, sync},
     };
 
-    let manifest = Manifest::load(&args.path).ok();
+    // Only "not a project" falls through to flags-only mode: a manifest that
+    // exists but is malformed (e.g. a [sync] table missing a field) must
+    // surface its real parse error, not a misleading "no [sync] section".
+    let manifest = match Manifest::load(&args.path)
+    {
+        Ok(manifest) => Some(manifest),
+        Err(crate::Error::NotAProject(_)) => None,
+        Err(e) => return Err(e),
+    };
     let config = manifest.as_ref().and_then(|m| m.sync.as_ref());
 
     let resolve = |flag: Option<PathBuf>, configured: Option<&String>| {
@@ -432,6 +480,57 @@ fn run_sync(args: SyncArgs) -> Result<ExitCode, crate::Error>
     }
     println!("History: {}", report.history_log.display());
     println!("Detail:  {}", report.detail_log.display());
+    Ok(ExitCode::SUCCESS)
+}
+
+fn run_experiment_new(
+    name: String,
+    path: PathBuf,
+    data_root: Option<String>,
+    processed_root: Option<String>,
+    no_input: bool,
+) -> Result<ExitCode, crate::Error>
+{
+    use crate::experiment::{NewExperimentOptions, stamp_experiment};
+
+    // The raw root is derivable from the manifest, so only the processed root
+    // (which is never derived) is worth a prompt.
+    let mut processed_root = processed_root;
+    let interactive = !no_input && std::io::stdin().is_terminal();
+    if processed_root.is_none() && interactive
+    {
+        let answer: Result<String, _> = dialoguer::Input::new()
+            .with_prompt("Processed data root (Enter to skip)")
+            .allow_empty(true)
+            .interact_text();
+        if let Ok(answer) = answer
+        {
+            let answer = answer.trim().to_string();
+            if !answer.is_empty()
+            {
+                processed_root = Some(answer);
+            }
+        }
+    }
+
+    let report = stamp_experiment(&NewExperimentOptions {
+        project_root: path,
+        name,
+        raw_data_root: data_root,
+        processed_data_root: processed_root,
+    })?;
+    println!(
+        "Created {} ({} files)",
+        report.dir.display(),
+        report.files_written
+    );
+    if !report.unfilled.is_empty()
+    {
+        println!(
+            "Unfilled tokens (fill by hand or leave for later): {}",
+            report.unfilled.join(", ")
+        );
+    }
     Ok(ExitCode::SUCCESS)
 }
 
@@ -516,5 +615,75 @@ fn print_changes(heading: &str, changes: &[PlannedChange])
             ChangeKind::Overwrite => "overwrite",
         };
         println!("  {kind:9} {}", change.rel);
+    }
+}
+
+#[cfg(test)]
+mod tests
+{
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    fn new_args() -> NewArgs
+    {
+        NewArgs {
+            name: "Pilot".to_string(),
+            path: PathBuf::from("."),
+            aim: Some("Does it remap?".to_string()),
+            status: Some(Status::Analysis),
+            repo: Some("https://github.com/org/repo".to_string()),
+            data_root: Some(r"\ktdata\snlkt\data".to_string()),
+            owner: Some("Darik".to_string()),
+            email: Some("doneil@salk.edu".to_string()),
+            no_input: true, // never prompt in tests
+            git: false,
+            force: false,
+        }
+    }
+
+    #[test]
+    fn resolve_tokens_maps_every_flag_to_its_token()
+    {
+        let values = resolve_tokens(&new_args());
+        let expected: [(Token, &str); 6] = [
+            (Token::OneLineAim, "Does it remap?"),
+            (Token::Status, "analysis"),
+            (Token::RepoUrl, "https://github.com/org/repo"),
+            (Token::DataRoot, r"\ktdata\snlkt\data"),
+            (Token::Owner, "Darik"),
+            (Token::OwnerEmail, "doneil@salk.edu"),
+        ];
+        for (token, value) in expected
+        {
+            assert_eq!(values.get(&token).map(String::as_str), Some(value));
+        }
+        // Name and created date are stamp's job, never the flag resolver's.
+        assert!(!values.contains_key(&Token::ProjectName));
+        assert!(!values.contains_key(&Token::CreatedDate));
+    }
+
+    #[test]
+    fn absent_flags_leave_tokens_unset()
+    {
+        let mut args = new_args();
+        args.aim = None;
+        args.status = None;
+        let values = resolve_tokens(&args);
+        assert!(!values.contains_key(&Token::OneLineAim));
+        assert!(!values.contains_key(&Token::Status));
+        assert_eq!(values.len(), 4);
+    }
+
+    /// The status vocabulary is a contract with the template's context.md
+    /// ("planning | active | analysis | writing | archived").
+    #[test]
+    fn status_strings_match_the_template_vocabulary()
+    {
+        let rendered: Vec<&str> = Status::ALL.iter().map(|s| s.as_str()).collect();
+        assert_eq!(
+            rendered,
+            vec!["planning", "active", "analysis", "writing", "archived"]
+        );
     }
 }

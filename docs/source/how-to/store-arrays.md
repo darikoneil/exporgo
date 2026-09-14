@@ -14,18 +14,18 @@ uv add "exporgo[datastore]"
 Give it a name, the ordered dimensions, and the array's element dtype. Each dimension maps to the
 polars dtype of its coordinate vector — the values you'll attach along that axis (frame
 timestamps, unit indices) — or `None` for a positional axis with no coordinate. Partition keys
-default to the study's identity keys, so a partition is an identity:
+default to the experiment's identity keys, so a partition is an identity:
 
 ```python
 import numpy as np
 import polars as pl
 
-study.declare_array_store(
+experiment.declare_array_store(
     "neural",
     dims={"unit": pl.Int64, "time": pl.Float64},
     dtype=np.float32,
 )
-store = study.array_store("neural")
+store = experiment.array_store("neural")
 ```
 
 The dimension order is the array's axis order: `neural` expects a 2-D array indexed `[unit,
@@ -96,7 +96,7 @@ print(
 ## Report membership
 
 An array store reports its identities the same way a tabular store does.
-{meth}`study.identities(array_store="neural") <exporgo.study.Study.identities>` returns the
-identities it holds (open-world, from the manifest), and {meth}`~exporgo.study.Study.coverage`
+{meth}`experiment.identities(array_store="neural") <exporgo.experiment.Experiment.identities>` returns the
+identities it holds (open-world, from the manifest), and {meth}`~exporgo.experiment.Experiment.coverage`
 folds the array store into the full present/missing/unregistered report alongside every other
 component.

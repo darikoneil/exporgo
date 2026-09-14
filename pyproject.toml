@@ -1,6 +1,6 @@
 [project]
 name = "exporgo"
-version = "2.2.2"
+version = "3.0.0"
 description = "Experiment organization, logging, and analysis monitoring for scientific studies."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -21,7 +21,7 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
 ]
 
-# Base dependencies: the log + study foundation. Keep this minimal -- the heavy analytical
+# Base dependencies: the log + experiment foundation. Keep this minimal -- the heavy analytical
 # stack (numpy/polars/pyarrow) lives in the `datastore` extra, not here.
 dependencies = [
     "loguru",
@@ -32,7 +32,7 @@ dependencies = [
 documentation = "https://exporgo.readthedocs.io/en/latest/"
 repository = "https://github.com/darikoneil/exporgo"
 
-# Optional runtime extras — layered. The `study` layer's deps live in the base above (it is
+# Optional runtime extras — layered. The `experiment` layer's deps live in the base above (it is
 # the shared foundation); `monitor` and `datastore` build on it. Only `datastore` pulls the
 # heavy analytical stack (numpy/polars/pyarrow).
 [project.optional-dependencies]

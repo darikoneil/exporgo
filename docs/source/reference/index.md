@@ -8,6 +8,6 @@ installed version.
 :maxdepth: 2
 
 log
-study
+experiment
 datastore
 ```

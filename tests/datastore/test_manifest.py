@@ -38,7 +38,6 @@ def _frame() -> pl.DataFrame:
 
 def test_manifest_is_empty_before_any_write(tmp_path: Path) -> None:
     manifest = Store(tmp_path, _spec()).manifest()
-    assert manifest.schema_version == 1
     assert manifest.fragments == []
     assert manifest.row_count() == 0
 

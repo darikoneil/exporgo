@@ -1,6 +1,6 @@
 """Shared fixtures for the datastore tests.
 
-Store writes emit loguru records and, when a store is exercised through a saved study,
+Store writes emit loguru records and, when a store is exercised through a saved experiment,
 real sinks are attached to the process-global logger; this fixture resets that global
 state around every test so sinks or the enabled/disabled flag never leak between tests.
 """

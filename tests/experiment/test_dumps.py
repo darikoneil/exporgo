@@ -1,10 +1,10 @@
-"""Tests for Dump: a study-global, relative-path-keyed index of file locations."""
+"""Tests for Dump: an experiment-global, relative-path-keyed index of file locations."""
 
 from pathlib import Path
 
 import pytest
 
-from exporgo.study import Dump
+from exporgo.experiment import Dump
 
 
 def _dump(root: Path) -> Dump:

@@ -9,6 +9,7 @@ pub mod check;
 #[cfg(feature = "cli")]
 pub mod cli;
 pub mod error;
+pub mod experiment;
 pub mod manifest;
 pub mod plan;
 pub mod stamp;

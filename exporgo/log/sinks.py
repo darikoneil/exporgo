@@ -6,7 +6,7 @@ used for log filenames, so any project can drive the same framework (e.g.
 
 Each writer -- a process on a host -- logs into its **own** directory,
 ``<base>/.logs/<host>_<user>_<pid>/``, rather than a single shared file. Independent writers,
-even on different machines sharing a study over a network filesystem, therefore never write the
+even on different machines sharing an experiment over a network filesystem, therefore never write the
 same file, so there is no interleaving, no rotation race, and no permission clash. :func:`read_log`
 merges every writer's log back into one chronological view.
 """
@@ -236,7 +236,7 @@ def read_log(
     reconstructs a single timeline from the per-writer files that concurrent writers produce.
 
     Args:
-        base_directory: The study (or log) root whose ``.logs`` directory holds the writers.
+        base_directory: The experiment (or log) root whose ``.logs`` directory holds the writers.
         file_stem: The log file stem; defaults to ``"exporgo"``.
         exceptions: Merge the exception logs instead of the primary logs.
 

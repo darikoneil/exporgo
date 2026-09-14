@@ -59,11 +59,9 @@ class Manifest(BaseModel):
     ``_manifest/`` directory.
 
     Attributes:
-        schema_version: Version of the manifest layout, for forward migration.
         fragments: The live fragments, in write order.
     """
 
-    schema_version: int = 1
     fragments: list[FragmentEntry] = Field(default_factory=list)
 
     def partitions(self) -> list[dict[str, str]]:

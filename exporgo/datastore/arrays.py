@@ -50,7 +50,7 @@ _IDENTITY_DTYPES: dict[str, Any] = {
     "int": pl.Int64,
     "bool": pl.Boolean,
 }
-"""Maps an :class:`~exporgo.study.identity.IdentityKey` dtype label to a polars dtype."""
+"""Maps an :class:`~exporgo.experiment.identity.IdentityKey` dtype label to a polars dtype."""
 
 
 def coord_dtype_for_label(label: str) -> Any:
@@ -234,7 +234,15 @@ class ArrayStore:
         - ``"unique"`` (default): refuse the write if this identity already has an array --
           fail loud rather than silently clobber.
         - ``"overwrite"``: replace this identity's array (the prior blob is tombstoned) and its
-          coordinate row.
+          coordinate row. The new blob is written (and registered in the manifest) **before**
+          the old one is deleted, so a failure mid-write never strands the identity with no
+          array -- at worst the old array survives alongside an orphaned temporary file.
+
+        Warning:
+            Both modes are check-then-act over the manifest, not atomic: two concurrent
+            writers targeting the **same identity** can race (both ``"unique"`` writes may
+            succeed, or two ``"overwrite"`` writes may interleave). Ensure a single writer
+            per identity for these modes; writers targeting different identities are safe.
 
         Args:
             data: The array-like payload; its rank must equal the number of declared dimensions.
@@ -267,10 +275,12 @@ class ArrayStore:
                 f"refusing to write (mode='unique')."
             )
             raise ValueError(msg)
-        self._write_coords(identity, supplied)
-        if mode == "overwrite":
-            self._remove_identity(target)
+        # Write-new-first, delete-old-last: capture the old blob paths, publish the new
+        # blob and its manifest entry, and only then remove the old blob -- so a failure
+        # at any step leaves the identity with a loadable array.
+        previous = self._fragment_paths(target) if mode == "overwrite" else []
         relative = self._write_array(identity, array)
+        self._write_coords(identity, supplied)
         entry = FragmentEntry(
             path=relative,
             partition=_partition.dict_of_identity(self.spec.partition_keys, identity),
@@ -278,6 +288,8 @@ class ArrayStore:
             written=datetime.now(UTC).isoformat(),
         )
         append_manifest_log(self.root / _MANIFEST_DIR, added=[entry])
+        if previous:
+            self._remove_fragments(previous)
         pretty = _partition.dict_of_identity(self.spec.partition_keys, identity)
         msg = (
             f"Wrote a {array.shape} {array.dtype} array for identity "
@@ -474,13 +486,17 @@ class ArrayStore:
                 found = fragment.path
         return found
 
-    def _remove_identity(self, target: tuple[str, ...]) -> None:
-        """Delete an identity's array file(s) and tombstone them in the manifest log."""
+    def _fragment_paths(self, target: tuple[str, ...]) -> list[str]:
+        """Return the live fragment paths recorded for an identity's partition tuple."""
         keys = self.spec.partition_keys
-        removed: list[str] = []
-        for fragment in self.manifest().fragments:
-            if _partition.tuple_of_partition(keys, fragment.partition) == target:
-                (self.root / fragment.path).unlink(missing_ok=True)
-                removed.append(fragment.path)
-        if removed:
-            append_manifest_log(self.root / _MANIFEST_DIR, removed=removed)
+        return [
+            fragment.path
+            for fragment in self.manifest().fragments
+            if _partition.tuple_of_partition(keys, fragment.partition) == target
+        ]
+
+    def _remove_fragments(self, paths: list[str]) -> None:
+        """Delete the given fragment files and tombstone them in the manifest log."""
+        for path in paths:
+            (self.root / path).unlink(missing_ok=True)
+        append_manifest_log(self.root / _MANIFEST_DIR, removed=paths)

@@ -70,6 +70,15 @@ class Store:
 
         All modes are out-of-core -- data for other partitions is never read.
 
+        Warning:
+            ``"append"`` is multi-writer safe (fragments and manifest entries are
+            uniquely named and append-only). ``"unique"`` and ``"overwrite"`` are
+            check-then-act over the manifest, not atomic: two concurrent writers
+            targeting the **same partition** can race (both ``"unique"`` writes may
+            succeed, or an ``"overwrite"`` may miss a fragment landing concurrently).
+            Ensure a single writer per partition for those modes; writers targeting
+            different partitions are safe.
+
         Args:
             frame: The data to write; its columns must match the declared schema.
             mode: ``"append"`` to add, ``"overwrite"`` to replace by partition,
@@ -123,12 +132,16 @@ class Store:
 
         Returns:
             A :class:`polars.LazyFrame` over the component's Parquet fragments, cast to
-            the declared schema and projected to the declared columns.
+            the declared schema and projected to the declared columns. A store with no
+            data yet yields an **empty** frame with the declared schema (rather than
+            erroring on collect), so downstream queries need no special-casing.
 
         Note:
             Chain ``.filter(...)`` on the partition keys *before* ``.collect()`` to keep
             partition pruning; collecting first materializes the whole dataset.
         """
+        if next(self.root.rglob("part-*.parquet"), None) is None:
+            return pl.LazyFrame(schema=self.spec.polars_schema())
         lazy = pl.scan_parquet(
             self.root / "**" / "part-*.parquet", hive_partitioning=True
         )
@@ -155,7 +168,7 @@ class Store:
         :meth:`write_schema` persists and :meth:`scan` restores. Cheap (no IO) and
         available even before anything has been written. Use the static
         :meth:`read_schema` only when no store instance exists (the bootstrap during
-        :meth:`~exporgo.study.study.Study.load`).
+        :meth:`~exporgo.experiment.experiment.Experiment.load`).
 
         Returns:
             The declared schema as a :class:`polars.Schema` (a dict-like mapping).
@@ -174,7 +187,7 @@ class Store:
     def read_schema(root: str | Path) -> dict[str, Any]:
         """Read a store's persisted column schema (name -> dtype) from its anchor.
 
-        Reads the 0-row anchor Parquet written by :meth:`write_schema`, letting a study
+        Reads the 0-row anchor Parquet written by :meth:`write_schema`, letting an experiment
         reload a store's schema without re-declaring its columns in code. This is the
         pre-instance bootstrap (before a :class:`Store`/``StoreSpec`` exists); with a live
         store in hand, use the :attr:`schema` property instead (in-memory, no IO).

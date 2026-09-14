@@ -208,21 +208,21 @@ def test_read_log_merges_writers_chronologically(tmp_path: Path) -> None:
     logs = tmp_path / ".logs"
     (logs / "hostA_alice_1").mkdir(parents=True)
     (logs / "hostB_bob_2").mkdir(parents=True)
-    (logs / "hostA_alice_1" / "study.log").write_text(
+    (logs / "hostA_alice_1" / "experiment.log").write_text(
         "2026-08-30 00:00:01.000\tINFO\n\tfrom A\n", encoding="utf-8"
     )
-    (logs / "hostB_bob_2" / "study.log").write_text(
+    (logs / "hostB_bob_2" / "experiment.log").write_text(
         "2026-08-30 00:00:00.000\tINFO\n\tfrom B\n", encoding="utf-8"
     )
 
-    merged = sinks.read_log(tmp_path, file_stem="study")
+    merged = sinks.read_log(tmp_path, file_stem="experiment")
 
     assert "from A" in merged
     assert merged.index("from B") < merged.index("from A")  # B is earlier -> sorted first
 
 
 def test_read_log_is_empty_without_any_logs(tmp_path: Path) -> None:
-    assert sinks.read_log(tmp_path, file_stem="study") == ""
+    assert sinks.read_log(tmp_path, file_stem="experiment") == ""
 
 
 # -------------------------------------------------------------------------- reset_tqdm

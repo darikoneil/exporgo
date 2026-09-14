@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from exporgo.study.identity import Identity, IdentityKey, IdentitySchema
-from exporgo.study.resources import (
+from exporgo.experiment.identity import Identity, IdentityKey, IdentitySchema
+from exporgo.experiment.resources import (
     Resource,
     ResourceSpec,
     _template_to_glob,
@@ -168,3 +168,33 @@ def test_discover_rejects_paths_breaking_a_repeated_placeholder(tmp_path: Path) 
     (tmp_path / "m02" / "m03_info.txt").write_text("x", encoding="utf-8")  # backref fails
 
     assert handle.discover() == {Identity(keys=("Subject",), values=("m01",))}
+
+
+def test_discover_skips_candidates_that_do_not_coerce(tmp_path: Path) -> None:
+    """A path shaped like the template whose segment can't coerce is not that identity."""
+    schema = IdentitySchema(
+        keys=[IdentityKey(name="Subject"), IdentityKey(name="Session", dtype="int")]
+    )
+    spec = ResourceSpec(name="beh", template="{Subject}/{Session}/x.csv")
+    handle = Resource(tmp_path, spec, schema)
+    (tmp_path / "m01" / "1").mkdir(parents=True)
+    (tmp_path / "m01" / "1" / "x.csv").write_text("x", encoding="utf-8")
+    (tmp_path / "m01" / "notes").mkdir()  # 'notes' is not an int Session
+    (tmp_path / "m01" / "notes" / "x.csv").write_text("x", encoding="utf-8")
+
+    found = handle.discover()
+
+    assert found == {Identity(keys=("Subject", "Session"), values=("m01", 1))}
+
+
+def test_discover_round_trips_a_bool_identity(tmp_path: Path) -> None:
+    schema = IdentitySchema(keys=[IdentityKey(name="Flag", dtype="bool")])
+    spec = ResourceSpec(name="beh", template="{Flag}/x.csv")
+    handle = Resource(tmp_path, spec, schema)
+    (tmp_path / "False").mkdir()
+    (tmp_path / "False" / "x.csv").write_text("x", encoding="utf-8")
+
+    found = handle.discover()
+
+    assert len(found) == 1
+    assert next(iter(found))["Flag"] is False

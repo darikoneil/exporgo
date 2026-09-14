@@ -204,3 +204,13 @@ def test_unique_is_all_or_nothing(tmp_path: Path) -> None:
     parts = {(p["Subject"], p["Session"]) for p in store.manifest().partitions()}
     assert ("m01", "1") in parts
     assert ("m02", "2") not in parts  # nothing from the rejected write landed
+
+
+def test_scan_of_an_empty_store_returns_a_typed_empty_frame(tmp_path: Path) -> None:
+    """A declared-but-unwritten store scans as an empty frame, not a ComputeError."""
+    store = Store(tmp_path, _spec())
+
+    out = store.scan().collect()
+
+    assert out.height == 0
+    assert dict(out.schema) == dict(store.schema)

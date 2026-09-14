@@ -1,5 +1,7 @@
 # exporgo — Study & Identity model Design
 
+*(2026-09-14: Study was renamed Experiment.)*
+
 *Design record, 2026-08-23. Shaped through discussion; the shared foundation both the
 monitoring and datastore layers build on. **Built & verified 2026-08-24** (TDD;
 ruff/pyrefly clean). `discover()` for resources was **built 2026-08-27** (reverse-resolves

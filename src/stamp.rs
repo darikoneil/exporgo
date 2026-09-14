@@ -144,7 +144,7 @@ pub fn stamp(options: &NewOptions) -> Result<StampReport, Error>
 
 /// Windows reserved device names, which cannot be used as file or folder names.
 /// `slug` is already lowercase.
-fn is_windows_reserved(slug: &str) -> bool
+pub(crate) fn is_windows_reserved(slug: &str) -> bool
 {
     matches!(slug, "con" | "prn" | "aux" | "nul")
         || ((slug.starts_with("com") || slug.starts_with("lpt"))

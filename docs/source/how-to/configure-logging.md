@@ -1,8 +1,8 @@
 # Configure logging
 
 exporgo's logging layer is the base install: a {mod}`loguru`-based framework any project can
-drive, whether or not you use the study or datastore layers. This guide covers turning it on,
-the logging a study gets for free, and the call-logging decorators.
+drive, whether or not you use the experiment or datastore layers. This guide covers turning it on,
+the logging an experiment gets for free, and the call-logging decorators.
 
 ## Turn logging on
 
@@ -52,29 +52,29 @@ NOTSET=0  TRACE=5  DEBUG=10  INFO=20  SUCCESS=25  WARNING=30  ERROR=40  CRITICAL
 Because the members are integers, they compare directly against the numeric levels used by both
 {mod}`logging` and {mod}`loguru`.
 
-## A study logs for free
+## An experiment logs for free
 
-You rarely call `init_logger` yourself when working with a study.
-{meth}`~exporgo.study.Study.save` wires logging into the study automatically, so a saved study
+You rarely call `init_logger` yourself when working with an experiment.
+{meth}`~exporgo.experiment.Experiment.save` wires logging into the experiment automatically, so a saved experiment
 gets a per-writer log under `<root>/.logs/`: the first save records a "created" line, later saves
-a "saved" line. To start logging into a study *before* the first save (for instance after
-{meth}`~exporgo.study.Study.load`, which is deliberately silent), call
-{meth}`~exporgo.study.Study.init_logging` yourself:
+a "saved" line. To start logging into an experiment *before* the first save (for instance after
+{meth}`~exporgo.experiment.Experiment.load`, which is deliberately silent), call
+{meth}`~exporgo.experiment.Experiment.init_logging` yourself:
 
 ```python
-study = Study.load(root)
-study.init_logging()   # resume logging into this study
+experiment = Experiment.load(root)
+experiment.init_logging()   # resume logging into this experiment
 ```
 
-## Read a study's log
+## Read an experiment's log
 
 Because each writer keeps its own file, read the log through
-{meth}`~exporgo.study.Study.read_log`, which merges every writer's records into one chronological
+{meth}`~exporgo.experiment.Experiment.read_log`, which merges every writer's records into one chronological
 string:
 
 ```python
-print(study.read_log())                # the merged INFO/WARNING timeline
-print(study.read_log(exceptions=True))  # merged exceptions instead
+print(experiment.read_log())                # the merged INFO/WARNING timeline
+print(experiment.read_log(exceptions=True))  # merged exceptions instead
 ```
 
 Records sort by a fixed-width UTC timestamp, so logs written on different machines in different

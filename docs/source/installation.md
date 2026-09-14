@@ -4,7 +4,7 @@ exporgo requires **Python 3.12 or newer**.
 
 ## Base install
 
-The base install is the **logging** and **study** layers together. It depends only on
+The base install is the **logging** and **experiment** layers together. It depends only on
 `loguru` and `pydantic`. With [uv](https://docs.astral.sh/uv/):
 
 ```bash

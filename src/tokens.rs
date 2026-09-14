@@ -113,6 +113,18 @@ pub fn scan(text: &str) -> BTreeSet<String>
 /// quoting `{{OWNER}}`) is not substituted recursively.
 pub fn substitute(text: &str, values: &TokenValues) -> String
 {
+    let by_placeholder: BTreeMap<String, String> = values
+        .iter()
+        .map(|(token, value)| (token.placeholder().to_string(), value.clone()))
+        .collect();
+    substitute_placeholders(text, &by_placeholder)
+}
+
+/// [`substitute`] for an arbitrary placeholder set: keys are full literal
+/// placeholders (`{{EXPERIMENT_NAME}}`), empty values and unknown placeholders
+/// stay literal, and substituted values are never rescanned.
+pub fn substitute_placeholders(text: &str, values: &BTreeMap<String, String>) -> String
+{
     let mut result = String::with_capacity(text.len());
     let mut rest = text;
     while let Some(start) = rest.find("{{")
@@ -124,10 +136,7 @@ pub fn substitute(text: &str, values: &TokenValues) -> String
             break;
         };
         let placeholder = &rest[start..close];
-        let replacement = values
-            .iter()
-            .find(|(token, value)| token.placeholder() == placeholder && !value.is_empty())
-            .map(|(_, value)| value.as_str());
+        let replacement = values.get(placeholder).filter(|value| !value.is_empty());
         if let Some(value) = replacement
         {
             result.push_str(&rest[..start]);

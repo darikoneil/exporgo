@@ -1,12 +1,17 @@
-"""The Study container: identities, resources, validation, and persistence.
+"""The Experiment container: identities, resources, validation, and persistence.
 
-A :class:`Study` ties together an identity coordinate system, the identities it should
-contain, and the components (resources, stores, array stores, dumps) expected for each. It
-describes and validates; it never executes. Identity keys become the datastore's partition keys, and
-:meth:`Study.validate` seeds the monitoring layer's derived status.
+An :class:`Experiment` is the **data-side unit**: it lives at the data root (typically on
+the lab server) and owns one root, one identity coordinate system, and one store catalog.
+A workspace's ``experiments/<name>/`` folder (the Rust CLI side) merely points at that
+data root. The experiment ties together the identity coordinate system, the identities it
+should contain, and the components (resources, stores, array stores, dumps) expected for
+each. It describes and validates; it never executes. Identity keys become the datastore's
+partition keys, and :meth:`Experiment.validate` seeds the monitoring layer's derived
+status.
 
-Saving a study also wires up logging into its directory (see :meth:`Study.init_logging`),
-so every study automatically gets logging (a per-writer log under ``<root>/.logs/``).
+Saving an experiment also wires up logging into its directory (see
+:meth:`Experiment.init_logging`), so every experiment automatically gets logging (a
+per-writer log under ``<root>/.logs/``).
 """
 
 import json
@@ -19,14 +24,14 @@ from typing import TYPE_CHECKING, Any, Self
 from loguru import logger
 
 from exporgo._atomic import atomic_write_text
-from exporgo.log import LogLevel, init_logger, read_log
-from exporgo.study.identity import (
+from exporgo.experiment.identity import (
     Identity,
     IdentityKey,
     IdentitySchema,
     IdentityValue,
 )
-from exporgo.study.resources import Dump, Resource, ResourceSpec
+from exporgo.experiment.resources import Dump, Resource, ResourceSpec
+from exporgo.log import LogLevel, init_logger, read_log
 
 if TYPE_CHECKING:
     import polars as pl
@@ -35,15 +40,47 @@ if TYPE_CHECKING:
     from exporgo.datastore.spec import StoreSpec
     from exporgo.datastore.store import Store
 
-__all__ = ["CoverageReport", "Study", "ValidationReport"]
+__all__ = ["CoverageReport", "Experiment", "ValidationReport"]
 
-_CONFIG_NAME = "study.json"
+_CONFIG_NAME = "experiment.json"
 _ENTITIES_NAME = "entities.jsonl"
+_LOGS_NAME = ".logs"  # matches exporgo.log.sinks._LOGS_DIRNAME
+
+_FORMAT_VERSION = 1
+"""The experiment.json format this exporgo writes; loads refuse a file declaring a newer one."""
+
+_KNOWN_KEYS = frozenset(
+    {"format", "name", "identity", "resources", "stores", "array_stores", "dumps"}
+)
+"""The experiment.json top-level keys this exporgo understands (others warn on load)."""
+
+
+def _require_store_type(experiment_name: str) -> "type[Store]":
+    """Import and return :class:`~exporgo.datastore.store.Store`, or explain the extra.
+
+    Args:
+        experiment_name: The experiment being loaded, for the error message.
+
+    Returns:
+        The :class:`~exporgo.datastore.store.Store` class.
+
+    Raises:
+        ImportError: If the datastore layer is not installed, with the install hint.
+    """
+    try:
+        from exporgo.datastore.store import Store
+    except ImportError as error:
+        msg = (
+            f"Experiment {experiment_name!r} declares stores or array stores, which require "
+            f"the datastore layer; install the datastore extra (exporgo[datastore])."
+        )
+        raise ImportError(msg) from error
+    return Store
 
 
 @dataclass(frozen=True)
 class ValidationReport:
-    """Outcome of :meth:`Study.validate` — whether each identity's indicated files exist.
+    """Outcome of :meth:`Experiment.validate` — whether each identity's indicated files exist.
 
     A closed-world, existence-only snapshot: each registered identity's declared resources
     are bucketed by whether the file or folder they point at exists on disk. Holds no live
@@ -72,7 +109,7 @@ class CoverageReport:
     """Which identities each component (store/resource) contains, derived on demand.
 
     Generalizes :class:`ValidationReport` across stores and resources -- the outcome of both
-    :meth:`Study.coverage` (stores and array stores) and :meth:`Study.discover` (resources).
+    :meth:`Experiment.coverage` (stores and array stores) and :meth:`Experiment.discover` (resources).
 
     Attributes:
         present: ``(identity, component_name)`` pairs where the registered identity is
@@ -80,7 +117,7 @@ class CoverageReport:
         missing: ``(identity, component_name)`` pairs where a registered identity is
             absent from that component.
         unregistered: ``(identity, component_name)`` pairs for identities physically present
-            on disk but not registered in the study.
+            on disk but not registered in the experiment.
 
     Note:
         See the "Coverage and validation" explanation for closed- vs open-world reporting
@@ -150,7 +187,7 @@ class CoverageReport:
             ImportError: If polars is not installed (it ships with the ``datastore`` extra).
 
         Note:
-            See the "Validate and report on a study" how-to for filtering and pivoting.
+            See the "Validate and report on an experiment" how-to for filtering and pivoting.
         """
         try:
             import polars as pl
@@ -184,8 +221,13 @@ class CoverageReport:
         return pl.DataFrame(data)
 
 
-class Study:
-    """A study: an identity coordinate system, registered identities, and their components."""
+class Experiment:
+    """An experiment: an identity coordinate system, registered identities, and their components.
+
+    The data-side unit, living at the data root on the lab server: one root, one
+    identity schema, one store catalog. A workspace's ``experiments/<name>/`` folder
+    (the Rust CLI side) merely points at this root.
+    """
 
     def __init__(
         self,
@@ -193,11 +235,11 @@ class Study:
         root: str | Path,
         identity: Iterable[str | IdentityKey] | IdentitySchema | None = None,
     ) -> None:
-        """Create a study.
+        """Create an experiment.
 
         Args:
-            name: A human-readable study name.
-            root: The study's root directory on disk.
+            name: A human-readable experiment name.
+            root: The experiment's root directory on disk.
             identity: The identity keys (1-3), an :class:`IdentitySchema`, or ``None``
                 to default to ``["Subject"]``.
         """
@@ -226,25 +268,25 @@ class Study:
         return IdentitySchema(keys=keys)
 
     def __repr__(self) -> str:
-        """Return an unambiguous representation of the study for debugging."""
+        """Return an unambiguous representation of the experiment for debugging."""
         return (
             f"{type(self).__name__}(name={self.name!r}, root={self.root!r}, "
             f"identity={self.identity.names!r})"
         )
 
     def __str__(self) -> str:
-        """Return a concise one-line human-readable summary of the study."""
+        """Return a concise one-line human-readable summary of the experiment."""
         keys = ", ".join(self.identity.names)
         return (
-            f"Study {self.name!r} [{keys}]: {len(self._entities)} identities, "
+            f"Experiment {self.name!r} [{keys}]: {len(self._entities)} identities, "
             f"{len(self._resources)} resources, {len(self._stores)} stores, "
             f"{len(self._array_stores)} array stores, {len(self._dumps)} dumps"
         )
 
     def print(self) -> None:
-        """Print a multi-line summary of the study's declared contents to stdout.
+        """Print a multi-line summary of the experiment's declared contents to stdout.
 
-        Reports the study name and root, its identity keys, and the counts (and names)
+        Reports the experiment name and root, its identity keys, and the counts (and names)
         of registered identities, declared resources, stores, array stores, and dumps.
         """
         resources = ", ".join(sorted(self._resources)) or "(none)"
@@ -253,7 +295,7 @@ class Study:
         dumps = ", ".join(sorted(self._dumps)) or "(none)"
         keys = ", ".join(self.identity.names)
         lines = [
-            f"Study {self.name!r}",
+            f"Experiment {self.name!r}",
             f"  root:         {self.root}",
             f"  identity:     {keys}",
             f"  identities:   {len(self._entities)} registered",
@@ -285,7 +327,7 @@ class Study:
         return dict(self._array_stores)
 
     def register(self, **values: IdentityValue) -> Identity:
-        """Register an identity the study should contain (a declared expectation).
+        """Register an identity the experiment should contain (a declared expectation).
 
         Registration records what *should* exist; it never touches the filesystem. This
         declared expectation is what lets :meth:`validate` detect missing data.
@@ -296,7 +338,7 @@ class Study:
                 ``Subject="m01", Session=1``); each is coerced to its key's dtype.
 
         Returns:
-            The registered :class:`~exporgo.study.identity.Identity`.
+            The registered :class:`~exporgo.experiment.identity.Identity`.
 
         Raises:
             ValueError: If a key is missing or an unexpected key is supplied.
@@ -314,9 +356,9 @@ class Study:
     def declare_resource(self, name: str, template: str) -> Resource:
         """Declare a named resource located by a path template over the identity keys.
 
-        A resource is a file/folder the study expects at each identity (e.g. ``"raw"``,
+        A resource is a file/folder the experiment expects at each identity (e.g. ``"raw"``,
         ``"suite2p"``). Its ``template`` uses ``{KeyName}`` placeholders drawn from any
-        subset of the study's identity keys and is resolved against the study root by
+        subset of the experiment's identity keys and is resolved against the experiment root by
         :meth:`path` / :meth:`resource` and :meth:`validate`.
 
         Args:
@@ -325,19 +367,19 @@ class Study:
                 ``"{Subject}/{Session}/behavior.csv"``.
 
         Returns:
-            The root-bound :class:`~exporgo.study.resources.Resource` handle, ready to
+            The root-bound :class:`~exporgo.experiment.resources.Resource` handle, ready to
             resolve paths and check existence (the declared spec is available via
             :attr:`resources`).
 
         Raises:
-            ValueError: If the template references keys not in the study's identity.
+            ValueError: If the template references keys not in the experiment's identity.
         """
         spec = ResourceSpec(name=name, template=template)
         unknown = [key for key in spec.placeholders if key not in self.identity.names]
         if unknown:
             msg = (
                 f"Resource {name!r} template uses unknown identity keys {unknown}; "
-                f"study identity keys are {list(self.identity.names)}."
+                f"experiment identity keys are {list(self.identity.names)}."
             )
             raise ValueError(msg)
         self._resources[name] = spec
@@ -348,9 +390,9 @@ class Study:
         return self.resource(name)
 
     def resource(self, name: str) -> Resource:
-        """Return the root-bound :class:`~exporgo.study.resources.Resource` handle.
+        """Return the root-bound :class:`~exporgo.experiment.resources.Resource` handle.
 
-        Binds the named resource's declaration to the study root and identity schema, so
+        Binds the named resource's declaration to the experiment root and identity schema, so
         you can resolve paths (:meth:`Resource.path`) and check existence
         (:meth:`Resource.exists`) for specific identity values. This is the resource
         counterpart of :meth:`store`.
@@ -359,7 +401,7 @@ class Study:
             name: The name of a previously declared resource.
 
         Returns:
-            The :class:`~exporgo.study.resources.Resource` bound to this study's root.
+            The :class:`~exporgo.experiment.resources.Resource` bound to this experiment's root.
 
         Raises:
             KeyError: If no resource with that name has been declared.
@@ -372,7 +414,21 @@ class Study:
                 f"declared resources: {sorted(self._resources)}"
             )
             raise KeyError(msg) from None
-        return Resource(self.root, spec, self.identity)
+        return Resource(self.root, spec, self.identity, exclude=self._owned_names())
+
+    def _owned_names(self) -> frozenset[str]:
+        """Top-level names under the root owned by the experiment itself, never identities.
+
+        Covers the experiment's manifest JSON, its entity sidecar, its log directory, and
+        every declared store, array-store, and dump directory, so resource discovery
+        never mistakes the experiment's own artifacts for identity candidates.
+        """
+        return frozenset(
+            {_CONFIG_NAME, _ENTITIES_NAME, _LOGS_NAME}
+            | set(self._stores)
+            | set(self._array_stores)
+            | set(self._dumps)
+        )
 
     def path(self, resource: str, **values: IdentityValue) -> Path:
         """Resolve the on-disk path of ``resource`` for the given identity values.
@@ -386,7 +442,7 @@ class Study:
             **values: One value per identity key, keyed by key name.
 
         Returns:
-            The resolved path under the study root.
+            The resolved path under the experiment root.
 
         Raises:
             KeyError: If no resource with that name has been declared.
@@ -407,10 +463,10 @@ class Study:
         """Declare a datastore component; partition keys default to the identity keys.
 
         Args:
-            name: The store's name (also its subdirectory under the study root).
+            name: The store's name (also its subdirectory under the experiment root).
             columns: The store's ``column -> polars dtype`` schema (must include the
                 partition keys); any polars dtype, at full fidelity.
-            partition_keys: Columns to partition by (1-3); defaults to the study's
+            partition_keys: Columns to partition by (1-3); defaults to the experiment's
                 identity keys.
             sort_column: Optional column to sort by within partitions.
             max_rows_per_file: Write-time cap on rows per Parquet fragment (``None`` = no
@@ -447,7 +503,7 @@ class Study:
 
         Binds the store's declared spec to ``<root>/<name>`` so it can be written to and
         scanned. The return type lives in the datastore extra, so it is imported lazily;
-        ``import exporgo.study`` alone does not pull in the datastore layer.
+        ``import exporgo.experiment`` alone does not pull in the datastore layer.
 
         Args:
             name: The name of a previously declared store.
@@ -480,17 +536,17 @@ class Study:
         """Declare an array-store component (one N-D array per identity, loaded as xarray).
 
         An array store holds a single dense array per identity as a NumPy ``.npy`` blob, paired
-        with a coordinate catalog. Partition keys default to the study's identity keys, so a
+        with a coordinate catalog. Partition keys default to the experiment's identity keys, so a
         partition is an identity.
 
         Args:
-            name: The array store's name (also its subdirectory under the study root).
+            name: The array store's name (also its subdirectory under the experiment root).
             dims: An ordered ``{dimension: coord dtype}`` mapping giving the array's axis order;
                 each value is the polars dtype of that dimension's coordinate vector, or ``None``
                 for a positional (unlabelled) dimension.
             dtype: The array's element dtype (anything :func:`numpy.dtype` accepts, e.g.
                 ``numpy.float32``); the write casts to it.
-            partition_keys: Columns to partition by (1-3); defaults to the study's identity keys.
+            partition_keys: Columns to partition by (1-3); defaults to the experiment's identity keys.
             max_rows_per_file: Write-time cap on rows per coordinate-catalog fragment (``None`` =
                 no exporgo-imposed limit). Part of the declaration, so it survives save/load.
             max_rows_per_group: Write-time cap on rows per coordinate-catalog row group
@@ -533,7 +589,7 @@ class Study:
 
         Binds the array store's declared spec to ``<root>/<name>`` so it can be written to and
         loaded. The return type lives in the datastore extra, so it is imported lazily;
-        ``import exporgo.study`` alone does not pull in the datastore layer.
+        ``import exporgo.experiment`` alone does not pull in the datastore layer.
 
         Args:
             name: The name of a previously declared array store.
@@ -557,18 +613,18 @@ class Study:
         return ArrayStore(self.root / name, spec)
 
     def declare_dump(self, name: str) -> Dump:
-        """Declare a study-global dump component and return its handle.
+        """Declare an experiment-global dump component and return its handle.
 
         A dump records one root and the files under it, keyed by each file's path relative
-        to that root -- for assets that belong to the whole study rather than to any one
+        to that root -- for assets that belong to the whole experiment rather than to any one
         identity (an atlas, a README, a shared lookup table). The recorded paths live in a
         sidecar ``<root>/<name>/_dump.json`` written by the handle.
 
         Args:
-            name: The dump's name (also its subdirectory under the study root).
+            name: The dump's name (also its subdirectory under the experiment root).
 
         Returns:
-            The :class:`~exporgo.study.resources.Dump` handle bound to ``<root>/<name>``.
+            The :class:`~exporgo.experiment.resources.Dump` handle bound to ``<root>/<name>``.
         """
         if name not in self._dumps:
             self._dumps.append(name)
@@ -579,13 +635,13 @@ class Study:
         return self.dump(name)
 
     def dump(self, name: str) -> Dump:
-        """Return the :class:`~exporgo.study.resources.Dump` handle for a component.
+        """Return the :class:`~exporgo.experiment.resources.Dump` handle for a component.
 
         Args:
             name: The name of a previously declared dump.
 
         Returns:
-            The :class:`~exporgo.study.resources.Dump` bound to ``<root>/<name>``.
+            The :class:`~exporgo.experiment.resources.Dump` bound to ``<root>/<name>``.
 
         Raises:
             KeyError: If no dump with that name has been declared.
@@ -597,7 +653,7 @@ class Study:
 
     @property
     def dumps(self) -> dict[str, Dump]:
-        """The declared dumps, keyed by name (the study-global :class:`Dump` handles)."""
+        """The declared dumps, keyed by name (the experiment-global :class:`Dump` handles)."""
         return {name: self.dump(name) for name in self._dumps}
 
     def validate(self) -> ValidationReport:
@@ -633,7 +689,7 @@ class Study:
 
         Exactly one target must be given. A **store** and an **array store** are reported
         open-world (their manifest partitions), so they may include identities never
-        registered in the study. A **resource** is reported closed-world -- the registered
+        registered in the experiment. A **resource** is reported closed-world -- the registered
         identities whose resolved file exists on disk (there is no scan for unregistered
         files; that is :meth:`discover`'s role).
 
@@ -643,7 +699,7 @@ class Study:
             array_store: The name of a declared array store to inventory, or ``None``.
 
         Returns:
-            The contained :class:`~exporgo.study.identity.Identity` objects. Store and
+            The contained :class:`~exporgo.experiment.identity.Identity` objects. Store and
             array-store identities are built over the component's partition keys; resource
             identities are the registered identities that are present.
 
@@ -808,7 +864,7 @@ class Study:
         """Scan the filesystem for resource identities and report the drift.
 
         Reverse-resolves each resource template (see
-        :meth:`~exporgo.study.resources.Resource.discover`) to find which identities are
+        :meth:`~exporgo.experiment.resources.Resource.discover`) to find which identities are
         physically present, surfacing on-disk-but-unregistered data as
         :attr:`CoverageReport.unregistered`. With ``register=True``, the discovered
         **full-key** identities are registered afterward; subset-key partials are reported
@@ -846,14 +902,14 @@ class Study:
 
         Sweeps every identity-bearing component for the identities physically present --
         resources (reverse-resolved from their templates, see
-        :meth:`~exporgo.study.resources.Resource.discover`) plus stores and array stores
-        (their manifest partitions) -- and registers each one the study does not already
+        :meth:`~exporgo.experiment.resources.Resource.discover`) plus stores and array stores
+        (their manifest partitions) -- and registers each one the experiment does not already
         contain. Dumps have no identity and are never swept. Only **full-key** identities can
         be registered; subset-key partials are skipped. The sweep is idempotent:
         already-registered identities are left untouched and are not returned.
 
         Returns:
-            The newly registered :class:`~exporgo.study.identity.Identity` objects, in
+            The newly registered :class:`~exporgo.experiment.identity.Identity` objects, in
             ``as_path`` order (empty if every found identity was already registered).
 
         Note:
@@ -872,13 +928,13 @@ class Study:
         log_level_console: LogLevel = LogLevel.INFO,
         log_level_custom: LogLevel | None = None,
     ) -> None:
-        """Configure logging to write into this study's directory.
+        """Configure logging to write into this experiment's directory.
 
-        Materializes the study root if needed and drives
-        :func:`exporgo.log.init_logger` with ``base_directory`` set to the study root and
-        ``file_stem`` set to the study name, so a study automatically has its own log
+        Materializes the experiment root if needed and drives
+        :func:`exporgo.log.init_logger` with ``base_directory`` set to the experiment root and
+        ``file_stem`` set to the experiment name, so an experiment automatically has its own log
         file. Called automatically by :meth:`save`; call it directly to start logging into
-        the study before the first save (e.g. when resuming a study via :meth:`load`).
+        the experiment before the first save (e.g. when resuming an experiment via :meth:`load`).
 
         Writes into this writer's own directory ``<root>/.logs/<host>_<user>_<pid>/`` --
         ``<name>.log`` (INFO/WARNING) and ``<name>.exception.log`` (exceptions) -- and adds a
@@ -888,7 +944,7 @@ class Study:
 
         Args:
             name: Loguru namespace to enable; ``None`` (the default) enables all
-                namespaces, so the study log captures both exporgo's own records and your
+                namespaces, so the experiment log captures both exporgo's own records and your
                 analysis code.
             log_level_console: Minimum level shown on the console.
             log_level_custom: If given, adds a file sink capturing records at or above
@@ -904,12 +960,12 @@ class Study:
         )
 
     def read_log(self, *, exceptions: bool = False) -> str:
-        """Return this study's log, merged across all writers in chronological order.
+        """Return this experiment's log, merged across all writers in chronological order.
 
-        Each process that logs into the study writes its own file under ``<root>/.logs/``;
+        Each process that logs into the experiment writes its own file under ``<root>/.logs/``;
         this reads them all and interleaves their records by timestamp (see
         :func:`exporgo.log.read_log`), so you get one timeline even when several people logged
-        to the study at once.
+        to the experiment at once.
 
         Args:
             exceptions: Read the exception logs instead of the primary logs.
@@ -919,21 +975,37 @@ class Study:
         """
         return read_log(self.root, file_stem=self.name, exceptions=exceptions)
 
-    def save(self) -> Path:
-        """Write the study's declaration to ``root/study.json`` and return that path.
+    def save(self, *, init_logging: bool = True) -> Path:
+        """Write the experiment's declaration to ``root/experiment.json`` and return that path.
 
         Registered entities are persisted separately, one JSON object per line, to
         ``root/entities.jsonl`` -- entity counts can grow far larger than the rest of the
-        declaration, and keeping them out of ``study.json`` keeps that file small and its
+        declaration, and keeping them out of ``experiment.json`` keeps that file small and its
         parse cost independent of how many identities are registered.
 
-        Also initializes logging into the study root (see :meth:`init_logging`), so a saved
-        study automatically gets logging (a per-writer log under ``<root>/.logs/``, readable
-        merged via :meth:`read_log`). The **first** save (when ``study.json`` does not yet
-        exist) records a "created" line with the creation date; subsequent saves record a
-        plain "saved" line.
+        By default, saving also initializes logging into the experiment root (see
+        :meth:`init_logging`), so a saved experiment automatically gets logging (a per-writer
+        log under ``<root>/.logs/``, readable merged via :meth:`read_log`). The **first**
+        save (when ``experiment.json`` does not yet exist) records a "created" line with the
+        creation date; subsequent saves record a plain "saved" line.
+
+        Warning:
+            ``init_logging=True`` (the default) reconfigures loguru's **process-global**
+            logger: every existing sink -- including sinks your application or another
+            library added -- is removed before the experiment's sinks are attached. When
+            embedding exporgo in a host application that manages its own logging, pass
+            ``init_logging=False`` to leave the global logger untouched.
+
+        Args:
+            init_logging: Whether to (re)initialize logging into the experiment root after
+                saving. ``True`` (the default) calls :meth:`init_logging`, which resets
+                all loguru sinks process-wide; ``False`` saves without touching logging.
+
+        Returns:
+            The path of the written ``experiment.json``.
         """
         data: dict[str, object] = {
+            "format": _FORMAT_VERSION,
             "name": self.name,
             "identity": [
                 {"name": key.name, "dtype": key.dtype} for key in self.identity.keys
@@ -977,20 +1049,19 @@ class Study:
         for array_store_name in self._array_stores:
             # persist each array store's coordinate-catalog schema anchor
             self.array_store(array_store_name).write_schema()
-        self.init_logging()
+        if init_logging:
+            self.init_logging()
         if is_first_save:
             creation_date = datetime.now(UTC).isoformat(timespec="seconds")
-            msg = (
-                f"Study {self.name!r} created {creation_date} (saved to {config_path})."
-            )
+            msg = f"Experiment {self.name!r} created {creation_date} (saved to {config_path})."
         else:
-            msg = f"Study {self.name!r} saved to {config_path}."
+            msg = f"Experiment {self.name!r} saved to {config_path}."
         logger.info(msg)
         return config_path
 
     @classmethod
     def load(cls, root: str | Path) -> Self:
-        """Reconstruct a study from ``root/study.json`` (the declaration only).
+        """Reconstruct an experiment from ``root/experiment.json`` (the declaration only).
 
         Restores the declared structure — identity keys, registered identities, resource
         templates, and store specs — but not the data or any derived status, which are
@@ -998,50 +1069,69 @@ class Study:
         read back from the ``root/entities.jsonl`` sidecar written by :meth:`save` (absent if
         none were ever saved). Loading does *not* reconfigure logging (it adds no sinks); it
         only emits an access log record, which is captured if logging is already configured.
-        Call :meth:`init_logging` to resume logging into a loaded study.
+        Call :meth:`init_logging` to resume logging into a loaded experiment.
 
         Args:
-            root: The study root directory containing ``study.json``.
+            root: The experiment root directory containing ``experiment.json``.
 
         Returns:
-            The reconstructed :class:`Study`.
+            The reconstructed :class:`Experiment`.
 
         Raises:
-            FileNotFoundError: If ``root/study.json`` does not exist.
+            FileNotFoundError: If ``root/experiment.json`` does not exist.
+            ValueError: If ``experiment.json`` declares a format newer than this exporgo
+                understands (upgrade exporgo to load it).
+            ImportError: If the experiment declares stores or array stores but the datastore
+                extra is not installed (``pip install exporgo[datastore]``).
         """
         root = Path(root)
         data = json.loads((root / _CONFIG_NAME).read_text(encoding="utf-8"))
+        format_version = data.get("format")  # absent = legacy (format 1) file
+        if isinstance(format_version, int) and format_version > _FORMAT_VERSION:
+            msg = (
+                f"{root / _CONFIG_NAME} declares format {format_version}, but this "
+                f"exporgo understands only format {_FORMAT_VERSION} or lower; upgrade "
+                f"exporgo to load this experiment."
+            )
+            raise ValueError(msg)
+        unknown = sorted(set(data) - _KNOWN_KEYS)
+        if unknown:
+            msg = (
+                f"{root / _CONFIG_NAME} carries unknown top-level keys {unknown}; "
+                f"they are ignored and will be dropped by the next save()."
+            )
+            logger.warning(msg)
         keys = [IdentityKey.model_validate(spec) for spec in data["identity"]]
-        study = cls(name=data["name"], root=root, identity=keys)
+        experiment = cls(name=data["name"], root=root, identity=keys)
         for name, template in data.get("resources", {}).items():
-            study.declare_resource(name, template)
+            experiment.declare_resource(name, template)
         stores_data = data.get("stores", {})
+        array_stores_data = data.get("array_stores", {})
         if stores_data:
-            from exporgo.datastore.store import Store
-
+            store_type = _require_store_type(data["name"])
             for store_name, entry in stores_data.items():
-                study.declare_store(
+                experiment.declare_store(
                     store_name,
-                    Store.read_schema(root / store_name),
+                    store_type.read_schema(root / store_name),
                     partition_keys=entry["partition_keys"],
                     sort_column=entry.get("sort_column"),
                     max_rows_per_file=entry.get("max_rows_per_file", 25_000_000),
                     max_rows_per_group=entry.get("max_rows_per_group"),
                 )
-        array_stores_data = data.get("array_stores", {})
         if array_stores_data:
-            from exporgo.datastore.store import Store
-
+            store_type = _require_store_type(data["name"])
             for array_store_name, entry in array_stores_data.items():
                 # The coordinate-catalog anchor is authoritative for each labelled
-                # dimension's coordinate dtype; study.json fixes the axis order and which
+                # dimension's coordinate dtype; experiment.json fixes the axis order and which
                 # dimensions are positional (absent from the anchor).
-                coord_schema = Store.read_schema(root / array_store_name / "_coords")
+                coord_schema = store_type.read_schema(
+                    root / array_store_name / "_coords"
+                )
                 dims = {
                     dim: (coord_schema[dim].inner if dim in coord_schema else None)
                     for dim in entry["dims"]
                 }
-                study.declare_array_store(
+                experiment.declare_array_store(
                     array_store_name,
                     dims=dims,
                     dtype=entry["dtype"],
@@ -1050,12 +1140,12 @@ class Study:
                     max_rows_per_group=entry.get("max_rows_per_group"),
                 )
         for dump_name in data.get("dumps", []):
-            study.declare_dump(dump_name)
+            experiment.declare_dump(dump_name)
         entities_path = root / _ENTITIES_NAME
         if entities_path.exists():
             for line in entities_path.read_text(encoding="utf-8").splitlines():
                 if line.strip():
-                    study.register(**json.loads(line))
-        msg = f"Study {study.name!r} accessed (loaded from {root / _CONFIG_NAME})."
+                    experiment.register(**json.loads(line))
+        msg = f"Experiment {experiment.name!r} accessed (loaded from {root / _CONFIG_NAME})."
         logger.info(msg)
-        return study
+        return experiment

@@ -1,5 +1,7 @@
 # exporgo — Datastore Layer Design
 
+*(2026-09-14: Study was renamed Experiment.)*
+
 *Design record, 2026-08-23. Shaped through discussion; not yet scheduled for build.*
 
 ## Context

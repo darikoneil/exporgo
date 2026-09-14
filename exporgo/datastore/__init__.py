@@ -1,7 +1,7 @@
-"""Datastore layer -- fast, polars/Parquet component stores for a study's bulk data.
+"""Datastore layer -- fast, polars/Parquet component stores for an experiment's bulk data.
 
-A study is a catalog of named component stores (behavior, neural, ...), each keyed by the
-study's identity vocabulary. There are two store kinds. A tabular
+An experiment is a catalog of named component stores (behavior, neural, ...), each keyed by the
+experiment's identity vocabulary. There are two store kinds. A tabular
 :class:`~exporgo.datastore.store.Store` is an independent Hive-partitioned Parquet dataset with
 a strict, declared schema, retrieved via lazy, partition-pruned polars queries. An
 :class:`~exporgo.datastore.arrays.ArrayStore` holds one dense N-D array per identity as a NumPy

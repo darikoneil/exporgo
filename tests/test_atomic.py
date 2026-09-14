@@ -13,8 +13,8 @@ def test_write_bytes_round_trips(tmp_path: Path) -> None:
 
 def test_write_text_round_trips(tmp_path: Path) -> None:
     target = tmp_path / "config.json"
-    atomic_write_text(target, '{"name": "study"}')
-    assert target.read_text(encoding="utf-8") == '{"name": "study"}'
+    atomic_write_text(target, '{"name": "experiment"}')
+    assert target.read_text(encoding="utf-8") == '{"name": "experiment"}'
 
 
 def test_write_overwrites_existing_content(tmp_path: Path) -> None:

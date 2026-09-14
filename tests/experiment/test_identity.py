@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from exporgo.study.identity import Identity, IdentityKey, IdentitySchema
+from exporgo.experiment.identity import Identity, IdentityKey, IdentitySchema
 
 
 # ---------------------------------------------------------------------- IdentityKey
@@ -83,3 +83,48 @@ def test_identity_is_hashable_and_equal_by_value() -> None:
     assert hash(first) == hash(second)
     assert first != other
     assert len({first, second, other}) == 2
+
+
+def test_bool_key_parses_textual_false_as_false() -> None:
+    key = IdentityKey(name="Flag", dtype="bool")
+
+    assert key.coerce("False") is False
+    assert key.coerce("false") is False
+    assert key.coerce("0") is False
+
+
+def test_bool_key_parses_textual_true_as_true() -> None:
+    key = IdentityKey(name="Flag", dtype="bool")
+
+    assert key.coerce("True") is True
+    assert key.coerce("true") is True
+    assert key.coerce("1") is True
+
+
+def test_bool_key_passes_actual_bools_through() -> None:
+    key = IdentityKey(name="Flag", dtype="bool")
+
+    assert key.coerce(True) is True
+    assert key.coerce(False) is False
+
+
+def test_bool_key_accepts_zero_and_one_ints() -> None:
+    key = IdentityKey(name="Flag", dtype="bool")
+
+    assert key.coerce(1) is True
+    assert key.coerce(0) is False
+
+
+def test_bool_key_rejects_unrecognized_text() -> None:
+    key = IdentityKey(name="Flag", dtype="bool")
+
+    with pytest.raises(ValueError, match="bool"):
+        key.coerce("banana")
+
+
+def test_bool_identity_round_trips_false_through_schema() -> None:
+    schema = IdentitySchema(keys=[IdentityKey(name="Flag", dtype="bool")])
+
+    identity = schema.identity(Flag="False")
+
+    assert identity["Flag"] is False

@@ -1,4 +1,4 @@
-# Protocol(s): <experiment name>
+# Protocol(s): {{EXPERIMENT_NAME}}
 
 How the data is produced or acquired — enough that it could be repeated. If the experiment has
 more than one protocol (e.g. surgery, then recording, then a behavioral paradigm), give each its

@@ -7,25 +7,25 @@ hinge the layers turn on.
 
 ## Keys, schema, identity
 
-A study is organized along a small set of named axes. Three types express that:
+An experiment is organized along a small set of named axes. Three types express that:
 
-**{class}`~exporgo.study.IdentityKey`**: one named, typed axis. A key has a `name` (used both
+**{class}`~exporgo.experiment.IdentityKey`**: one named, typed axis. A key has a `name` (used both
 as the keyword when you address data and as the Hive partition key on disk) and a `dtype`, one
 of `"str"`, `"int"`, or `"bool"`. The dtype is stored as a string label so it round-trips
-through `study.json`.
+through `experiment.json`.
 
-**{class}`~exporgo.study.IdentitySchema`**: an ordered set of one to three keys, the study's
+**{class}`~exporgo.experiment.IdentitySchema`**: an ordered set of one to three keys, the experiment's
 coordinate system. The bound is deliberate. One to three axes is enough to name a unit of data
-in almost any study (subject, session, maybe group) and few enough that the on-disk
+in almost any experiment (subject, session, maybe group) and few enough that the on-disk
 partition tree stays shallow and fast. The default schema is a single `Subject` key.
 
-**{class}`~exporgo.study.Identity`**: one concrete point in that system, e.g.
+**{class}`~exporgo.experiment.Identity`**: one concrete point in that system, e.g.
 `Subject="m01", Session=1`. It's immutable and hashable, so an identity can key a dict or live
 in a set. Build one through the schema, which requires *exactly* the schema's keys and coerces
 each value to its key's dtype:
 
 ```python
-from exporgo.study import IdentityKey, IdentitySchema
+from exporgo.experiment import IdentityKey, IdentitySchema
 
 schema = IdentitySchema(keys=["Subject", IdentityKey(name="Session", dtype="int")])
 identity = schema.identity(Subject="m01", Session="1")   # "1" is coerced to int 1
@@ -52,9 +52,9 @@ print(identity.as_path())
 Subject=m01/Session=1
 ```
 
-This is the whole trick. Because {meth}`~exporgo.study.Identity.as_path` produces the same
+This is the whole trick. Because {meth}`~exporgo.experiment.Identity.as_path` produces the same
 `key=value/…` fragment the store writes to, the identity you register, the identity you query,
-and the directory the data lands in are one and the same. Declare your keys once, and the study
+and the directory the data lands in are one and the same. Declare your keys once, and the experiment
 layer and the datastore layer agree on where everything is without any further coordination.
 
 ## Full and partial identities

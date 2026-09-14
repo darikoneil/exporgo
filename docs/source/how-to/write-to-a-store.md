@@ -12,17 +12,17 @@ uv add "exporgo[datastore]"
 
 Give the store a name and a polars schema: a `column → dtype` map at full fidelity (exact int
 and float widths, and `List`/`Array`/`Struct` for array columns). Partition keys default to the
-study's identity keys; an optional `sort_column` enables row-group range pruning:
+experiment's identity keys; an optional `sort_column` enables row-group range pruning:
 
 ```python
 import polars as pl
 
-study.declare_store(
+experiment.declare_store(
     "behavior",
     {"Subject": pl.String, "Session": pl.Int64, "trial": pl.Int64, "rt": pl.Float64},
     sort_column="trial",
 )
-store = study.store("behavior")
+store = experiment.store("behavior")
 ```
 
 The schema is strict and enforced on every write. A frame whose columns don't exactly match
@@ -97,6 +97,6 @@ print(store.manifest().row_count())
 3
 ```
 
-At the study level, {meth}`study.identities(store="behavior") <exporgo.study.Study.identities>`
-returns those partitions as typed identities, and {meth}`~exporgo.study.Study.coverage` folds
+At the experiment level, {meth}`experiment.identities(store="behavior") <exporgo.experiment.Experiment.identities>`
+returns those partitions as typed identities, and {meth}`~exporgo.experiment.Experiment.coverage` folds
 them into the full present/missing/unregistered report.

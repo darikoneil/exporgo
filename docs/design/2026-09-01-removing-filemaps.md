@@ -1,5 +1,7 @@
 # exporgo — Removing file maps
 
+*(2026-09-14: Study was renamed Experiment.)*
+
 *Design record, 2026-09-01. A deletion, not a feature. **Done & verified 2026-09-01**
 (ruff/pyrefly clean; 193 tests pass). Supersedes the `FileMap` sections of
 [the Study & Identity design](2026-08-23-study-identity-design.md).*

@@ -38,8 +38,9 @@ standing instructions belong in `.claude/local.md` (imported below, never overwr
 3. **Keep the docs current and small.** When work reveals a new or moved location, update the right
    `resources.md` (or `context.md`) the same session, and say so. Don't let `context.md` grow —
    detail belongs in the experiment files.
-4. **Plans vs. experiments.** `plans/` is intent; `experiments/` is execution. Promote a plan by
-   copying `experiments/_TEMPLATE/` into a new experiment folder.
+4. **Plans vs. experiments.** `plans/` is intent; `experiments/` is execution. Promote a plan with
+   `exporgo experiment new "<name>"` — it stamps `experiments/_TEMPLATE/` into a new folder and
+   pre-fills the raw data root as `<project data_root>\<slug>`.
 5. **Never edit `.claude/skills/exporgo/` in a project.** Those files are overwritten by
    `exporgo update`; improvements go to the template repo. Project-specific skills go in
    `.claude/skills/local/`, and project-specific instructions in `.claude/local.md`.
@@ -50,6 +51,8 @@ standing instructions belong in `.claude/local.md` (imported below, never overwr
   status; prompts for anything missing; `--git` to init a repo — it never commits).
 - **Update a project from the template** → `exporgo check` to preview, then `exporgo update`.
   Refreshes only the exporgo-owned files; never touches project content.
+- **Start a new experiment** → `exporgo experiment new "<name>"` (from the project root). Stamped
+  experiment folders are project content — never touched by update.
 - **Sync data and outputs across machines** → `exporgo sync` (paths from `exporgo.toml`'s
   `[sync]` section or flags); the `gdrive-folder-sync` skill
   (`.claude/skills/exporgo/sync/SKILL.md`) is the operational guide. Data travels via Drive,

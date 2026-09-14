@@ -246,3 +246,29 @@ def test_write_logs_a_summary(tmp_path: Path) -> None:
     joined = " ".join(records).lower()
     assert "neural" in joined
     assert "array" in joined
+
+
+def test_overwrite_failure_preserves_the_old_array(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed overwrite must leave the identity with its previous, loadable array."""
+    store = ArrayStore(tmp_path, _spec())
+    old = _write_one(store)
+
+    def boom(*args: object, **kwargs: object) -> None:
+        msg = "disk full"
+        raise RuntimeError(msg)
+
+    monkeypatch.setattr(store, "_write_coords", boom)
+    replacement = np.zeros((4, 6), dtype=np.float32)
+    with pytest.raises(RuntimeError, match="disk full"):
+        store.write(
+            replacement,
+            coords={"unit": np.arange(4), "time": np.linspace(0.0, 0.5, 6)},
+            mode="overwrite",
+            Subject="m01",
+            Session=1,
+        )
+
+    loaded = store.load(Subject="m01", Session=1)
+    np.testing.assert_array_equal(loaded.to_numpy(), old)

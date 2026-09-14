@@ -4,7 +4,7 @@ Writing to a uniquely-named temporary in the same directory and then renaming it
 target makes the write atomic on a single filesystem: a reader never sees a half-written file,
 and concurrent writers resolve to last-writer-wins rather than a torn result. The unique
 temporary name means two writers publishing the same target never collide on the scratch file.
-Used for the small metadata files exporgo maintains (``study.json``, the ``entities.jsonl``
+Used for the small metadata files exporgo maintains (``experiment.json``, the ``entities.jsonl``
 sidecar, dump sidecars, the store schema anchor and manifest log).
 
 The last-writer-wins guarantee is POSIX semantics; on Windows two ``os.replace`` calls racing

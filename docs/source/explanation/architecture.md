@@ -21,8 +21,8 @@ project can drive through {func}`~exporgo.log.init_logger`: a colorized console 
 file and exception sinks, and decorators that record calls, arguments, return values, and
 timing. It's the foundation the other layers log through, and it's useful on its own.
 
-**study**: also in the base install (it adds only `pydantic`). The Study & Identity model: the
-coordinate system, the resources a study expects, and file-existence validation.
+**experiment**: also in the base install (it adds only `pydantic`). The Experiment & Identity model: the
+coordinate system, the resources an experiment expects, and file-existence validation.
 This is the shared foundation — the identity keys it defines become the datastore's partition
 keys, and its validation seeds what a monitoring layer would report.
 
@@ -36,21 +36,21 @@ an agent-readable map. Planned; not yet implemented.
 
 ## How the layers depend on each other
 
-The dependency arrow points one way: study builds on logging, and datastore builds on study.
-It doesn't point back — importing `exporgo.study` never pulls in the datastore layer. The study module refers to store types only under `TYPE_CHECKING` and imports the real
+The dependency arrow points one way: experiment builds on logging, and datastore builds on experiment.
+It doesn't point back — importing `exporgo.experiment` never pulls in the datastore layer. The experiment module refers to store types only under `TYPE_CHECKING` and imports the real
 datastore classes lazily, inside the methods that need them. So the base install stays light,
-and a study that never touches a store never imports polars.
+and an experiment that never touches a store never imports polars.
 
-The identity model is the seam that holds it together. Because the study layer and the
-datastore layer both key everything by the same {class}`~exporgo.study.Identity`, and an
+The identity model is the seam that holds it together. Because the experiment layer and the
+datastore layer both key everything by the same {class}`~exporgo.experiment.Identity`, and an
 identity renders to exactly the partition path a store writes to, the layers line up on disk
 without any coupling in code. Declare your keys once; the layers agree from there.
 
 ## Persistence
 
-A study persists its **declaration** (keys, resource templates, store specs) to `study.json`,
+An experiment persists its **declaration** (keys, resource templates, store specs) to `experiment.json`,
 with registered identities kept separately in `entities.jsonl` so a large registry doesn't bloat
-the config file. {meth}`~exporgo.study.Study.load` reloads both. It never persists data or
+the config file. {meth}`~exporgo.experiment.Experiment.load` reloads both. It never persists data or
 derived status: those are re-read from the filesystem on demand, because the filesystem is the
 source of truth. Those two files plus the tree they describe are enough to reconstruct the whole
-picture, which also makes a study straightforward for an agent to read and reason about.
+picture, which also makes an experiment straightforward for an agent to read and reason about.

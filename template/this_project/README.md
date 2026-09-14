@@ -17,7 +17,8 @@ Small and pointed, so an agent loads only what a task needs:
   pointers to everything else. This is the file that loads on every prompt, so it stays brief.
 - **`experiments/`** — one folder per experiment, each a self-contained unit: `experiment.md`
   (scientific description), `protocol.md`, `analysis.md` (pipeline), `resources.md` (where its code
-  and data live). Copy `experiments/_TEMPLATE/` to start one.
+  and data live). Start one with `exporgo experiment new "<name>"` — it stamps
+  `experiments/_TEMPLATE/` and pre-fills the raw data root from the project's `data_root`.
 - **`plans/`** — unexecuted aims, ideas, and timelines. What you *intend* to do, distinct from the
   experiments you're running.
 

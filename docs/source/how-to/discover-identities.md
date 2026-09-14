@@ -1,23 +1,23 @@
 # Discover identities from an existing dataset
 
-You already have data on disk and want a study registry that matches it — without typing out
+You already have data on disk and want an experiment registry that matches it — without typing out
 every `register(...)` call by hand. exporgo can reverse-resolve your resource templates to find
 what's there and seed the registry from it.
 
 ## See what's on disk
 
 Declare the resource whose template matches your existing layout, then call
-{meth}`~exporgo.study.Study.discover`. It reverse-resolves the template against the study root
+{meth}`~exporgo.experiment.Experiment.discover`. It reverse-resolves the template against the experiment root
 and reports every identity it finds. With an empty registry, everything on disk shows up as
 `unregistered` drift:
 
 ```python
-from exporgo.study import IdentityKey, Study
+from exporgo.experiment import IdentityKey, Experiment
 
-study = Study("mouse_study", root, identity=["Subject", IdentityKey(name="Session", dtype="int")])
-study.declare_resource("raw", "{Subject}/{Session}/raw.tif")
+experiment = Experiment("mouse_experiment", root, identity=["Subject", IdentityKey(name="Session", dtype="int")])
+experiment.declare_resource("raw", "{Subject}/{Session}/raw.tif")
 
-print(study.discover())
+print(experiment.discover())
 ```
 
 ```text
@@ -36,13 +36,13 @@ complete. The three `unregistered` entries are what there is to act on.
 
 ## Seed the registry
 
-{meth}`~exporgo.study.Study.sync_registry` is the one-call bootstrap. It sweeps every declared
+{meth}`~exporgo.experiment.Experiment.sync_registry` is the one-call bootstrap. It sweeps every declared
 component: resources (reverse-resolved) and stores and array stores (their manifests). It
 registers each full-key identity that isn't registered yet, returning the ones it added in path
 order:
 
 ```python
-print(study.sync_registry())
+print(experiment.sync_registry())
 ```
 
 ```text
@@ -52,7 +52,7 @@ print(study.sync_registry())
 Discover again and the drift is gone — the same identities are now `present`:
 
 ```python
-print(study.discover())
+print(experiment.discover())
 ```
 
 ```text
@@ -69,11 +69,11 @@ CoverageReport: 3 present, 0 missing, 0 unregistered (complete)
 
 Both bootstrap the registry; they differ in scope.
 
-- {meth}`Study.discover(register=True) <exporgo.study.Study.discover>` is
+- {meth}`Experiment.discover(register=True) <exporgo.experiment.Experiment.discover>` is
   **resource-only**. It builds the drift report, then registers the discovered full-key
   identities. Reach for it when you want the report *and* the bootstrap in one call, from
   resource templates.
-- {meth}`~exporgo.study.Study.sync_registry` sweeps **every identity-bearing component**:
+- {meth}`~exporgo.experiment.Experiment.sync_registry` sweeps **every identity-bearing component**:
   resources, stores, and array stores together (dumps have no identity, so they're never
   swept). Reach for it to seed a registry from everything on disk at once.
 

@@ -1,8 +1,8 @@
 # Storage and concurrency
 
-exporgo stores a study's bulk data as plain Parquet files with a small catalog on top, and it
+exporgo stores an experiment's bulk data as plain Parquet files with a small catalog on top, and it
 never runs a server. That choice is deliberate, and it shapes both what exporgo is fast at and
-how it behaves when several people hit the same study at once. This page explains the model,
+how it behaves when several people hit the same experiment at once. This page explains the model,
 the concurrency guarantee it can honestly make, and why it isn't a database.
 
 ## The storage model: a data lake, in miniature
@@ -36,7 +36,7 @@ The plain-files model buys real strengths:
   row-group statistics prune within a file, and nothing is read until you collect — so a
   selective query over a large store touches only the fragments it needs, and never loads more
   than it must.
-- **No server, no service.** A study is a directory. You can put it on a laptop, a lab NAS, or
+- **No server, no service.** An experiment is a directory. You can put it on a laptop, a lab NAS, or
   cloud object storage and it works the same way, with nothing to install, run, or keep alive.
 - **The filesystem is the source of truth.** exporgo caches no status; `validate`, `coverage`,
   and every scan re-read the tree. State can't drift out of sync with reality, and any tool —
@@ -46,7 +46,7 @@ These are the properties you'd lose the moment the data moved into a database en
 
 ## Concurrency: the guarantee, and its honest limits
 
-The realistic multi-user case is a study on a lab server that several members mount at once.
+The realistic multi-user case is an experiment on a lab server that several members mount at once.
 Here is what exporgo can promise, and what no plain file share can:
 
 - **Disjoint writers are safe.** Two people writing different subjects (or different sessions)
@@ -89,7 +89,7 @@ exporgo's workload is write-once bulk data, occasional metadata declarations, an
 scans, with writers who own disjoint slices. That's a data-lake access pattern, not an OLTP
 one. A database is the right tool when you have high-frequency concurrent mutation of shared
 rows, strong cross-entity transactions, or complex indexed queries at write time — a web app,
-not a study.
+not an experiment.
 
 ## The lakehouse option, explicitly
 
@@ -109,17 +109,17 @@ deliberate miniature of the same idea — immutable data files plus a transactio
 **Cons:**
 
 - **A heavy dependency and real operational weight.** delta-rs or PyIceberg is a large addition
-  to a framework whose selling point is "a study is a directory."
+  to a framework whose selling point is "an experiment is a directory."
 - **The atomic-commit guarantee needs a primitive the medium may not have.** Their isolation
   leans on an atomic put-if-absent, which object stores provide but a bare NFS/SMB share only
   approximates via atomic rename. On a plain lab server with no coordinator, even a lakehouse
   degrades toward "safe for disjoint writers, careful for concurrent same-table commits" — the
   same place the append-only manifest already sits, with a fraction of the machinery.
 - **Overkill for the actual workload.** The sophistication buys safe concurrent same-partition
-  commits and multi-file atomic transactions — things a disjoint-writer lab study rarely needs.
+  commits and multi-file atomic transactions — things a disjoint-writer lab experiment rarely needs.
 
 **The migration path stays open.** Today's unique-fragment manifest is a natural stepping stone,
-not a dead end: if a study outgrows it — moving to cloud object storage, or genuinely needing
+not a dead end: if an experiment outgrows it — moving to cloud object storage, or genuinely needing
 concurrent commits to the same partition — you can swap the catalog layer for Iceberg or Delta
 with the *same Parquet files underneath*. You get the cheap, dependency-free, performance-neutral
 model now, and the escape hatch later.

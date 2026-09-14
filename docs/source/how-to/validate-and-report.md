@@ -1,17 +1,17 @@
-# Validate and report on a study
+# Validate and report on an experiment
 
-Once a study is registered and has data, you'll want to ask what's there and what's missing.
+Once an experiment is registered and has data, you'll want to ask what's there and what's missing.
 exporgo gives you a quick liveness check and a fuller report. This guide shows both and how to
 filter the result. For the concepts behind the two, see [Coverage and
 validation](../explanation/coverage-and-validation).
 
 ## Quick liveness check
 
-{meth}`~exporgo.study.Study.validate` checks that every registered identity's *indicated* files
+{meth}`~exporgo.experiment.Experiment.validate` checks that every registered identity's *indicated* files
 (its resources) still exist on disk:
 
 ```python
-report = study.validate()
+report = experiment.validate()
 print(report.is_complete)
 print(report.missing)
 ```
@@ -27,12 +27,12 @@ contents are never read. Stores are out of scope (use `coverage` for those).
 
 ## The full report
 
-{meth}`~exporgo.study.Study.coverage` reports every registered identity against every
+{meth}`~exporgo.experiment.Experiment.coverage` reports every registered identity against every
 identity-bearing component (resources, stores, and array stores; dumps have no identity and are
 excluded) and adds anything on disk that was never registered:
 
 ```python
-print(study.coverage())
+print(experiment.coverage())
 ```
 
 ```text
@@ -50,21 +50,21 @@ CoverageReport: 4 present, 2 missing, 0 unregistered (incomplete)
 The report object carries helpers for drilling in:
 
 ```python
-coverage = study.coverage()
+coverage = experiment.coverage()
 print(coverage.identities("behavior"))          # identities present in one component
 print(coverage.components(some_identity))         # components that contain one identity
 ```
 
 ## Filter it as a DataFrame
 
-For anything beyond eyeballing, {meth}`~exporgo.study.CoverageReport.to_polars` reshapes the
+For anything beyond eyeballing, {meth}`~exporgo.experiment.CoverageReport.to_polars` reshapes the
 report into a tidy long frame — one row per `(identity, component)`, the identity keys exploded
 into their own columns, plus `component` and `status`:
 
 ```python
 import polars as pl
 
-frame = study.coverage().to_polars()
+frame = experiment.coverage().to_polars()
 print(frame.filter(pl.col("status") == "missing"))
 ```
 
@@ -86,16 +86,16 @@ lives); without it you get a clear `ImportError` pointing you to `exporgo[datast
 
 ## Inventory a single component
 
-To ask which identities one component contains, {meth}`~exporgo.study.Study.identities` takes
+To ask which identities one component contains, {meth}`~exporgo.experiment.Experiment.identities` takes
 exactly one target:
 
 ```python
-study.identities(store="behavior")          # open-world: the store's manifest partitions
-study.identities(array_store="traces")      # open-world: the array store's partitions
-study.identities(resource="raw")            # closed-world: registered identities whose file exists
+experiment.identities(store="behavior")          # open-world: the store's manifest partitions
+experiment.identities(array_store="traces")      # open-world: the array store's partitions
+experiment.identities(resource="raw")            # closed-world: registered identities whose file exists
 ```
 
 A store and an array store report **open-world** (whatever's on disk, including unregistered
 identities); a resource reports **closed-world** (registered identities whose file exists). To
-find unregistered *resource* data, use {meth}`~exporgo.study.Study.discover` (see [Discover
+find unregistered *resource* data, use {meth}`~exporgo.experiment.Experiment.discover` (see [Discover
 identities](discover-identities)).
