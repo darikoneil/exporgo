@@ -258,3 +258,5 @@ fabric.properties
 # personal voice-profile reference for the voice-matcher agent (contains verbatim
 # snippets from private writing samples; kept out of version control)
 /.claude/agents/references/
+
+.idea/
