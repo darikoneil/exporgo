@@ -42,9 +42,8 @@ touching the rest.
 *Reach for an array store when* each identity has exactly one dense N-D array you want back as a
 labelled {class}`xarray.DataArray`. *Not when* the data is tabular rows (a tabular store) or a
 file you only need to locate (a resource). For example, a `neural` array store holds each
-session's
-calcium traces as a `[unit, time]` array with unit indices and frame timestamps as coordinates;
-{meth}`~exporgo.datastore.ArrayStore.load` returns it aligned and ready for
+session's calcium traces as a `[unit, time]` array with unit indices and frame timestamps as
+coordinates; {meth}`~exporgo.datastore.ArrayStore.load` returns it aligned and ready for
 `neural.sel(time=slice(0, 10))`. The declaration fixes the coordinate *structure* (the dimension
 names, the axis order, and which axes are labelled), so every array in the store shares it. The
 coordinate *values* are per-identity: each write brings its own vectors, and each array its own
@@ -56,7 +55,7 @@ with its own unit indices and timestamps.
 whole folder's worth of paths that belong to no identity at all. Use it for assets that belong to
 the experiment rather than one subject: an atlas, a README, a shared lookup table. Paths are stored
 as-given; nothing is copied, and the index persists to a `_dump.json` sidecar. Retrieval
-dispatches on `*` — a selector without one is an exact relative-path key, a selector with one is
+dispatches on `*`: a selector without one is an exact relative-path key, a selector with one is
 an {mod}`fnmatch` glob that crosses `/`.
 
 *Reach for it when* an asset belongs to the whole experiment rather than any one subject or session.
@@ -72,7 +71,7 @@ with {meth}`~exporgo.experiment.Dump.exists`.
 The distinction to remember is how each component knows where its data is:
 
 - A **resource** *derives* one path from a template. exporgo reads; you own the bytes.
-- A **store** *owns* the data. exporgo writes and reads it — a tabular store as Parquet, an
+- A **store** *owns* the data. exporgo writes and reads it: a tabular store as Parquet, an
   array store as `.npy` blobs (plus a Parquet coordinate catalog).
 - A **dump** *indexes* many files under one experiment-global root, keyed by relative path. exporgo
   remembers; you own the bytes.
@@ -81,17 +80,22 @@ Resource and store are deliberately symmetric. Each splits into a declaration an
 handle ({class}`~exporgo.experiment.ResourceSpec` + {class}`~exporgo.experiment.Resource` mirror
 {class}`~exporgo.datastore.StoreSpec` + {class}`~exporgo.datastore.Store`), reached the same
 way: `experiment.declare_resource(...)` / `experiment.resource(name)` alongside `experiment.declare_store(...)`
-/ `experiment.store(name)`. A dump has no separate spec — its declaration is just its name — so
-`experiment.declare_dump(name)` / `experiment.dump(name)` hands back the handle directly.
+/ `experiment.store(name)`. A dump has no separate spec, since its declaration is just its name,
+so `experiment.declare_dump(name)` / `experiment.dump(name)` hands back the handle directly.
 
 ## Where the data lives
 
 A resource path is wherever its template resolves: exporgo doesn't impose a layout on data it
 only reads. A store, by contrast, lives under `<root>/<name>/` and is partitioned on its keys,
 so `behavior` data for `Subject=m01, Session=1` lands in
-`<root>/behavior/Subject=m01/Session=1/`. Because a store's default partition keys *are* the
-experiment's identity keys, a store partition and an identity are the same thing, which is what lets
-a store report its own membership (see [Coverage and validation](coverage-and-validation)).
+`<root>/behavior/Subject=m01/Session=1/`. A store's directory names are percent-encoded, so a
+value with a space or a `#` in it is spelled differently on disk than in the identity you wrote:
+`Subject=m 01#a` becomes `Subject=m%2001%23a`, and a `bool` renders lowercase as `Flag=false`.
+The store's manifest holds the raw values, and is what to read membership from. See
+[Values with special characters](identity-model.md#values-with-special-characters). Because a
+store's default partition keys *are* the experiment's identity keys, a store partition and an
+identity are the same thing, which is what lets a store report its own membership (see
+[Coverage and validation](coverage-and-validation)).
 
 A raw resource feeds your processing, which writes tabular results a store owns — exporgo
 brackets the ends and stays out of the middle. It describes, validates, and reports; it never

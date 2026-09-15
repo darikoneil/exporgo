@@ -272,3 +272,35 @@ def test_overwrite_failure_preserves_the_old_array(
 
     loaded = store.load(Subject="m01", Session=1)
     np.testing.assert_array_equal(loaded.to_numpy(), old)
+
+
+def test_overwrite_failure_at_the_manifest_commit_preserves_the_old_pairing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failure before the blob's manifest entry lands must leave the previous
+    array loadable WITH its previous coordinates -- never paired with the incoming
+    coordinates, and never stripped of coordinates entirely."""
+    store = ArrayStore(tmp_path, _spec())
+    old = _write_one(store)  # unit=0..3, time=linspace(0.0, 0.5, 6)
+
+    def boom(*args: object, **kwargs: object) -> None:
+        msg = "disk full"
+        raise RuntimeError(msg)
+
+    # The blob's manifest append is the write's commit point; fail exactly there.
+    monkeypatch.setattr("exporgo.datastore.arrays.append_manifest_log", boom)
+    with pytest.raises(RuntimeError, match="disk full"):
+        store.write(
+            np.full((4, 6), 9.0, dtype=np.float32),
+            coords={"unit": np.arange(10, 14), "time": np.linspace(1.0, 2.0, 6)},
+            mode="overwrite",
+            Subject="m01",
+            Session=1,
+        )
+
+    loaded = store.load(Subject="m01", Session=1)
+    np.testing.assert_array_equal(loaded.to_numpy(), old)
+    np.testing.assert_array_equal(loaded.coords["unit"].to_numpy(), np.arange(4))
+    np.testing.assert_allclose(
+        loaded.coords["time"].to_numpy(), np.linspace(0.0, 0.5, 6)
+    )

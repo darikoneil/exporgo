@@ -1,7 +1,7 @@
 # Store arrays with coordinates
 
-An **array store** holds one dense N-D array per identity — a calcium trace `[unit, time]`, an
-imaging tensor — as a NumPy `.npy` blob paired with a coordinate catalog, and hands it back as an
+An **array store** holds one dense N-D array per identity (a calcium trace `[unit, time]`, an
+imaging tensor) as a NumPy `.npy` blob paired with a coordinate catalog, and hands it back as an
 {class}`xarray.DataArray`. It is the datastore's second store kind, for the bulk arrays that don't
 belong in a tabular store. It needs the datastore extra:
 
@@ -12,8 +12,8 @@ uv add "exporgo[datastore]"
 ## Declare the array store
 
 Give it a name, the ordered dimensions, and the array's element dtype. Each dimension maps to the
-polars dtype of its coordinate vector — the values you'll attach along that axis (frame
-timestamps, unit indices) — or `None` for a positional axis with no coordinate. Partition keys
+polars dtype of its coordinate vector, the values you'll attach along that axis (frame
+timestamps, unit indices), or to `None` for a positional axis with no coordinate. Partition keys
 default to the experiment's identity keys, so a partition is an identity:
 
 ```python
@@ -30,7 +30,7 @@ store = experiment.array_store("neural")
 
 The dimension order is the array's axis order: `neural` expects a 2-D array indexed `[unit,
 time]`. A `.npy` file records its own shape and element dtype, so the coordinate catalog stores
-only the coordinate vectors — nothing scalar.
+only the coordinate vectors, nothing scalar.
 
 ## Write an identity's array
 
@@ -56,11 +56,26 @@ store.write(array, coords=coords, mode="overwrite", Subject="m01", Session=1)  #
 ```
 
 - **`unique`** (the default) refuses the write, raising a `ValueError`, if the identity already
-  has an array — a re-run won't silently clobber.
+  has an array, so a re-run won't silently clobber.
 - **`overwrite`** replaces it: the prior `.npy` is tombstoned and the coordinate row is rewritten.
 
 A wrong rank, a value that can't be cast to the element dtype, a missing or mis-sized coordinate,
 or the wrong identity keys each raise a `ValueError` before anything is written.
+
+### A failed overwrite leaves the old array and coordinates intact
+
+`overwrite` publishes before it deletes, with the blob's manifest entry as the commit point. The
+new blob and its coordinate row are written first, the manifest entry lands, and only then are the
+old blob and old coordinate row tombstoned. So if the write dies part-way (a full disk, a dropped
+mount, a killed process), the identity still loads: the new array once the manifest entry landed,
+otherwise the previous array **with its previous coordinates**. Each coordinate row is paired with
+its blob in the catalog, so a crash can never hand you an array matched to the wrong coordinates.
+The worst case is an orphaned blob or coordinate fragment on disk, cleaned up by the next
+successful overwrite — not a hole in your dataset.
+
+One thing this doesn't cover: it is durability, not concurrency. Both modes check the manifest and
+then act, so keep one writer per identity (see
+[Storage and concurrency](../explanation/storage-and-concurrency)).
 
 ## Load it as an xarray DataArray
 
@@ -76,13 +91,14 @@ print(neural.coords["time"][:3]) # the frame timestamps you wrote
 ```
 
 The result is a genuine {class}`xarray.DataArray` named after the store, so labelled indexing,
-alignment, and reductions are all available — for example `neural.sel(time=slice(0, 10)).mean("unit")`.
+alignment, and reductions are all available, as in
+`neural.sel(time=slice(0, 10)).mean("unit")`.
 
 ## Query the coordinate catalog
 
 The coordinates live in a nested tabular store, one row per identity with a list-valued column per
 labelled dimension. {meth}`~exporgo.datastore.ArrayStore.scan_coords` exposes it as a lazy
-{class}`polars.LazyFrame` for cross-identity questions — how many frames each session has, say —
+{class}`polars.LazyFrame` for cross-identity questions, such as how many frames each session has,
 without loading a single array:
 
 ```python

@@ -57,6 +57,57 @@ This is the whole trick. Because {meth}`~exporgo.experiment.Identity.as_path` pr
 and the directory the data lands in are one and the same. Declare your keys once, and the experiment
 layer and the datastore layer agree on where everything is without any further coordination.
 
+## Values with special characters
+
+Real identity values are not always tidy. `Subject="m 01#a"` has a space and a `#`; a `bool` key's
+value is `True`, which is not how a Hive path spells a boolean. exporgo carries such values
+through a store unchanged. It does that by keeping **two renderings** of the same value and being
+clear about which lives where:
+
+- **Raw** is the value as you wrote it, stringified: `m 01#a`, and for booleans the lowercase
+  Hive spelling `true` / `false`. This is what a store's **manifest** records, so an identity and
+  a manifest partition compare equal without any decoding step.
+- **Encoded** is the percent-encoded form pyarrow's Hive writer puts in a **directory name**:
+  `Subject=m%2001%23a`, `Flag=false`. Only path construction and path parsing touch it, and
+  parsing decodes straight back to raw.
+
+Because the manifest is the authority on membership, everything that asks a store what it contains
+speaks raw: `mode="unique"` correctly refuses a duplicate `m 01#a`, `mode="overwrite"` finds the
+right partition to replace, and
+{meth}`experiment.identities(store=...) <exporgo.experiment.Experiment.identities>` hands back the
+value you originally wrote.
+
+{meth}`~exporgo.experiment.Identity.as_path` renders **raw**, which is the useful thing for a
+resource path or a log line but is *not* a datastore directory name. The two differ exactly where
+encoding bites: an identity whose `Subject` is `m 01#a` and whose `Flag` is `False` renders as
+`Subject=m 01#a/Flag=False`, while the store's directory for it is
+`Subject=m%2001%23a/Flag=false`. Read a datastore path through the manifest rather than by
+string-matching it against `as_path()`.
+
+## Reading a `bool` back
+
+A `bool` key is the one dtype where the obvious coercion is a trap. Python's `bool("False")` is
+`True`, because every non-empty string is truthy, so a directory named `Flag=False` would read
+back as `True`. An identity key won't do that. It accepts an actual `bool`, or a
+case-insensitive `"true"` / `"1"` / `"false"` / `"0"`, and **raises `ValueError` on anything
+else** rather than guessing:
+
+```python
+from exporgo.experiment import IdentityKey
+
+flag = IdentityKey(name="Flag", dtype="bool")
+print(flag.coerce("FALSE"), flag.coerce("1"))
+```
+
+```text
+False True
+```
+
+`flag.coerce("maybe")` is a `ValueError`. Refusing an unrecognized spelling is what makes the
+round-trip trustworthy: `true`/`false` from a partition directory, `True`/`False` from a resource
+folder, and `1`/`0` from a config file all land on the same two values, and anything without a
+boolean spelling is reported instead of silently becoming `True`.
+
 ## Full and partial identities
 
 Most identities are **full**: they carry a value for every key in the schema. But some parts

@@ -608,6 +608,24 @@ def test_load_refuses_a_newer_format(tmp_path: Path) -> None:
         Experiment.load(tmp_path)
 
 
+@pytest.mark.parametrize("bad_format", ["2", 1.5, True, None])
+def test_load_refuses_a_non_integer_format(tmp_path: Path, bad_format: object) -> None:
+    """A non-integer format can only come from a newer or corrupted writer.
+
+    Only an *absent* ``format`` key means legacy; an explicit ``null`` (or a
+    string, float, or boolean) is refused rather than silently treated as
+    legacy.
+    """
+    experiment = Experiment(name="s", root=tmp_path)
+    config = experiment.save(init_logging=False)
+    data = json.loads(config.read_text(encoding="utf-8"))
+    data["format"] = bad_format
+    config.write_text(json.dumps(data), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="integer formats"):
+        Experiment.load(tmp_path)
+
+
 def test_load_warns_about_unknown_top_level_keys(tmp_path: Path) -> None:
     experiment = Experiment(name="s", root=tmp_path)
     config = experiment.save(init_logging=False)

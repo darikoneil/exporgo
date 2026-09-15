@@ -1086,12 +1086,21 @@ class Experiment:
         """
         root = Path(root)
         data = json.loads((root / _CONFIG_NAME).read_text(encoding="utf-8"))
-        format_version = data.get("format")  # absent = legacy (format 1) file
-        if isinstance(format_version, int) and format_version > _FORMAT_VERSION:
+        # An absent "format" key means a legacy (format 1) file; an explicit
+        # null does not, so membership is tested rather than data.get().
+        format_version = data["format"] if "format" in data else _FORMAT_VERSION
+        if (
+            not isinstance(format_version, int)
+            or isinstance(format_version, bool)
+            or format_version > _FORMAT_VERSION
+        ):
+            # A non-integer format is refused too: it can only come from a
+            # newer (or corrupted) writer, and silently treating it as legacy
+            # would hide that.
             msg = (
-                f"{root / _CONFIG_NAME} declares format {format_version}, but this "
-                f"exporgo understands only format {_FORMAT_VERSION} or lower; upgrade "
-                f"exporgo to load this experiment."
+                f"{root / _CONFIG_NAME} declares format {format_version!r}, but this "
+                f"exporgo understands only integer formats up to {_FORMAT_VERSION}; "
+                f"upgrade exporgo to load this experiment."
             )
             raise ValueError(msg)
         unknown = sorted(set(data) - _KNOWN_KEYS)

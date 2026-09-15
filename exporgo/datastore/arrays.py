@@ -10,9 +10,10 @@ Each identity's array lives at a Hive-partitioned path (``Subject=m01/Session=1/
 tracked by the same append-only ``_manifest/`` log the tabular store uses, so writes are
 multi-writer safe and overwrite tombstones the prior blob. The **coordinate catalog** -- the
 actual coordinate vectors (timestamps, unit indices) -- is a nested tabular store under
-``_coords/``: one row per identity, one list-valued column per labelled dimension. A ``.npy``
+``_coords/``: one row per identity, one list-valued column per labelled dimension, plus a hidden
+column pairing the row with its blob so a crashed overwrite can never mismatch the two. A ``.npy``
 already records its own shape and element dtype, so the catalog stores coordinates and nothing
-scalar.
+else.
 """
 
 from datetime import UTC, datetime
@@ -41,6 +42,15 @@ _MAX_PARTITION_KEYS = 3
 _MANIFEST_DIR = "_manifest"
 _COORDS_DIR = "_coords"
 _DATA_PREFIX = "data-"
+
+_BLOB_COLUMN = "__blob__"
+"""Hidden catalog column pairing each coordinate row with its blob's manifest path.
+
+Overwrites append the new coordinate row *before* the new blob's manifest entry lands
+(publish-before-delete), so during a crash window the catalog can briefly hold both the
+old and the new row. ``load`` resolves the ambiguity by selecting the row whose
+``__blob__`` matches the manifest-selected blob -- deterministic in every crash state.
+"""
 
 _NESTED_DTYPES = (pl.List, pl.Array, pl.Struct)
 """polars dtypes that cannot serve as a partition key or a coordinate element type."""
@@ -176,7 +186,9 @@ class ArrayStoreSpec(BaseModel):
         """Build the :class:`~exporgo.datastore.spec.StoreSpec` for the coordinate catalog.
 
         The catalog is a plain tabular store whose columns are the partition keys followed by
-        one :class:`polars.List` column per labelled dimension, partitioned by the same keys.
+        one :class:`polars.List` column per labelled dimension, partitioned by the same keys,
+        plus a hidden string column pairing each row with its blob's manifest path (dropped
+        from :meth:`ArrayStore.scan_coords`).
 
         Returns:
             The coordinate catalog's :class:`~exporgo.datastore.spec.StoreSpec`.
@@ -186,6 +198,7 @@ class ArrayStoreSpec(BaseModel):
         }
         for dim in self.labelled_dims:
             columns[dim] = pl.List(self.dims[dim])
+        columns[_BLOB_COLUMN] = pl.String
         return StoreSpec(
             name=f"{self.name}/{_COORDS_DIR}",
             columns=columns,
@@ -234,9 +247,12 @@ class ArrayStore:
         - ``"unique"`` (default): refuse the write if this identity already has an array --
           fail loud rather than silently clobber.
         - ``"overwrite"``: replace this identity's array (the prior blob is tombstoned) and its
-          coordinate row. The new blob is written (and registered in the manifest) **before**
-          the old one is deleted, so a failure mid-write never strands the identity with no
-          array -- at worst the old array survives alongside an orphaned temporary file.
+          coordinate row. The write is publish-before-delete with the blob's manifest entry as
+          its commit point: the new blob and its coordinate row are written first, the manifest
+          entry lands, and only then are the old blob and old coordinate row tombstoned. A
+          failure at any step therefore leaves the identity loadable with its **previous array
+          and its previous coordinates** intact -- at worst an orphaned blob or coordinate
+          fragment survives on disk (cleaned up by the next successful overwrite).
 
         Warning:
             Both modes are check-then-act over the manifest, not atomic: two concurrent
@@ -275,12 +291,17 @@ class ArrayStore:
                 f"refusing to write (mode='unique')."
             )
             raise ValueError(msg)
-        # Write-new-first, delete-old-last: capture the old blob paths, publish the new
-        # blob and its manifest entry, and only then remove the old blob -- so a failure
-        # at any step leaves the identity with a loadable array.
+        # Publish-before-delete, committed by the blob's manifest entry: capture the old
+        # blob and coordinate fragments, publish the new blob and its coordinate row
+        # (paired via the hidden blob column), append the blob's manifest entry, and only
+        # then tombstone the old fragments -- so a failure at any step leaves the previous
+        # array loadable with its previous coordinates.
         previous = self._fragment_paths(target) if mode == "overwrite" else []
+        previous_coords = (
+            self._coord_fragment_paths(target) if mode == "overwrite" else []
+        )
         relative = self._write_array(identity, array)
-        self._write_coords(identity, supplied)
+        self._write_coords(identity, supplied, blob=relative)
         entry = FragmentEntry(
             path=relative,
             partition=_partition.dict_of_identity(self.spec.partition_keys, identity),
@@ -288,6 +309,8 @@ class ArrayStore:
             written=datetime.now(UTC).isoformat(),
         )
         append_manifest_log(self.root / _MANIFEST_DIR, added=[entry])
+        if previous_coords:
+            self._remove_coord_fragments(previous_coords)
         if previous:
             self._remove_fragments(previous)
         pretty = _partition.dict_of_identity(self.spec.partition_keys, identity)
@@ -333,7 +356,7 @@ class ArrayStore:
             raise KeyError(msg)
         with (self.root / relative).open("rb") as handle:
             array = np.load(handle)
-        coord_values = self._read_coords(identity)
+        coord_values = self._read_coords(identity, blob=relative)
         coords = {
             dim: coord_values[dim]
             for dim in self.spec.labelled_dims
@@ -357,9 +380,10 @@ class ArrayStore:
 
         Returns:
             A :class:`polars.LazyFrame` over the coordinate catalog: the partition-key columns
-            plus one list-valued column per labelled dimension, one row per identity.
+            plus one list-valued column per labelled dimension, one row per identity. The
+            internal blob-pairing column is dropped.
         """
-        return self._coords.scan()
+        return self._coords.scan().drop(_BLOB_COLUMN)
 
     def path(self, **identity: Any) -> Path | None:
         """Return the on-disk path of an identity's array, or ``None`` if it has none.
@@ -422,8 +446,14 @@ class ArrayStore:
                 )
                 raise ValueError(msg)
 
-    def _write_coords(self, identity: dict[str, Any], coords: dict[str, Any]) -> None:
-        """Write (overwrite) one identity's coordinate row in the catalog."""
+    def _write_coords(
+        self, identity: dict[str, Any], coords: dict[str, Any], *, blob: str
+    ) -> None:
+        """Append one identity's coordinate row, paired with its blob's manifest path.
+
+        Appends rather than overwrites: the old coordinate row must stay live until the
+        new blob's manifest entry lands, and is tombstoned afterwards by ``write``.
+        """
         if not self.spec.labelled_dims:
             return
         row: dict[str, list[Any]] = {
@@ -431,14 +461,16 @@ class ArrayStore:
         }
         for dim in self.spec.labelled_dims:
             row[dim] = [np.asarray(coords[dim]).tolist()]
-        self._coords.write(pl.DataFrame(row), mode="overwrite")
+        row[_BLOB_COLUMN] = [blob]
+        self._coords.write(pl.DataFrame(row), mode="append")
 
-    def _read_coords(self, identity: dict[str, Any]) -> dict[str, Any]:
-        """Read one identity's coordinate vectors from the catalog (empty if none).
+    def _read_coords(self, identity: dict[str, Any], *, blob: str) -> dict[str, Any]:
+        """Read the coordinate vectors paired with one blob (empty if none).
 
         Reads the identity's own partition directory directly (rather than filtering the whole
-        catalog), so only that identity's coordinate fragment is touched and partition-key types
-        never enter a predicate.
+        catalog), so only that identity's coordinate fragments are touched and partition-key
+        types never enter a predicate. Selecting by the blob-pairing column keeps the result
+        deterministic even when a crashed overwrite left more than one row on disk.
         """
         if not self.spec.labelled_dims:
             return {}
@@ -448,7 +480,7 @@ class ArrayStore:
         fragments = sorted(partition_directory.glob("part-*.parquet"))
         if not fragments:
             return {}
-        frame = pl.read_parquet(fragments)
+        frame = pl.read_parquet(fragments).filter(pl.col(_BLOB_COLUMN) == blob)
         if frame.height == 0:
             return {}
         record = frame.row(0, named=True)
@@ -500,3 +532,18 @@ class ArrayStore:
         for path in paths:
             (self.root / path).unlink(missing_ok=True)
         append_manifest_log(self.root / _MANIFEST_DIR, removed=paths)
+
+    def _coord_fragment_paths(self, target: tuple[str, ...]) -> list[str]:
+        """Return the live coordinate-catalog fragment paths for an identity's partition tuple."""
+        keys = self.spec.partition_keys
+        return [
+            fragment.path
+            for fragment in self._coords.manifest().fragments
+            if _partition.tuple_of_partition(keys, fragment.partition) == target
+        ]
+
+    def _remove_coord_fragments(self, paths: list[str]) -> None:
+        """Delete the given catalog fragment files and tombstone them in the catalog's log."""
+        for path in paths:
+            (self._coords.root / path).unlink(missing_ok=True)
+        append_manifest_log(self._coords.root / _MANIFEST_DIR, removed=paths)

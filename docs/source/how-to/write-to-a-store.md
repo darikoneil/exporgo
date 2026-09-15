@@ -49,8 +49,15 @@ store.write(frame, mode="unique")     # refuse if any incoming identity already 
   already contains, raising a `ValueError`. Use it to make a re-run safe against silent
   duplication.
 
-Every mode is out-of-core — data for other partitions is never read, so writes stay cheap even
+Every mode is out-of-core: data for other partitions is never read, so writes stay cheap even
 as the store grows.
+
+The modes also differ under **concurrent writers**. `append` is multi-writer safe, even into the
+same partition: every fragment and manifest entry is uniquely named and the log is append-only.
+`unique` and `overwrite` are check-then-act over the manifest, reading, deciding, and then
+writing, so two writers aiming at the *same* partition can interleave and both land. Use them
+where one writer owns the partition. See
+[Storage and concurrency](../explanation/storage-and-concurrency).
 
 ## Read it back with pruning
 
@@ -79,8 +86,32 @@ shape: (3, 4)
 └─────────┴─────────┴───────┴──────┘
 ```
 
-Collecting first and filtering after materializes the whole dataset, defeating the pruning — so
-keep the `.filter(...)` on the lazy frame.
+Collecting first and filtering after materializes the whole dataset, defeating the pruning. Keep
+the `.filter(...)` on the lazy frame.
+
+A store you've declared but not yet written to scans as an **empty frame with the declared
+schema**, not an error:
+
+```python
+store = experiment.declare_store(
+    "features", {"Subject": pl.String, "score": pl.Float64}, partition_keys=["Subject"]
+)
+print(store.scan().collect())
+```
+
+```text
+shape: (0, 2)
+┌─────────┬───────┐
+│ Subject ┆ score │
+│ ---     ┆ ---   │
+│ str     ┆ f64   │
+╞═════════╪═══════╡
+└─────────┴───────┘
+```
+
+The schema is there and the frame is simply empty, so a query that joins, filters, or concatenates
+across stores works the same whether or not data has landed yet. You don't need to guard a scan
+with an existence check.
 
 ## Check what a store contains
 

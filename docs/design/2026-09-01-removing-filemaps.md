@@ -49,7 +49,9 @@ across a tree (`s2p.path("*iscell*", ...)`) is gone; `Path.rglob` covers it.
 
 No migration path is provided. `FileMap` was never released, so any `_filemap.json` on disk is an
 inert file that nothing reads. `Study.load` ignores a `"filemaps"` key in an old `study.json`
-without comment.
+without comment. *(2026-09-15: since the unknown-key handling added in 3.0.0, the loader — now
+`Experiment.load` — warns about the key instead of ignoring it silently; the next save still
+drops it.)*
 
 ## If this comes back
 

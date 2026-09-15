@@ -3,7 +3,7 @@
 This tutorial builds a small experiment end to end: you'll declare an identity coordinate system,
 register the subjects and sessions the experiment should contain, point at raw files on disk,
 store some behavioral data, and ask exporgo what's present and what's missing. By the end
-you'll have a `experiment.json` you can reload, and a clear picture of how the pieces fit.
+you'll have an `experiment.json` you can reload, and a clear picture of how the pieces fit.
 
 It assumes the base install (`uv add exporgo`) plus the datastore extra for the storage step:
 
@@ -13,7 +13,7 @@ uv add "exporgo[datastore]"
 
 ## Declare an experiment
 
-A **experiment** is the top-level container. It needs a name, a root directory, and an *identity
+An **experiment** is the top-level container. It needs a name, a root directory, and an *identity
 coordinate system*: the one to three keys that name a single unit of data. Here the units are
 a subject and a session, so the keys are `Subject` (a string) and `Session` (an integer):
 
@@ -57,7 +57,7 @@ print(experiment.entities)
 ```
 
 Each call returns a validated {class}`~exporgo.experiment.Identity`. Re-registering the same
-identity is a no-op — identities are de-duplicated.
+identity is a no-op: identities are de-duplicated.
 
 ## Point at raw files with a resource
 
@@ -221,7 +221,8 @@ shape: (6, 4)
 {meth}`~exporgo.experiment.Experiment.save` writes the experiment's *declaration* (its keys, resource
 templates, and store specs) to `experiment.json`, with registered identities kept separately in
 `entities.jsonl`. It also wires logging into the experiment root, so from here on a
-`mouse_experiment.log` records what happens.
+`mouse_experiment.log` records what happens — under `<root>/.logs/`, one directory per writing
+process, which is what {meth}`~exporgo.experiment.Experiment.read_log` merges back together.
 
 ```python
 experiment.save()
@@ -233,8 +234,31 @@ print(reloaded)
 Experiment 'mouse_experiment' [Subject, Session]: 3 identities, 1 resources, 1 stores, 0 array stores, 0 dumps
 ```
 
-The reload restores the declaration, not the data — data and status are always re-read from
+The reload restores the declaration, not the data. Data and status are always re-read from
 the filesystem, because the filesystem is the source of truth.
+
+Open `experiment.json` and the first thing in it is the layout version. Here are its first three
+keys:
+
+```json
+{
+  "format": 1,
+  "name": "mouse_experiment",
+  "identity": [
+    {"name": "Subject", "dtype": "str"},
+    {"name": "Session", "dtype": "int"}
+  ]
+}
+```
+
+That field is how a future exporgo will know what it's looking at. You never set it: `save`
+writes it and `load` checks it, refusing with a clear message if the file was written by a newer
+exporgo than the one you're running.
+
+`save()` does one more thing worth knowing about. It sets up logging by resetting loguru's sinks
+process-wide, which is what you want in a script like this one and what you don't want inside an
+application that manages its own logging. Pass `experiment.save(init_logging=False)` to skip it.
+See [Configure logging](../how-to/configure-logging.md#save-without-touching-the-global-logger).
 
 ## Where to go next
 
