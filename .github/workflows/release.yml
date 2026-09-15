@@ -81,3 +81,6 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
+          # Everything is pre-alpha until this line is removed: releases are
+          # badged "Pre-release" and never served as the repo's "latest".
+          prerelease: true
