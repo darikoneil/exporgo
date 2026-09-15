@@ -1,4 +1,4 @@
-//! Copies `template/this_project` into `$OUT_DIR/template`, skipping files that
+//! Copies `template/` into `$OUT_DIR/template`, skipping files that
 //! must never ship inside the binary (private profiles, maintainer docs,
 //! superseded files, OS cruft). `src/template.rs` then embeds the filtered copy
 //! with `include_dir!`.
@@ -10,7 +10,7 @@
 
 use std::{fs, io, path::Path};
 
-const TEMPLATE_SOURCE: &str = "template/this_project";
+const TEMPLATE_SOURCE: &str = "template";
 
 /// File names excluded wherever they appear (compared case-insensitively —
 /// Windows and macOS filesystems treat `HANDOFF.MD` as the same file).

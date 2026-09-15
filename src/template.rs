@@ -1,6 +1,6 @@
 //! The embedded project template and its standard directory set.
 //!
-//! `build.rs` copies `template/this_project` into `$OUT_DIR/template`,
+//! `build.rs` copies `template/` into `$OUT_DIR/template`,
 //! excluding files that must never ship (private profiles, maintainer docs,
 //! superseded files, OS cruft); this module embeds that filtered copy into the
 //! binary. The crate version is therefore also the template version.
@@ -154,7 +154,7 @@ mod tests
     fn every_embedded_file_is_git_tracked()
     {
         let output = std::process::Command::new("git")
-            .args(["ls-files", "-z", "--cached", "template/this_project"])
+            .args(["ls-files", "-z", "--cached", "template"])
             .current_dir(env!("CARGO_MANIFEST_DIR"))
             .output()
             .expect("git is available in the development environment");
@@ -162,7 +162,7 @@ mod tests
         let tracked: std::collections::BTreeSet<&str> = std::str::from_utf8(&output.stdout)
             .expect("git ls-files output is UTF-8")
             .split('\0')
-            .filter_map(|p| p.strip_prefix("template/this_project/"))
+            .filter_map(|p| p.strip_prefix("template/"))
             .collect();
         for (rel, _) in files()
         {
