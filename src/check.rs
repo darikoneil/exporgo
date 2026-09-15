@@ -102,7 +102,7 @@ mod tests
         r.changes.push(PlannedChange { rel: "SKILLS.md".to_string(), kind: ChangeKind::Overwrite })
     })]
     #[case::unfilled_token(|r: &mut CheckReport| {
-        r.unfilled_tokens.push("{{REPO_URL}}".to_string())
+        r.unfilled_tokens.push("{{OWNER}}".to_string())
     })]
     #[case::missing_dir(|r: &mut CheckReport| r.missing_dirs.push("literature".to_string()))]
     fn any_single_finding_makes_the_report_unclean(#[case] perturb: fn(&mut CheckReport))

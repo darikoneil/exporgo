@@ -57,8 +57,8 @@ pub enum Error
     SyncSourceMissing(PathBuf),
 
     #[error(
-        "sync paths overlap: '{a}' and '{b}' are the same directory or nested in each other; \
-         source, intermediate, and destination must be disjoint"
+        "sync paths overlap: '{a}' and '{b}' are the same directory or nested in each other; the \
+         project, its cache, and its remote must be disjoint"
     )]
     SyncPathsOverlap
     {
@@ -66,10 +66,40 @@ pub enum Error
     },
 
     #[error(
-        "sync paths incomplete (missing {0}); pass --source/--intermediate/--destination or add a \
-         [sync] section to exporgo.toml"
+        "cannot locate a config directory: none of EXPORGO_HOME, APPDATA, XDG_CONFIG_HOME, or \
+         HOME is set"
     )]
-    SyncUnconfigured(String),
+    NoConfigDir,
+
+    #[error("invalid machine config {path}: {message}")]
+    Config
+    {
+        path: PathBuf, message: String
+    },
+
+    #[error(
+        "no sync remote configured on this machine; set it once with `exporgo config \
+         --remote-root <path>` (config file: {0})"
+    )]
+    RemoteRootUnset(PathBuf),
+
+    #[error("sync remote root not found: '{0}' (drive not mounted? share offline?)")]
+    RemoteRootMissing(PathBuf),
+
+    #[error(
+        "no remote copy of this project at '{0}'; push it first from a machine that has it \
+         (`exporgo sync push`)"
+    )]
+    RemoteProjectMissing(PathBuf),
+
+    #[error(
+        "--mirror needs an explicit direction (`exporgo sync push --mirror` or `pull --mirror`); \
+         a bidirectional mirror would delete on both sides"
+    )]
+    MirrorNeedsDirection,
+
+    #[error("clone target '{0}' already exists and is not empty")]
+    CloneTargetNotEmpty(PathBuf),
 }
 
 impl Error
@@ -117,9 +147,24 @@ mod tests
         Error::SyncPathsOverlap { a: PathBuf::from("a"), b: PathBuf::from("a/b") },
         &["overlap", "disjoint"]
     )]
+    #[case(Error::NoConfigDir, &["EXPORGO_HOME", "APPDATA"])]
     #[case(
-        Error::SyncUnconfigured("source, destination".to_string()),
-        &["source, destination", "[sync]"]
+        Error::Config { path: PathBuf::from("config.toml"), message: "bad toml".to_string() },
+        &["config.toml", "bad toml"]
+    )]
+    #[case(
+        Error::RemoteRootUnset(PathBuf::from("config.toml")),
+        &["exporgo config --remote-root", "config.toml"]
+    )]
+    #[case(Error::RemoteRootMissing(PathBuf::from("G:/x")), &["G:/x", "mounted"])]
+    #[case(
+        Error::RemoteProjectMissing(PathBuf::from("G:/x/pilot")),
+        &["G:/x/pilot", "sync push"]
+    )]
+    #[case(Error::MirrorNeedsDirection, &["--mirror", "push"])]
+    #[case(
+        Error::CloneTargetNotEmpty(PathBuf::from("pilot")),
+        &["pilot", "not empty"]
     )]
     fn messages_name_the_problem_and_the_remedy(
         #[case] error: Error,

@@ -38,11 +38,13 @@ binary at build time, so the crate version is the template version and no networ
 is needed on lab machines — install a binary from GitHub Releases.
 
 ```bash
-exporgo new "Grid Cell Remapping" --aim "..." --data-root "\\ktdata\snlkt\..."   # stamp a project
+exporgo config --remote-root "G:\\My Drive\\exporgo-projects"   # once per machine
+exporgo new "Grid Cell Remapping" --status active   # stamp a project (owner/email from config)
 exporgo check    # report drift from this binary's template
 exporgo update   # refresh exporgo-owned files; never touches project content
-exporgo sync     # two-hop non-destructive data sync (paths from exporgo.toml [sync])
-exporgo experiment new "Remap Pilot"   # stamp experiments/_TEMPLATE/, derive the data-root pointer
+exporgo sync     # converge this workspace with its shared remote (pull newer, push newer)
+exporgo clone "Grid Cell Remapping"     # bring an existing project onto this machine
+exporgo experiment new "Remap Pilot"    # stamp experiments/_TEMPLATE/ inside the project
 ```
 
 ## Installation

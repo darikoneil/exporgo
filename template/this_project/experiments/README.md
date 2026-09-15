@@ -10,9 +10,10 @@ From the project root:
 exporgo experiment new "Grid Remap V1"
 ```
 
-This stamps `_TEMPLATE/` into a slug-named folder and pre-fills the experiment name and the raw
-data root (derived as `<project data_root>\<slug>`; override with `--data-root`, add
-`--processed-root` for the processed side — anything skipped stays visible as a `{{TOKEN}}`):
+This stamps `_TEMPLATE/` into a slug-named folder and fills the experiment name. Data roots are
+per-experiment hints for where the data may live — give them with `--data-root` /
+`--processed-root` or at the prompts; anything skipped stays visible as a `{{TOKEN}}` to fill
+when the location becomes real:
 
 ```
 experiments/

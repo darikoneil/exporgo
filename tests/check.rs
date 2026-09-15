@@ -16,10 +16,7 @@ use pretty_assertions::assert_eq;
 fn fully_filled_project(parent: &Path) -> PathBuf
 {
     let mut values = TokenValues::new();
-    values.insert(Token::OneLineAim, "Does it remap?".to_string());
     values.insert(Token::Status, "active".to_string());
-    values.insert(Token::RepoUrl, "https://github.com/org/repo".to_string());
-    values.insert(Token::DataRoot, r"\\ktdata\snlkt\data\proj".to_string());
     values.insert(Token::Owner, "Darik".to_string());
     values.insert(Token::OwnerEmail, "doneil@salk.edu".to_string());
     stamp(&NewOptions {
@@ -27,7 +24,6 @@ fn fully_filled_project(parent: &Path) -> PathBuf
         parent: parent.to_path_buf(),
         values,
         force: false,
-        git_init: false,
     })
     .expect("stamp succeeds")
     .root

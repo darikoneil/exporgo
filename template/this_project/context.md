@@ -1,11 +1,22 @@
 # {{PROJECT_NAME}}
 
-{{ONE_LINE_AIM}}
-
 - **Status:** {{STATUS}}
-- **Primary repo:** {{REPO_URL}}
-- **Data root:** {{DATA_ROOT}}
 - **Owner:** {{OWNER}} · {{OWNER_EMAIL}} · created {{CREATED_DATE}}
+
+## Aims
+
+<!-- What the project is trying to establish, if it has stated aims. Projects already underway
+(or that never went through a proposal) may not have any — delete this section if so. -->
+
+## Repositories
+
+<!-- One line per repo: URL — what it holds. There is usually more than one. Repos tied to a
+single experiment belong in that experiment's resources.md instead. -->
+
+## Data
+
+<!-- General pointers only (lab share, acquisition machines, big storage). Each experiment
+records its own raw/processed locations in experiments/<name>/resources.md. -->
 
 ## Where to look
 

@@ -1,13 +1,10 @@
 # Private writing-voice profile (personal samples) — never publish
 .claude/skills/exporgo/code/agents/references/darik-voice.md
 
-# Sync / setup logs
-_sync_detail.log
-_sync_history.log
+# Logs (exporgo sync logs live outside the project, but keep stray logs out)
 *.log
 
 # OS + download cruft
 Thumbs.db
 *.Identifier
 .DS_Store
-Claude outputs/

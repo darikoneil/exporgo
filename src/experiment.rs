@@ -2,19 +2,14 @@
 //!
 //! Copies the project's own `experiments/_TEMPLATE/` (an owned zone, kept
 //! current by `exporgo update`) into `experiments/<slug>/` and fills its
-//! `{{TOKENS}}`. The raw data root is derived from the project manifest's
-//! `data_root` by convention — `<data_root>/<slug>` — so the pointer from the
-//! workspace to the lab server is computed once instead of hand-typed. The
-//! stamped folder is user territory: `exporgo update` never touches it.
+//! `{{TOKENS}}`. Data roots are per-experiment hints, given (or skipped) at
+//! stamp time — there is no project-level data root to derive from, because
+//! each experiment's data can live somewhere different. The stamped folder is
+//! user territory: `exporgo update` never touches it.
 
 use std::{collections::BTreeMap, path::PathBuf};
 
-use crate::{
-    error::Error,
-    manifest::Manifest,
-    stamp,
-    tokens::{self, Token},
-};
+use crate::{error::Error, manifest::Manifest, stamp, tokens};
 
 /// The placeholders `experiments/_TEMPLATE/` files may carry.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -53,11 +48,10 @@ pub struct NewExperimentOptions
     pub project_root: PathBuf,
     /// Human experiment name; the folder name is its slug.
     pub name: String,
-    /// Raw data root. `None` derives `<manifest data_root>/<slug>`; if the
-    /// manifest has no `data_root` either, the placeholder stays visible.
+    /// Raw data root, a hint for where this experiment's data may live; the
+    /// placeholder stays visible when absent.
     pub raw_data_root: Option<String>,
-    /// Processed data root; never derived (labs differ), stays visible if
-    /// absent.
+    /// Processed data root; the placeholder stays visible when absent.
     pub processed_data_root: Option<String>,
 }
 
@@ -77,7 +71,8 @@ pub struct ExperimentReport
 /// the experiment folder already exists (experiments are never re-stamped).
 pub fn stamp_experiment(options: &NewExperimentOptions) -> Result<ExperimentReport, Error>
 {
-    let manifest = Manifest::load(&options.project_root)?;
+    // Loaded only as the "is this an exporgo project?" gate.
+    Manifest::load(&options.project_root)?;
 
     let slug =
         tokens::slugify(&options.name).ok_or_else(|| Error::BadSlug(options.name.clone()))?;
@@ -97,21 +92,17 @@ pub fn stamp_experiment(options: &NewExperimentOptions) -> Result<ExperimentRepo
         return Err(Error::ExperimentExists(destination));
     }
 
-    let raw_root = options.raw_data_root.clone().or_else(|| {
-        manifest
-            .tokens
-            .get(Token::DataRoot.manifest_key())
-            .map(|root| join_data_path(root, &slug))
-    });
-
     let mut values = BTreeMap::new();
     values.insert(
         ExperimentToken::ExperimentName.placeholder().to_string(),
         options.name.clone(),
     );
-    if let Some(raw) = raw_root
+    if let Some(raw) = &options.raw_data_root
     {
-        values.insert(ExperimentToken::RawDataRoot.placeholder().to_string(), raw);
+        values.insert(
+            ExperimentToken::RawDataRoot.placeholder().to_string(),
+            raw.clone(),
+        );
     }
     if let Some(processed) = &options.processed_data_root
     {
@@ -159,20 +150,10 @@ pub fn stamp_experiment(options: &NewExperimentOptions) -> Result<ExperimentRepo
     })
 }
 
-/// Appends `slug` to a data root using the root's own separator style, so a
-/// UNC root stays backslashed and a POSIX root stays forward-slashed.
-fn join_data_path(root: &str, slug: &str) -> String
-{
-    let trimmed = root.trim_end_matches(['/', '\\']);
-    let separator = if trimmed.contains('\\') { '\\' } else { '/' };
-    format!("{trimmed}{separator}{slug}")
-}
-
 #[cfg(test)]
 mod tests
 {
     use pretty_assertions::assert_eq;
-    use rstest::rstest;
 
     use super::*;
     use crate::template;
@@ -200,27 +181,5 @@ mod tests
             scanned, declared,
             "_TEMPLATE placeholders and ExperimentToken have drifted apart"
         );
-    }
-
-    #[rstest]
-    #[case(
-        r"\\ktdata\snlkt\data\proj",
-        "pilot",
-        r"\\ktdata\snlkt\data\proj\pilot"
-    )]
-    #[case(
-        r"\\ktdata\snlkt\data\proj\",
-        "pilot",
-        r"\\ktdata\snlkt\data\proj\pilot"
-    )]
-    #[case("/mnt/data/proj", "pilot", "/mnt/data/proj/pilot")]
-    #[case("/mnt/data/proj/", "pilot", "/mnt/data/proj/pilot")]
-    fn join_data_path_keeps_the_root_separator(
-        #[case] root: &str,
-        #[case] slug: &str,
-        #[case] expected: &str,
-    )
-    {
-        assert_eq!(join_data_path(root, slug), expected);
     }
 }

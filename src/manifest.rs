@@ -97,24 +97,11 @@ pub struct Manifest
     pub template_version: Version,
     /// Token values filled at stamp time, keyed by
     /// [`crate::tokens::Token::manifest_key`].
+    ///
+    /// Only machine-neutral values belong here: the manifest travels with the
+    /// project directory, which `exporgo sync` replicates between machines.
     #[serde(default)]
     pub tokens: std::collections::BTreeMap<String, String>,
-    /// Optional standing configuration for `exporgo sync`, so a project can be
-    /// synced with no arguments. Added by hand; preserved across updates.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sync: Option<SyncConfig>,
-}
-
-/// The `[sync]` table of `exporgo.toml`: the three paths (and extra excludes)
-/// `exporgo sync` uses when flags don't override them.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SyncConfig
-{
-    pub source: String,
-    pub intermediate: String,
-    pub destination: String,
-    #[serde(default)]
-    pub exclude: Vec<String>,
 }
 
 impl Manifest
@@ -199,34 +186,11 @@ mod tests
             created: "2026-09-13".to_string(),
             template_version: Version(2, 3, 0),
             tokens: [("status".to_string(), "active".to_string())].into(),
-            sync: Some(SyncConfig {
-                source: r"G:\My Drive\projects\grid".to_string(),
-                intermediate: r"C:\Users\dao25\SyncMirror\grid".to_string(),
-                destination: r"\\ktdata\snlkt\backup\grid".to_string(),
-                exclude: vec!["*.tmp".to_string()],
-            }),
         };
         let dir = tempfile::tempdir().expect("tempdir");
         manifest.save(dir.path()).expect("save");
         let loaded = Manifest::load(dir.path()).expect("load");
         assert_eq!(loaded, manifest);
-    }
-
-    #[test]
-    fn manifest_without_sync_section_loads_and_omits_it_on_save()
-    {
-        let manifest = Manifest {
-            project: "Pilot".to_string(),
-            created: "2026-09-13".to_string(),
-            template_version: Version(2, 3, 0),
-            tokens: Default::default(),
-            sync: None,
-        };
-        let dir = tempfile::tempdir().expect("tempdir");
-        manifest.save(dir.path()).expect("save");
-        let text = std::fs::read_to_string(dir.path().join(FILE_NAME)).expect("read");
-        assert!(!text.contains("[sync]"));
-        assert_eq!(Manifest::load(dir.path()).expect("load").sync, None);
     }
 
     #[test]

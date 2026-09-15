@@ -13,12 +13,14 @@ it works anywhere without depending on a central library.
 
 Small and pointed, so an agent loads only what a task needs:
 
-- **`context.md`** — deliberately short. The project's aim, status, primary repo and data root, and
-  pointers to everything else. This is the file that loads on every prompt, so it stays brief.
+- **`context.md`** — deliberately short. The project's status and owner, short sections for aims
+  (if any), repositories, and general data pointers, and pointers to everything else. This is the
+  file that loads on every prompt, so it stays brief.
 - **`experiments/`** — one folder per experiment, each a self-contained unit: `experiment.md`
   (scientific description), `protocol.md`, `analysis.md` (pipeline), `resources.md` (where its code
-  and data live). Start one with `exporgo experiment new "<name>"` — it stamps
-  `experiments/_TEMPLATE/` and pre-fills the raw data root from the project's `data_root`.
+  and data live — repos and data roots are recorded per experiment). Start one with
+  `exporgo experiment new "<name>"` — it stamps `experiments/_TEMPLATE/`, prompting for optional
+  data-root hints.
 - **`plans/`** — unexecuted aims, ideas, and timelines. What you *intend* to do, distinct from the
   experiments you're running.
 
@@ -33,7 +35,7 @@ lets the workspace sync cheaply and travel with the project.
 ```
 <project>/                     one project (or, unstamped, the template)
 ├─ exporgo.toml                manifest: name, created, template version, stamp values
-├─ context.md                  SMALL router: aim, status, repo/data root, pointers
+├─ context.md                  SMALL router: status, aims/repos/data sections, pointers
 ├─ README.md                   this file — project-agnostic, same in every copy
 ├─ CLAUDE.md                   orientation for Claude — read first
 ├─ SKILLS.md                   index of the skills carried in .claude/skills
@@ -49,7 +51,7 @@ lets the workspace sync cheaply and travel with the project.
 │  └─ skills/
 │     ├─ exporgo/              shipped library — OVERWRITTEN by `exporgo update`
 │     │  ├─ third_party_skills.md
-│     │  ├─ sync/              Google Drive ↔ folder sync (SKILL.md + sync.ps1)
+│     │  ├─ sync/              multi-machine project sync guide (SKILL.md)
 │     │  ├─ code/              Python conventions + review/documentation agents
 │     │  └─ science/           science skills — to fill (upstream, in the template)
 │     └─ local/                YOUR skills — never touched by update
@@ -71,16 +73,16 @@ repo's GitHub Releases; updating the binary is how a machine gets newer skills.
 ## Make a new project
 
 ```powershell
-exporgo new "Grid Cell Remapping" `
-    --path "C:\Users\dao25\Projects" `
-    --aim "Does grid-cell remapping track task boundaries?" `
-    --repo "https://github.com/darik/gridremap" `
-    --data-root "\\ktdata\snlkt\data\gridremap" --status active
+exporgo new "Grid Cell Remapping" --path "C:\Users\dao25\Projects" --status active
 ```
 
-Any value you omit is prompted for (press Enter to skip — skipped values stay visible as
-`{{TOKENS}}` in `context.md` to fill later). `--no-input` skips all prompts for scripting;
-`--git` also runs `git init` (it never commits).
+Owner and email default from the machine config (`exporgo config --owner .. --email ..`, set
+once per machine); anything still missing is prompted for (press Enter to skip — skipped values
+stay visible as `{{TOKENS}}` in `context.md` to fill later). `--no-input` skips all prompts for
+scripting. Aims, repositories, and data
+locations are *not* collected up front — a project may have several repos and no formal aims;
+fill the matching `context.md` sections (and each experiment's `resources.md`) as they become
+real.
 
 ## Keep a project's template up to date
 
@@ -94,25 +96,26 @@ exporgo check     # what would change (also reports unfilled tokens, missing fol
 exporgo update    # apply; --dry-run to preview, --skills-only to narrow
 ```
 
-## Sync data and outputs
+## Work from several machines
 
-The binary carries the template; `exporgo sync` moves **data and outputs**. It mirrors a source
-to a destination through a durable local intermediate, non-destructively (new and newer files
-only, never deletes), on any OS. Put the paths in `exporgo.toml` once and the command needs no
-arguments:
+The binary carries the template; `exporgo sync` carries **this workspace** between your
+computers. Each machine syncs its local project folder, through a per-machine cache exporgo
+manages by itself, against one shared remote copy (`<remote_root>\<project-slug>`). Tell each
+machine where the shared location lives, once:
 
-```toml
-[sync]
-source = 'G:\My Drive\projects\this_project'
-intermediate = 'C:\Users\dao25\SyncMirror\this_project'
-destination = '\\ktdata\snlkt\backup\this_project'
+```powershell
+exporgo config --remote-root "G:\My Drive\exporgo-projects"
 ```
 
 ```powershell
-exporgo sync                        # forward: source -> intermediate -> destination
-exporgo sync --direction reverse   # pull the destination back
-exporgo sync --dry-run             # preview only
+exporgo sync              # bidirectional: pull newer, push newer — never deletes
+exporgo sync push         # one-way, local -> remote (add --mirror to also delete)
+exporgo sync pull         # one-way, remote -> local
+exporgo sync --dry-run    # preview only
+exporgo clone "Grid Cell Remapping" --path "C:\Users\dao25\Projects"   # new machine
 ```
 
-Operational details (drive-mount constraints, UNC paths, scheduling) are in the
-**`gdrive-folder-sync`** skill: `.claude/skills/exporgo/sync/SKILL.md`.
+Run `exporgo sync` at the start and end of a session and every machine converges on the newest
+version of each file. Bring the project onto a new machine with `exporgo clone`, never by
+re-stamping `exporgo new` there. Operational details (deletion semantics, mount constraints,
+scheduling) are in the **`project-sync`** skill: `.claude/skills/exporgo/sync/SKILL.md`.

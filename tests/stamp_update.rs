@@ -18,14 +18,12 @@ use pretty_assertions::assert_eq;
 fn options(name: &str, parent: &Path) -> NewOptions
 {
     let mut values = TokenValues::new();
-    values.insert(Token::OneLineAim, "Does it remap?".to_string());
     values.insert(Token::Status, "active".to_string());
     NewOptions {
         name: name.to_string(),
         parent: parent.to_path_buf(),
         values,
         force: false,
-        git_init: false,
     }
 }
 
@@ -63,12 +61,9 @@ fn stamp_creates_a_complete_project()
 
     let context = std::fs::read_to_string(report.root.join("context.md")).unwrap();
     assert!(context.contains("# Grid Cell Remapping"));
-    assert!(context.contains("Does it remap?"));
-    assert!(
-        context.contains("{{REPO_URL}}"),
-        "skipped token stays visible"
-    );
-    assert!(report.unfilled.contains(&"{{REPO_URL}}".to_string()));
+    assert!(context.contains("**Status:** active"));
+    assert!(context.contains("{{OWNER}}"), "skipped token stays visible");
+    assert!(report.unfilled.contains(&"{{OWNER}}".to_string()));
 
     // Excluded files must not materialize.
     for forbidden in [
@@ -307,7 +302,7 @@ fn check_reports_drift_and_cleanliness()
     assert!(fresh.changes.is_empty());
     assert!(fresh.missing_dirs.is_empty());
     assert_eq!(fresh.project_version, fresh.binary_version);
-    // REPO_URL etc. were skipped at stamp time, so a fresh project is not
+    // OWNER etc. were skipped at stamp time, so a fresh project is not
     // "clean".
     assert!(!fresh.unfilled_tokens.is_empty());
     assert!(!fresh.is_clean());

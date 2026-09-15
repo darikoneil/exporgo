@@ -17,16 +17,18 @@ Two zones, one rule: `.claude/skills/exporgo/` is the shipped library — `expor
 
 ### Project ops — `.claude/skills/exporgo/`
 
-- **`sync/`** — Google Drive ↔ folder sync for **data and outputs** (not the template — that
-  travels with the `exporgo` binary). `exporgo sync` runs a two-hop, non-destructive mirror
-  through a durable local intermediate; paths live in the project's `exporgo.toml` `[sync]`
-  section (or flags). Cross-platform; schedule with the OS scheduler. The `SKILL.md` here is the
-  operational guide (mount constraints, UNC paths, scheduling).
+- **`sync/`** — multi-machine **project sync** (not the template — that travels with the
+  `exporgo` binary). `exporgo sync` converges this workspace across computers through a
+  per-machine cache and a shared remote (`exporgo config --remote-root ..`, once per machine);
+  `exporgo clone` brings a project onto a new machine. Non-destructive, newest-file-wins;
+  cross-platform; schedule with the OS scheduler. The `SKILL.md` here is the operational guide
+  (deletion semantics, mount constraints, scheduling).
 
 Project ops are otherwise not skills: the **`exporgo` CLI** does the work.
 `exporgo new <name>` stamps a project from the template embedded in the binary; `exporgo check`
 previews what an update would change; `exporgo update` refreshes the exporgo-owned files (this
-library + boilerplate) and never touches project content; `exporgo sync` moves data.
+library + boilerplate) and never touches project content; `exporgo sync`/`exporgo clone` carry
+the workspace between machines; `exporgo config` holds the per-machine settings.
 
 ### Code — `.claude/skills/exporgo/code/`
 

@@ -13,10 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub enum Token
 {
     ProjectName,
-    OneLineAim,
     Status,
-    RepoUrl,
-    DataRoot,
     Owner,
     OwnerEmail,
     CreatedDate,
@@ -27,12 +24,9 @@ pub type TokenValues = BTreeMap<Token, String>;
 
 impl Token
 {
-    pub const ALL: [Token; 8] = [
+    pub const ALL: [Token; 5] = [
         Token::ProjectName,
-        Token::OneLineAim,
         Token::Status,
-        Token::RepoUrl,
-        Token::DataRoot,
         Token::Owner,
         Token::OwnerEmail,
         Token::CreatedDate,
@@ -45,10 +39,7 @@ impl Token
         match self
         {
             Token::ProjectName => "{{PROJECT_NAME}}",
-            Token::OneLineAim => "{{ONE_LINE_AIM}}",
             Token::Status => "{{STATUS}}",
-            Token::RepoUrl => "{{REPO_URL}}",
-            Token::DataRoot => "{{DATA_ROOT}}",
             Token::Owner => "{{OWNER}}",
             Token::OwnerEmail => "{{OWNER_EMAIL}}",
             Token::CreatedDate => "{{CREATED_DATE}}",
@@ -61,10 +52,7 @@ impl Token
         match self
         {
             Token::ProjectName => "project_name",
-            Token::OneLineAim => "one_line_aim",
             Token::Status => "status",
-            Token::RepoUrl => "repo_url",
-            Token::DataRoot => "data_root",
             Token::Owner => "owner",
             Token::OwnerEmail => "owner_email",
             Token::CreatedDate => "created_date",
@@ -240,10 +228,10 @@ mod tests
     fn substitute_never_rescans_substituted_values()
     {
         let mut values = TokenValues::new();
-        values.insert(Token::OneLineAim, "about {{OWNER}}'s data".to_string());
+        values.insert(Token::ProjectName, "about {{OWNER}}'s data".to_string());
         values.insert(Token::Owner, "Darik".to_string());
         assert_eq!(
-            substitute("{{ONE_LINE_AIM}} by {{OWNER}}", &values),
+            substitute("{{PROJECT_NAME}} by {{OWNER}}", &values),
             "about {{OWNER}}'s data by Darik"
         );
     }

@@ -11,7 +11,7 @@ standing instructions belong in `.claude/local.md` (imported below, never overwr
 
 ## Read order (keep context small)
 
-1. **`context.md`** — short by design; the aim, status, where things live, and pointers.
+1. **`context.md`** — short by design; status, aims (if any), key repos, data pointers.
 2. **The specific `experiments/<name>/` file the task needs** — `analysis.md` for an analysis
    question, `resources.md` to locate data or code, `protocol.md` for how data was produced. Open
    only what the task needs; do not load every experiment.
@@ -33,30 +33,33 @@ standing instructions belong in `.claude/local.md` (imported below, never overwr
 1. **No code or raw data in this workspace.** Analysis code goes in the project's repo; data stays
    on the lab share. If asked to write a script "here," clarify it belongs in the repo — unless it's
    a *reusable procedure*, which belongs in `.claude/skills/` as a skill.
-2. **Locations are canonical, never guessed.** Use the GitHub URLs and UNC paths in `context.md` and
-   each experiment's `resources.md`. If a path isn't recorded, ask.
+2. **Locations are canonical, never guessed.** Use the GitHub URLs and UNC paths in `context.md`
+   and each experiment's `resources.md` — a project usually has several repos, and each
+   experiment records its own repos and data roots. If a path isn't recorded, ask.
 3. **Keep the docs current and small.** When work reveals a new or moved location, update the right
    `resources.md` (or `context.md`) the same session, and say so. Don't let `context.md` grow —
    detail belongs in the experiment files.
 4. **Plans vs. experiments.** `plans/` is intent; `experiments/` is execution. Promote a plan with
-   `exporgo experiment new "<name>"` — it stamps `experiments/_TEMPLATE/` into a new folder and
-   pre-fills the raw data root as `<project data_root>\<slug>`.
+   `exporgo experiment new "<name>"` — it stamps `experiments/_TEMPLATE/` into a new folder; data
+   roots are optional per-experiment hints recorded in its `resources.md`.
 5. **Never edit `.claude/skills/exporgo/` in a project.** Those files are overwritten by
    `exporgo update`; improvements go to the template repo. Project-specific skills go in
    `.claude/skills/local/`, and project-specific instructions in `.claude/local.md`.
 
 ## Reach for the right tool
 
-- **Start a new project** → the `exporgo` CLI: `exporgo new <name>` (flags for aim/repo/data-root/
-  status; prompts for anything missing; `--git` to init a repo — it never commits).
+- **Start a new project** → the `exporgo` CLI: `exporgo new <name>` (`--status`; owner/email come
+  from the machine config).
 - **Update a project from the template** → `exporgo check` to preview, then `exporgo update`.
   Refreshes only the exporgo-owned files; never touches project content.
 - **Start a new experiment** → `exporgo experiment new "<name>"` (from the project root). Stamped
   experiment folders are project content — never touched by update.
-- **Sync data and outputs across machines** → `exporgo sync` (paths from `exporgo.toml`'s
-  `[sync]` section or flags); the `gdrive-folder-sync` skill
-  (`.claude/skills/exporgo/sync/SKILL.md`) is the operational guide. Data travels via Drive,
-  the template via the binary.
+- **Keep this workspace converged across machines** → `exporgo sync` (bidirectional by default;
+  `push`/`pull` for one-way; the shared remote is set once per machine via
+  `exporgo config --remote-root ..`). Bring the project onto a new machine with
+  `exporgo clone "<name>"`, never by re-stamping. The `project-sync` skill
+  (`.claude/skills/exporgo/sync/SKILL.md`) is the operational guide. The workspace travels via
+  sync, the template via the binary.
 - **Write or review Python** → `.claude/skills/exporgo/code/CLAUDE.md` (uv; ruff; pyrefly;
   Google-style docstrings; never commit or push). Review/doc agents in `code/agents/`.
 - **Science procedures** → `.claude/skills/exporgo/science/`.

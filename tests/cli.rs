@@ -1,14 +1,25 @@
 //! End-to-end tests of the compiled `exporgo` binary.
+//!
+//! Every invocation that touches machine state (config, cache, logs) sets
+//! `EXPORGO_HOME` to a temp directory, so the tests never read or write the
+//! developer's real `%APPDATA%`/`%LOCALAPPDATA%`.
 #![cfg(feature = "cli")]
 
 use std::path::Path;
 
 use assert_cmd::Command;
 
+/// A `exporgo` command sandboxed to `home` for all machine state.
+fn exporgo(home: &Path) -> Command
+{
+    let mut command = Command::cargo_bin("exporgo").unwrap();
+    command.env("EXPORGO_HOME", home);
+    command
+}
+
 fn stamped_project(dir: &Path, extra_args: &[&str]) -> std::path::PathBuf
 {
-    Command::cargo_bin("exporgo")
-        .unwrap()
+    exporgo(dir)
         .args(["new", "Pilot Study", "--no-input"])
         .args(["--path", dir.to_str().unwrap()])
         .args(extra_args)
@@ -32,14 +43,50 @@ fn version_prints_crate_version()
 fn new_no_input_stamps_a_project()
 {
     let dir = tempfile::tempdir().unwrap();
-    Command::cargo_bin("exporgo")
-        .unwrap()
+    exporgo(dir.path())
         .args(["new", "Pilot Study", "--no-input", "--status", "planning"])
         .args(["--path", dir.path().to_str().unwrap()])
         .assert()
         .success()
         .stdout(predicates::str::contains("Created"));
     assert!(dir.path().join("pilot-study/exporgo.toml").is_file());
+}
+
+#[test]
+fn removed_project_level_flags_no_longer_parse()
+{
+    let dir = tempfile::tempdir().unwrap();
+    for args in [
+        ["--aim", "x"].as_slice(),
+        ["--repo", "x"].as_slice(),
+        ["--data-root", "x"].as_slice(),
+        ["--git"].as_slice(),
+    ]
+    {
+        exporgo(dir.path())
+            .args(["new", "Pilot", "--no-input"])
+            .args(args)
+            .args(["--path", dir.path().to_str().unwrap()])
+            .assert()
+            .failure()
+            .stderr(predicates::str::contains("unexpected argument"));
+    }
+    assert!(!dir.path().join("pilot").exists(), "nothing stamped");
+}
+
+#[test]
+fn new_fills_owner_and_email_from_the_machine_config()
+{
+    let dir = tempfile::tempdir().unwrap();
+    exporgo(dir.path())
+        .args(["config", "--owner", "Darik", "--email", "doneil@salk.edu"])
+        .assert()
+        .success();
+
+    let project = stamped_project(dir.path(), &[]);
+    let context = std::fs::read_to_string(project.join("context.md")).unwrap();
+    assert!(context.contains("Darik"), "owner from config: {context}");
+    assert!(context.contains("doneil@salk.edu"), "email from config");
 }
 
 #[test]
@@ -60,8 +107,7 @@ fn new_refuses_a_duplicate_project_with_a_pointer_to_update()
 {
     let dir = tempfile::tempdir().unwrap();
     stamped_project(dir.path(), &[]);
-    Command::cargo_bin("exporgo")
-        .unwrap()
+    exporgo(dir.path())
         .args(["new", "Pilot Study", "--no-input", "--force"])
         .args(["--path", dir.path().to_str().unwrap()])
         .assert()
@@ -73,8 +119,7 @@ fn new_refuses_a_duplicate_project_with_a_pointer_to_update()
 fn new_refuses_a_name_with_no_usable_slug()
 {
     let dir = tempfile::tempdir().unwrap();
-    Command::cargo_bin("exporgo")
-        .unwrap()
+    exporgo(dir.path())
         .args(["new", "!!!", "--no-input"])
         .args(["--path", dir.path().to_str().unwrap()])
         .assert()
@@ -86,8 +131,7 @@ fn new_refuses_a_name_with_no_usable_slug()
 fn new_rejects_an_unknown_status_value()
 {
     let dir = tempfile::tempdir().unwrap();
-    Command::cargo_bin("exporgo")
-        .unwrap()
+    exporgo(dir.path())
         .args(["new", "Pilot", "--no-input", "--status", "procrastinating"])
         .args(["--path", dir.path().to_str().unwrap()])
         .assert()
@@ -97,28 +141,14 @@ fn new_rejects_an_unknown_status_value()
 }
 
 #[test]
-fn new_git_flag_initializes_a_repository()
-{
-    let dir = tempfile::tempdir().unwrap();
-    let project = stamped_project(dir.path(), &["--git"]);
-    assert!(project.join(".git").is_dir(), "git init ran");
-}
-
-#[test]
 fn check_exits_zero_on_a_fully_filled_project_and_two_outside_one()
 {
     let dir = tempfile::tempdir().unwrap();
     let project = stamped_project(
         dir.path(),
         &[
-            "--aim",
-            "Does it remap?",
             "--status",
             "active",
-            "--repo",
-            "https://github.com/org/repo",
-            "--data-root",
-            r"\\ktdata\snlkt\data\pilot",
             "--owner",
             "Darik",
             "--email",
@@ -174,97 +204,177 @@ fn update_output_distinguishes_clean_dry_run_and_applied()
 }
 
 #[test]
-fn sync_runs_flag_driven_warns_on_mirror_and_rejects_overlap()
+fn config_shows_guidance_then_records_the_remote_root()
 {
     let dir = tempfile::tempdir().unwrap();
-    let source = dir.path().join("src");
-    std::fs::create_dir_all(&source).unwrap();
-    std::fs::write(source.join("a.txt"), "x").unwrap();
-    let flags = |from: &Path, mid: &str, to: &str| {
-        vec![
-            "--source".to_string(),
-            from.to_string_lossy().to_string(),
-            "--intermediate".to_string(),
-            dir.path().join(mid).to_string_lossy().to_string(),
-            "--destination".to_string(),
-            dir.path().join(to).to_string_lossy().to_string(),
-            "--log-dir".to_string(),
-            dir.path().join("logs").to_string_lossy().to_string(),
-        ]
-    };
-
-    Command::cargo_bin("exporgo")
-        .unwrap()
-        .arg("sync")
-        .args(flags(&source, "mid", "dst"))
-        .arg("--mirror")
-        .current_dir(dir.path())
+    exporgo(dir.path())
+        .arg("config")
         .assert()
         .success()
-        .stdout(predicates::str::contains("=> OK"))
-        .stderr(predicates::str::contains("DELETES"));
+        .stdout(predicates::str::contains("remote_root = (unset)"))
+        .stdout(predicates::str::contains("--remote-root"));
 
-    // Intermediate nested inside the source: refused before anything runs.
-    Command::cargo_bin("exporgo")
-        .unwrap()
-        .arg("sync")
-        .args(flags(&source, "src/nested-mid", "dst2"))
-        .current_dir(dir.path())
+    let remote_root = dir.path().join("shared");
+    exporgo(dir.path())
+        .args(["config", "--remote-root", remote_root.to_str().unwrap()])
         .assert()
-        .code(2)
-        .stderr(predicates::str::contains("overlap"));
-    assert!(!dir.path().join("dst2").exists());
+        .success()
+        .stdout(predicates::str::contains("shared"));
+    assert!(dir.path().join("config.toml").is_file());
 }
 
 #[test]
-fn sync_reads_the_manifest_config_and_reports_reverse_runs()
+fn sync_without_a_remote_root_points_at_exporgo_config()
 {
     let dir = tempfile::tempdir().unwrap();
     let project = stamped_project(dir.path(), &[]);
-    let source = dir.path().join("src");
-    std::fs::create_dir_all(&source).unwrap();
-    std::fs::write(source.join("a.txt"), "x").unwrap();
-
-    let manifest_path = project.join("exporgo.toml");
-    let mut manifest_text = std::fs::read_to_string(&manifest_path).unwrap();
-    manifest_text.push_str(&format!(
-        "\n[sync]\nsource = '{}'\nintermediate = '{}'\ndestination = '{}'\n",
-        source.display(),
-        dir.path().join("mid").display(),
-        dir.path().join("dst").display(),
-    ));
-    std::fs::write(&manifest_path, manifest_text).unwrap();
-
-    // Forward, no flags at all: every path comes from the [sync] table.
-    Command::cargo_bin("exporgo")
-        .unwrap()
+    exporgo(dir.path())
         .arg("sync")
         .current_dir(&project)
         .assert()
-        .success()
-        .stdout(predicates::str::contains("=> OK"));
-    assert!(dir.path().join("dst/a.txt").is_file());
-
-    Command::cargo_bin("exporgo")
-        .unwrap()
-        .args(["sync", "--direction", "reverse"])
-        .current_dir(&project)
-        .assert()
-        .success()
-        .stdout(predicates::str::contains("Reverse done"));
+        .code(2)
+        .stderr(predicates::str::contains("exporgo config --remote-root"));
 }
 
 #[test]
-fn sync_with_no_paths_anywhere_is_unconfigured()
+fn sync_outside_a_project_is_refused()
 {
     let dir = tempfile::tempdir().unwrap();
-    Command::cargo_bin("exporgo")
-        .unwrap()
+    exporgo(dir.path())
         .arg("sync")
         .current_dir(dir.path())
         .assert()
         .code(2)
-        .stderr(predicates::str::contains("sync paths incomplete"));
+        .stderr(predicates::str::contains("not an exporgo project"));
+}
+
+#[test]
+fn malformed_machine_config_reports_the_parse_error()
+{
+    let dir = tempfile::tempdir().unwrap();
+    let project = stamped_project(dir.path(), &[]);
+    std::fs::write(dir.path().join("config.toml"), "remote_root = [broken").unwrap();
+    exporgo(dir.path())
+        .arg("sync")
+        .current_dir(&project)
+        .assert()
+        .code(2)
+        .stderr(predicates::str::contains("invalid machine config"));
+}
+
+/// The full multi-machine story on one filesystem: stamp, push to the remote,
+/// clone as a "second machine" (its own EXPORGO_HOME), and edit both ways.
+#[test]
+fn sync_and_clone_round_trip_between_two_machine_homes()
+{
+    let dir = tempfile::tempdir().unwrap();
+    let remote_root = dir.path().join("shared");
+    std::fs::create_dir_all(&remote_root).unwrap();
+    let machine_a = dir.path().join("machine-a");
+    let machine_b = dir.path().join("machine-b");
+
+    for machine in [&machine_a, &machine_b]
+    {
+        exporgo(machine)
+            .args(["config", "--remote-root", remote_root.to_str().unwrap()])
+            .assert()
+            .success();
+    }
+
+    // Machine A: stamp and push.
+    let project_a = stamped_project(&machine_a, &[]);
+    exporgo(&machine_a)
+        .arg("sync")
+        .current_dir(&project_a)
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("=> OK"));
+    assert!(remote_root.join("pilot-study/exporgo.toml").is_file());
+
+    // Machine B: clone, then receive an edit from A.
+    let clones = machine_b.join("projects");
+    std::fs::create_dir_all(&clones).unwrap();
+    exporgo(&machine_b)
+        .args(["clone", "Pilot Study", "--path", clones.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("Cloned into"));
+    let project_b = clones.join("pilot-study");
+    assert!(project_b.join("exporgo.toml").is_file());
+
+    std::fs::write(project_a.join("plans/idea.md"), "try remapping").unwrap();
+    exporgo(&machine_a)
+        .arg("sync")
+        .current_dir(&project_a)
+        .assert()
+        .success();
+    exporgo(&machine_b)
+        .arg("sync")
+        .current_dir(&project_b)
+        .assert()
+        .success();
+    assert_eq!(
+        std::fs::read_to_string(project_b.join("plans/idea.md")).unwrap(),
+        "try remapping"
+    );
+}
+
+#[test]
+fn clone_into_an_occupied_target_is_refused()
+{
+    let dir = tempfile::tempdir().unwrap();
+    let remote_root = dir.path().join("shared");
+    std::fs::create_dir_all(&remote_root).unwrap();
+    exporgo(dir.path())
+        .args(["config", "--remote-root", remote_root.to_str().unwrap()])
+        .assert()
+        .success();
+
+    let project = stamped_project(dir.path(), &[]);
+    exporgo(dir.path())
+        .arg("sync")
+        .current_dir(&project)
+        .assert()
+        .success();
+
+    // The stamped project itself already occupies <path>/pilot-study.
+    exporgo(dir.path())
+        .args([
+            "clone",
+            "Pilot Study",
+            "--path",
+            dir.path().to_str().unwrap(),
+        ])
+        .assert()
+        .code(2)
+        .stderr(predicates::str::contains("not empty"));
+}
+
+#[test]
+fn sync_mirror_requires_an_explicit_direction()
+{
+    let dir = tempfile::tempdir().unwrap();
+    let remote_root = dir.path().join("shared");
+    std::fs::create_dir_all(&remote_root).unwrap();
+    exporgo(dir.path())
+        .args(["config", "--remote-root", remote_root.to_str().unwrap()])
+        .assert()
+        .success();
+    let project = stamped_project(dir.path(), &[]);
+
+    exporgo(dir.path())
+        .args(["sync", "--mirror"])
+        .current_dir(&project)
+        .assert()
+        .code(2)
+        .stderr(predicates::str::contains("explicit direction"));
+
+    exporgo(dir.path())
+        .args(["sync", "push", "--mirror"])
+        .current_dir(&project)
+        .assert()
+        .success()
+        .stderr(predicates::str::contains("DELETES"));
 }
 
 #[test]
@@ -326,27 +436,6 @@ fn check_reports_missing_dirs_and_deleted_owned_files_as_creates()
 }
 
 #[test]
-fn new_git_flag_warns_instead_of_failing_when_git_is_unavailable()
-{
-    let dir = tempfile::tempdir().unwrap();
-    let empty_path_dir = dir.path().join("empty-path");
-    std::fs::create_dir_all(&empty_path_dir).unwrap();
-    // With PATH pointing at an empty directory, `git` cannot be spawned; the
-    // stamp must still succeed and surface a warning (legacy behavior).
-    Command::cargo_bin("exporgo")
-        .unwrap()
-        .args(["new", "No Git Here", "--no-input", "--git"])
-        .args(["--path", dir.path().to_str().unwrap()])
-        .env("PATH", empty_path_dir.to_str().unwrap())
-        .assert()
-        .success()
-        .stderr(predicates::str::contains("warning"));
-    let project = dir.path().join("no-git-here");
-    assert!(project.join("exporgo.toml").is_file(), "stamp completed");
-    assert!(!project.join(".git").exists(), "git never ran");
-}
-
-#[test]
 fn experiment_new_outside_a_project_is_refused()
 {
     let dir = tempfile::tempdir().unwrap();
@@ -363,14 +452,7 @@ fn experiment_new_outside_a_project_is_refused()
 fn experiment_new_stamps_inside_a_project()
 {
     let dir = tempfile::tempdir().unwrap();
-    Command::cargo_bin("exporgo")
-        .unwrap()
-        .args(["new", "Pilot Study", "--no-input"])
-        .args(["--data-root", r"\\ktdata\snlkt\data\pilot"])
-        .args(["--path", dir.path().to_str().unwrap()])
-        .assert()
-        .success();
-    let project = dir.path().join("pilot-study");
+    let project = stamped_project(dir.path(), &[]);
 
     Command::cargo_bin("exporgo")
         .unwrap()
@@ -387,48 +469,16 @@ fn experiment_new_stamps_inside_a_project()
 }
 
 #[test]
-fn malformed_sync_config_reports_the_parse_error()
-{
-    let dir = tempfile::tempdir().unwrap();
-    Command::cargo_bin("exporgo")
-        .unwrap()
-        .args(["new", "Pilot Study", "--no-input"])
-        .args(["--path", dir.path().to_str().unwrap()])
-        .assert()
-        .success();
-    let project = dir.path().join("pilot-study");
-    // A [sync] table missing required fields must surface the real manifest
-    // parse error, not "no [sync] section".
-    let manifest_path = project.join("exporgo.toml");
-    let mut manifest_text = std::fs::read_to_string(&manifest_path).unwrap();
-    manifest_text.push_str("\n[sync]\nsource = 'X:\\somewhere'\n");
-    std::fs::write(&manifest_path, manifest_text).unwrap();
-
-    Command::cargo_bin("exporgo")
-        .unwrap()
-        .arg("sync")
-        .current_dir(&project)
-        .assert()
-        .code(2)
-        .stderr(predicates::str::contains("invalid manifest"));
-}
-
-#[test]
 fn check_is_quietly_scriptable()
 {
     let dir = tempfile::tempdir().unwrap();
-    Command::cargo_bin("exporgo")
-        .unwrap()
-        .args(["new", "Pilot Study", "--no-input"])
-        .args(["--path", dir.path().to_str().unwrap()])
-        .assert()
-        .success();
+    let project = stamped_project(dir.path(), &[]);
     // Fresh project has unfilled tokens, so check reports (exit 1) without
     // erroring.
     Command::cargo_bin("exporgo")
         .unwrap()
         .arg("check")
-        .current_dir(dir.path().join("pilot-study"))
+        .current_dir(&project)
         .assert()
         .code(1)
         .stdout(predicates::str::contains("Unfilled tokens"));

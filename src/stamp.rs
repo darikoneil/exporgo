@@ -1,9 +1,6 @@
 //! `exporgo new`: stamp a fresh project from the embedded template.
 
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::path::{Path, PathBuf};
 
 use crate::{
     error::Error,
@@ -26,8 +23,6 @@ pub struct NewOptions
     /// Overwrite colliding files in a non-empty target (never wipes the
     /// target).
     pub force: bool,
-    /// Run `git init` in the new project (never commits).
-    pub git_init: bool,
 }
 
 /// What [`stamp`] did.
@@ -39,8 +34,6 @@ pub struct StampReport
     pub dirs_created: usize,
     /// Placeholders still visible in the stamped `context.md`.
     pub unfilled: Vec<String>,
-    /// Set when `git init` was requested but failed (a warning, not an error).
-    pub git_warning: Option<String>,
 }
 
 /// Stamps the embedded template into `parent/<slug>`.
@@ -120,25 +113,14 @@ pub fn stamp(options: &NewOptions) -> Result<StampReport, Error>
             .filter(|(_, value)| !value.is_empty())
             .map(|(token, value)| (token.manifest_key().to_string(), value.clone()))
             .collect(),
-        sync: None,
     };
     manifest.save(&root)?;
-
-    let git_warning = if options.git_init
-    {
-        git_init(&root).err()
-    }
-    else
-    {
-        None
-    };
 
     Ok(StampReport {
         root,
         files_written,
         dirs_created,
         unfilled,
-        git_warning,
     })
 }
 
@@ -161,20 +143,4 @@ fn is_empty_dir(path: &Path) -> Result<bool, Error>
     }
     let mut entries = std::fs::read_dir(path).map_err(Error::io(path.to_path_buf()))?;
     Ok(entries.next().is_none())
-}
-
-/// Runs `git init`; a missing or failing git is reported as a warning string,
-/// matching the legacy script's warn-and-continue behavior.
-fn git_init(root: &Path) -> Result<(), String>
-{
-    match Command::new("git").arg("init").current_dir(root).output()
-    {
-        Ok(output) if output.status.success() => Ok(()),
-        Ok(output) => Err(format!(
-            "git init exited with {}: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr).trim()
-        )),
-        Err(e) => Err(format!("could not run git: {e}")),
-    }
 }

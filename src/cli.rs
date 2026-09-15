@@ -6,6 +6,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 
 use crate::{
     check::check,
+    config::{self, MachineConfig, MachineDirs},
     plan::{ChangeKind, PlannedChange},
     stamp::{NewOptions, stamp},
     tokens::{Token, TokenValues},
@@ -31,30 +32,18 @@ enum Command
         /// Parent directory to create the project in
         #[arg(long, default_value = ".")]
         path: PathBuf,
-        /// One-line aim of the project
-        #[arg(long)]
-        aim: Option<String>,
         /// Project status
         #[arg(long, value_enum)]
         status: Option<Status>,
-        /// Primary GitHub repository URL
-        #[arg(long)]
-        repo: Option<String>,
-        /// Data root (e.g. a UNC path on the lab share)
-        #[arg(long)]
-        data_root: Option<String>,
-        /// Project owner
+        /// Project owner (default: the machine config's `owner`)
         #[arg(long)]
         owner: Option<String>,
-        /// Owner email
+        /// Owner email (default: the machine config's `email`)
         #[arg(long)]
         email: Option<String>,
         /// Never prompt; unset values stay as {{TOKENS}} in context.md
         #[arg(long)]
         no_input: bool,
-        /// Run `git init` in the new project (never commits)
-        #[arg(long)]
-        git: bool,
         /// Stamp into a non-empty directory, overwriting colliding files
         #[arg(long)]
         force: bool,
@@ -78,38 +67,53 @@ enum Command
         #[arg(long)]
         skills_only: bool,
     },
-    /// Two-hop, non-destructive folder sync (source <-> intermediate <->
-    /// destination)
+    /// Sync this project directory with its shared remote copy (via the
+    /// per-machine cache); default is pull-then-push, newest file wins
     Sync
     {
-        /// Project root whose exporgo.toml [sync] section supplies defaults
-        /// (default: current directory)
-        path: Option<PathBuf>,
-        /// Sync source folder (overrides the manifest)
-        #[arg(long)]
-        source: Option<PathBuf>,
-        /// Durable local intermediate folder (overrides the manifest)
-        #[arg(long)]
-        intermediate: Option<PathBuf>,
-        /// Sync destination folder (overrides the manifest)
-        #[arg(long)]
-        destination: Option<PathBuf>,
-        /// Forward: source -> intermediate -> destination; reverse runs the
-        /// other way
-        #[arg(long, value_enum, default_value_t = DirectionArg::Forward)]
-        direction: DirectionArg,
-        /// Extra file-name patterns to exclude (repeatable; * wildcards)
+        /// One-way run; omit for the bidirectional default
+        #[arg(value_enum)]
+        mode: Option<SyncModeArg>,
+        /// Project root (default: current directory)
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+        /// Extra name patterns to exclude (repeatable; * wildcards; matches
+        /// files and directories)
         #[arg(long)]
         exclude: Vec<String>,
-        /// Also DELETE target entries absent from the source (destructive)
+        /// Also DELETE target entries absent from the source (destructive;
+        /// requires an explicit push or pull)
         #[arg(long)]
         mirror: bool,
         /// Log what would happen; copy and delete nothing
         #[arg(long)]
         dry_run: bool,
-        /// Where the sync logs are written (default: the project root)
+    },
+    /// Copy a project from the sync remote onto this machine (the way to get
+    /// an existing project onto a second computer)
+    Clone
+    {
+        /// The project name (or its slug) as it exists on the remote
+        name: String,
+        /// Parent directory to clone into (the project lands at
+        /// <path>/<slug>)
+        #[arg(long, default_value = ".")]
+        path: PathBuf,
+    },
+    /// Show or set this machine's exporgo configuration (sync remote, default
+    /// owner/email)
+    Config
+    {
+        /// Default project owner for `exporgo new`
         #[arg(long)]
-        log_dir: Option<PathBuf>,
+        owner: Option<String>,
+        /// Default owner email for `exporgo new`
+        #[arg(long)]
+        email: Option<String>,
+        /// This machine's path to the shared sync location (Drive mount, UNC
+        /// share, ...)
+        #[arg(long)]
+        remote_root: Option<String>,
     },
     /// Manage documented experiments inside a project
     Experiment
@@ -131,10 +135,10 @@ enum ExperimentCommand
         /// Project root (default: current directory)
         #[arg(long, default_value = ".")]
         path: PathBuf,
-        /// Raw data root (default: derived as <project data_root>/<slug>)
+        /// Where this experiment's raw data may live (a hint, not a mandate)
         #[arg(long)]
         data_root: Option<String>,
-        /// Processed data root (never derived — labs lay these out differently)
+        /// Processed data root
         #[arg(long)]
         processed_root: Option<String>,
         /// Never prompt; unset values stay as {{TOKENS}} in the stamped files
@@ -144,10 +148,12 @@ enum ExperimentCommand
 }
 
 #[derive(Clone, Copy, ValueEnum)]
-enum DirectionArg
+enum SyncModeArg
 {
-    Forward,
-    Reverse,
+    /// Local -> cache -> remote
+    Push,
+    /// Remote -> cache -> local
+    Pull,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -193,26 +199,18 @@ pub fn run() -> ExitCode
         Command::New {
             name,
             path,
-            aim,
             status,
-            repo,
-            data_root,
             owner,
             email,
             no_input,
-            git,
             force,
         } => run_new(NewArgs {
             name,
             path,
-            aim,
             status,
-            repo,
-            data_root,
             owner,
             email,
             no_input,
-            git,
             force,
         }),
         Command::Check { path } => run_check(path.unwrap_or_else(|| PathBuf::from("."))),
@@ -228,26 +226,24 @@ pub fn run() -> ExitCode
             },
         ),
         Command::Sync {
-            path,
-            source,
-            intermediate,
-            destination,
-            direction,
+            mode,
+            project,
             exclude,
             mirror,
             dry_run,
-            log_dir,
         } => run_sync(SyncArgs {
-            path: path.unwrap_or_else(|| PathBuf::from(".")),
-            source,
-            intermediate,
-            destination,
-            direction,
+            mode,
+            project,
             exclude,
             mirror,
             dry_run,
-            log_dir,
         }),
+        Command::Clone { name, path } => run_clone(name, path),
+        Command::Config {
+            owner,
+            email,
+            remote_root,
+        } => run_config(owner, email, remote_root),
         Command::Experiment {
             command:
                 ExperimentCommand::New {
@@ -276,26 +272,29 @@ struct NewArgs
 {
     name: String,
     path: PathBuf,
-    aim: Option<String>,
     status: Option<Status>,
-    repo: Option<String>,
-    data_root: Option<String>,
     owner: Option<String>,
     email: Option<String>,
     no_input: bool,
-    git: bool,
     force: bool,
 }
 
 fn run_new(args: NewArgs) -> Result<ExitCode, crate::Error>
 {
-    let values = resolve_tokens(&args);
+    // Owner/email fall back to the machine config. A machine with no
+    // resolvable config dir just gets no defaults; a *malformed* config file
+    // is a real error the user should see.
+    let machine = match config::machine_dirs()
+    {
+        Ok(dirs) => MachineConfig::load(&dirs.config_file)?,
+        Err(_) => MachineConfig::default(),
+    };
+    let values = resolve_tokens(&args, &machine);
     let report = stamp(&NewOptions {
         name: args.name,
         parent: args.path,
         values,
         force: args.force,
-        git_init: args.git,
     })?;
     println!(
         "Created {} ({} files, {} directories)",
@@ -310,24 +309,21 @@ fn run_new(args: NewArgs) -> Result<ExitCode, crate::Error>
             report.unfilled.join(", ")
         );
     }
-    if let Some(warning) = report.git_warning
-    {
-        eprintln!("warning: {warning}");
-    }
     Ok(ExitCode::SUCCESS)
 }
 
-/// Flags first; anything missing is prompted for unless prompting is disabled
-/// (`--no-input`, or stdin is not a terminal). Empty answers skip the token.
-fn resolve_tokens(args: &NewArgs) -> TokenValues
+/// Flags first, then the machine config's defaults; anything still missing is
+/// prompted for unless prompting is disabled (`--no-input`, or stdin is not a
+/// terminal). Empty answers skip the token.
+fn resolve_tokens(args: &NewArgs, machine: &MachineConfig) -> TokenValues
 {
     let mut values = TokenValues::new();
     let from_flags = [
-        (Token::OneLineAim, &args.aim),
-        (Token::RepoUrl, &args.repo),
-        (Token::DataRoot, &args.data_root),
-        (Token::Owner, &args.owner),
-        (Token::OwnerEmail, &args.email),
+        (Token::Owner, args.owner.as_ref().or(machine.owner.as_ref())),
+        (
+            Token::OwnerEmail,
+            args.email.as_ref().or(machine.email.as_ref()),
+        ),
     ];
     for (token, value) in from_flags
     {
@@ -347,10 +343,7 @@ fn resolve_tokens(args: &NewArgs) -> TokenValues
         return values;
     }
 
-    prompt_text(&mut values, Token::OneLineAim, "One-line aim");
     prompt_status(&mut values);
-    prompt_text(&mut values, Token::RepoUrl, "Primary repo URL");
-    prompt_text(&mut values, Token::DataRoot, "Data root");
     prompt_text(&mut values, Token::Owner, "Owner");
     prompt_text(&mut values, Token::OwnerEmail, "Owner email");
     values
@@ -397,74 +390,85 @@ fn prompt_status(values: &mut TokenValues)
 
 struct SyncArgs
 {
-    path: PathBuf,
-    source: Option<PathBuf>,
-    intermediate: Option<PathBuf>,
-    destination: Option<PathBuf>,
-    direction: DirectionArg,
+    mode: Option<SyncModeArg>,
+    project: PathBuf,
     exclude: Vec<String>,
     mirror: bool,
     dry_run: bool,
-    log_dir: Option<PathBuf>,
 }
 
-/// Merges flags over the manifest's optional `[sync]` section; flags win per
-/// field.
+/// The machine-side facts every sync-family command needs: this machine's
+/// remote root plus, per project slug, the cache and log directories.
+struct SyncContext
+{
+    remote_root: PathBuf,
+    dirs: MachineDirs,
+}
+
+impl SyncContext
+{
+    /// Loads the machine config and validates the remote root exists (an
+    /// absent root usually means the Drive/share is not mounted — failing
+    /// here beats half-running a sync against a phantom path).
+    fn resolve() -> Result<SyncContext, crate::Error>
+    {
+        let dirs = config::machine_dirs()?;
+        let machine = MachineConfig::load(&dirs.config_file)?;
+        let remote_root = machine
+            .remote_root
+            .ok_or_else(|| crate::Error::RemoteRootUnset(dirs.config_file.clone()))?;
+        let remote_root = PathBuf::from(remote_root);
+        if !remote_root.is_dir()
+        {
+            return Err(crate::Error::RemoteRootMissing(remote_root));
+        }
+        Ok(SyncContext { remote_root, dirs })
+    }
+
+    fn remote(&self, slug: &str) -> PathBuf
+    {
+        self.remote_root.join(slug)
+    }
+
+    fn cache(&self, slug: &str) -> PathBuf
+    {
+        self.dirs.cache_root.join(slug)
+    }
+
+    fn log_dir(&self, slug: &str) -> PathBuf
+    {
+        self.dirs.log_root.join(slug)
+    }
+}
+
 fn run_sync(args: SyncArgs) -> Result<ExitCode, crate::Error>
 {
     use crate::{
         manifest::Manifest,
-        sync::{Direction, SyncOptions, sync},
+        sync::{Mode, SyncOptions, sync},
+        tokens::slugify,
     };
 
-    // Only "not a project" falls through to flags-only mode: a manifest that
-    // exists but is malformed (e.g. a [sync] table missing a field) must
-    // surface its real parse error, not a misleading "no [sync] section".
-    let manifest = match Manifest::load(&args.path)
-    {
-        Ok(manifest) => Some(manifest),
-        Err(crate::Error::NotAProject(_)) => None,
-        Err(e) => return Err(e),
-    };
-    let config = manifest.as_ref().and_then(|m| m.sync.as_ref());
-
-    let resolve = |flag: Option<PathBuf>, configured: Option<&String>| {
-        flag.or_else(|| configured.map(PathBuf::from))
-    };
-    let source = resolve(args.source, config.map(|c| &c.source));
-    let intermediate = resolve(args.intermediate, config.map(|c| &c.intermediate));
-    let destination = resolve(args.destination, config.map(|c| &c.destination));
-
-    let missing: Vec<&str> = [
-        ("source", source.is_none()),
-        ("intermediate", intermediate.is_none()),
-        ("destination", destination.is_none()),
-    ]
-    .iter()
-    .filter(|(_, absent)| *absent)
-    .map(|(name, _)| *name)
-    .collect();
-    if !missing.is_empty()
-    {
-        return Err(crate::Error::SyncUnconfigured(missing.join(", ")));
-    }
-
-    let mut exclude = config.map(|c| c.exclude.clone()).unwrap_or_default();
-    exclude.extend(args.exclude);
+    // The slug comes from the manifest's project name, the one identifier
+    // every machine holding this project agrees on.
+    let manifest = Manifest::load(&args.project)?;
+    let slug = slugify(&manifest.project).ok_or(crate::Error::BadSlug(manifest.project))?;
+    let context = SyncContext::resolve()?;
 
     let options = SyncOptions {
-        source: source.expect("checked above"),
-        intermediate: intermediate.expect("checked above"),
-        destination: destination.expect("checked above"),
-        direction: match args.direction
+        local: args.project,
+        cache: context.cache(&slug),
+        remote: context.remote(&slug),
+        mode: match args.mode
         {
-            DirectionArg::Forward => Direction::Forward,
-            DirectionArg::Reverse => Direction::Reverse,
+            None => Mode::Both,
+            Some(SyncModeArg::Push) => Mode::Push,
+            Some(SyncModeArg::Pull) => Mode::Pull,
         },
-        exclude,
+        exclude: args.exclude,
         mirror: args.mirror,
         dry_run: args.dry_run,
-        log_dir: args.log_dir.unwrap_or_else(|| args.path.clone()),
+        log_dir: context.log_dir(&slug),
     };
 
     if options.mirror && !options.dry_run
@@ -474,12 +478,69 @@ fn run_sync(args: SyncArgs) -> Result<ExitCode, crate::Error>
 
     let report = sync(&options)?;
     println!("{}", report.summary);
-    if matches!(options.direction, Direction::Reverse)
-    {
-        println!("Reverse done: a cloud-drive client will now upload the source-side changes.");
-    }
     println!("History: {}", report.history_log.display());
     println!("Detail:  {}", report.detail_log.display());
+    Ok(ExitCode::SUCCESS)
+}
+
+fn run_clone(name: String, path: PathBuf) -> Result<ExitCode, crate::Error>
+{
+    use crate::{
+        sync::{CloneOptions, clone_project},
+        tokens::slugify,
+    };
+
+    let slug = slugify(&name).ok_or_else(|| crate::Error::BadSlug(name.clone()))?;
+    let context = SyncContext::resolve()?;
+    let target = path.join(&slug);
+
+    let report = clone_project(&CloneOptions {
+        remote: context.remote(&slug),
+        cache: context.cache(&slug),
+        target: target.clone(),
+        log_dir: context.log_dir(&slug),
+    })?;
+    println!("Cloned into {}", target.display());
+    println!("{}", report.summary);
+    Ok(ExitCode::SUCCESS)
+}
+
+fn run_config(
+    owner: Option<String>,
+    email: Option<String>,
+    remote_root: Option<String>,
+) -> Result<ExitCode, crate::Error>
+{
+    let dirs = config::machine_dirs()?;
+    let mut machine = MachineConfig::load(&dirs.config_file)?;
+
+    let changed = owner.is_some() || email.is_some() || remote_root.is_some();
+    if let Some(owner) = owner
+    {
+        machine.owner = Some(owner);
+    }
+    if let Some(email) = email
+    {
+        machine.email = Some(email);
+    }
+    if let Some(remote_root) = remote_root
+    {
+        machine.remote_root = Some(remote_root);
+    }
+    if changed
+    {
+        machine.save(&dirs.config_file)?;
+    }
+
+    let show = |value: &Option<String>| value.as_deref().unwrap_or("(unset)").to_string();
+    println!("Config file: {}", dirs.config_file.display());
+    println!("owner       = {}", show(&machine.owner));
+    println!("email       = {}", show(&machine.email));
+    println!("remote_root = {}", show(&machine.remote_root));
+    if machine.remote_root.is_none()
+    {
+        println!("Set the sync remote once per machine: exporgo config --remote-root <path>");
+    }
     Ok(ExitCode::SUCCESS)
 }
 
@@ -493,23 +554,29 @@ fn run_experiment_new(
 {
     use crate::experiment::{NewExperimentOptions, stamp_experiment};
 
-    // The raw root is derivable from the manifest, so only the processed root
-    // (which is never derived) is worth a prompt.
+    // Data roots are per-experiment hints; both are skippable prompts.
+    let mut data_root = data_root;
     let mut processed_root = processed_root;
     let interactive = !no_input && std::io::stdin().is_terminal();
-    if processed_root.is_none() && interactive
+    if interactive
     {
-        let answer: Result<String, _> = dialoguer::Input::new()
-            .with_prompt("Processed data root (Enter to skip)")
-            .allow_empty(true)
-            .interact_text();
-        if let Ok(answer) = answer
+        let prompt = |label: &str| -> Option<String> {
+            let answer: Result<String, _> = dialoguer::Input::new()
+                .with_prompt(format!("{label} (Enter to skip)"))
+                .allow_empty(true)
+                .interact_text();
+            answer
+                .ok()
+                .map(|a| a.trim().to_string())
+                .filter(|a| !a.is_empty())
+        };
+        if data_root.is_none()
         {
-            let answer = answer.trim().to_string();
-            if !answer.is_empty()
-            {
-                processed_root = Some(answer);
-            }
+            data_root = prompt("Raw data root");
+        }
+        if processed_root.is_none()
+        {
+            processed_root = prompt("Processed data root");
         }
     }
 
@@ -630,14 +697,10 @@ mod tests
         NewArgs {
             name: "Pilot".to_string(),
             path: PathBuf::from("."),
-            aim: Some("Does it remap?".to_string()),
             status: Some(Status::Analysis),
-            repo: Some("https://github.com/org/repo".to_string()),
-            data_root: Some(r"\ktdata\snlkt\data".to_string()),
             owner: Some("Darik".to_string()),
             email: Some("doneil@salk.edu".to_string()),
             no_input: true, // never prompt in tests
-            git: false,
             force: false,
         }
     }
@@ -645,12 +708,9 @@ mod tests
     #[test]
     fn resolve_tokens_maps_every_flag_to_its_token()
     {
-        let values = resolve_tokens(&new_args());
-        let expected: [(Token, &str); 6] = [
-            (Token::OneLineAim, "Does it remap?"),
+        let values = resolve_tokens(&new_args(), &MachineConfig::default());
+        let expected: [(Token, &str); 3] = [
             (Token::Status, "analysis"),
-            (Token::RepoUrl, "https://github.com/org/repo"),
-            (Token::DataRoot, r"\ktdata\snlkt\data"),
             (Token::Owner, "Darik"),
             (Token::OwnerEmail, "doneil@salk.edu"),
         ];
@@ -667,12 +727,44 @@ mod tests
     fn absent_flags_leave_tokens_unset()
     {
         let mut args = new_args();
-        args.aim = None;
+        args.owner = None;
         args.status = None;
-        let values = resolve_tokens(&args);
-        assert!(!values.contains_key(&Token::OneLineAim));
+        let values = resolve_tokens(&args, &MachineConfig::default());
+        assert!(!values.contains_key(&Token::Owner));
         assert!(!values.contains_key(&Token::Status));
-        assert_eq!(values.len(), 4);
+        assert_eq!(values.len(), 1);
+    }
+
+    /// The machine config supplies owner/email defaults; explicit flags beat
+    /// it.
+    #[test]
+    fn machine_config_fills_owner_and_email_but_never_overrides_flags()
+    {
+        let machine = MachineConfig {
+            owner: Some("Config Owner".to_string()),
+            email: Some("config@salk.edu".to_string()),
+            remote_root: None,
+        };
+
+        let mut args = new_args();
+        args.owner = None;
+        args.email = None;
+        let values = resolve_tokens(&args, &machine);
+        assert_eq!(
+            values.get(&Token::Owner).map(String::as_str),
+            Some("Config Owner")
+        );
+        assert_eq!(
+            values.get(&Token::OwnerEmail).map(String::as_str),
+            Some("config@salk.edu")
+        );
+
+        let values = resolve_tokens(&new_args(), &machine);
+        assert_eq!(values.get(&Token::Owner).map(String::as_str), Some("Darik"));
+        assert_eq!(
+            values.get(&Token::OwnerEmail).map(String::as_str),
+            Some("doneil@salk.edu")
+        );
     }
 
     /// The status vocabulary is a contract with the template's context.md

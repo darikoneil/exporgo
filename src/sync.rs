@@ -1,21 +1,33 @@
-//! `exporgo sync`: two-hop, non-destructive folder sync — the cross-platform
-//! replacement for the retired `sync.ps1`/robocopy skill.
+//! `exporgo sync`: keep a project directory converged across machines.
+//!
+//! Every machine holds the project at its own local path and syncs it, through
+//! a stable per-machine cache, against a shared remote copy named by the
+//! project's slug:
 //!
 //! ```text
-//! Forward : Source      -> Intermediate -> Destination
-//! Reverse : Destination -> Intermediate -> Source
+//! Pull : Remote  -> Cache -> Local
+//! Push : Local   -> Cache -> Remote
+//! Both : pull, then push (per-file newest-mtime wins everywhere)
 //! ```
 //!
+//! The cache hop exists because cloud-drive mounts are flaky about direct
+//! copies; the cache is real local disk, so each hop is mount-to-disk or
+//! disk-to-mount, never mount-to-mount.
+//!
 //! Non-destructive by default: new and newer files are copied, nothing is ever
-//! deleted. `mirror` additionally deletes entries at the target that are absent
-//! from the source — destructive, opt-in only. If the first hop's source is
-//! missing (Drive not mounted, share offline) the run aborts before the second
-//! hop, so a bad mount never overwrites a good target.
+//! deleted — which also means a deletion never propagates (bidirectional sync
+//! resurrects locally deleted files from the remote; `push --mirror` is the
+//! deliberate cleanup). `mirror` deletes entries at the target that are absent
+//! from the source — destructive, opt-in, and only meaningful with an explicit
+//! direction. If a hop's source is missing (Drive not mounted, share offline)
+//! the run aborts before the next hop, so a bad mount never overwrites a good
+//! target.
 //!
 //! File comparison is by modification time with a 2-second slack (FAT and cloud
 //! mounts round timestamps); copies preserve the source's mtime so re-runs are
-//! stable. Exclusion patterns match file *names* (robocopy `/XF` style, `*`
-//! wildcards, ASCII case-insensitive).
+//! stable. Exclusion patterns match file *and directory* names (robocopy `/XF`
+//! style, `*` wildcards, ASCII case-insensitive); `.git/` is excluded by
+//! default because mtime-copying a live git directory corrupts repositories.
 
 use std::{
     io::Write,
@@ -25,31 +37,36 @@ use std::{
 
 use crate::error::Error;
 
-/// Which way the two hops run.
+/// What a sync run does.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Direction
+pub enum Mode
 {
-    /// Source -> Intermediate -> Destination.
-    Forward,
-    /// Destination -> Intermediate -> Source.
-    Reverse,
+    /// Pull, then push: converge local and remote on the newest of each file.
+    Both,
+    /// Local -> Cache -> Remote only.
+    Push,
+    /// Remote -> Cache -> Local only.
+    Pull,
 }
 
-impl Direction
+impl Mode
 {
     pub fn as_str(self) -> &'static str
     {
         match self
         {
-            Direction::Forward => "Forward",
-            Direction::Reverse => "Reverse",
+            Mode::Both => "Sync",
+            Mode::Push => "Push",
+            Mode::Pull => "Pull",
         }
     }
 }
 
-/// File names that never propagate: OS cruft, this tool's own logs, and
-/// leftover temporaries from interrupted atomic copies.
+/// Names that never propagate: OS cruft, git's live object store, this tool's
+/// own logs, and leftover temporaries from interrupted atomic copies. Matched
+/// against file and directory names alike.
 pub const DEFAULT_EXCLUDES: &[&str] = &[
+    ".git",
     "Thumbs.db",
     "*.Identifier",
     ".DS_Store",
@@ -63,21 +80,25 @@ pub const DETAIL_LOG: &str = "_sync_detail.log";
 /// Appended each run with one summary line — the audit trail.
 pub const HISTORY_LOG: &str = "_sync_history.log";
 
-/// Fully resolved inputs for [`sync`] (the CLI merges manifest config and
-/// flags).
+/// Fully resolved inputs for [`sync`] (the CLI resolves the cache and remote
+/// from the machine config and the project slug).
 pub struct SyncOptions
 {
-    pub source: PathBuf,
-    pub intermediate: PathBuf,
-    pub destination: PathBuf,
-    pub direction: Direction,
-    /// Extra file-name patterns, on top of [`DEFAULT_EXCLUDES`].
+    /// The project directory on this machine.
+    pub local: PathBuf,
+    /// This machine's staging copy, `<cache_root>/<slug>`.
+    pub cache: PathBuf,
+    /// The shared copy, `<remote_root>/<slug>`.
+    pub remote: PathBuf,
+    pub mode: Mode,
+    /// Extra name patterns, on top of [`DEFAULT_EXCLUDES`].
     pub exclude: Vec<String>,
-    /// Also delete target entries absent from the source. Destructive.
+    /// Also delete target entries absent from the source. Destructive, and
+    /// only accepted with an explicit [`Mode::Push`] or [`Mode::Pull`].
     pub mirror: bool,
     /// Plan and log only; copy and delete nothing.
     pub dry_run: bool,
-    /// Where the two log files are written.
+    /// Where the two log files are written (outside all three trees).
     pub log_dir: PathBuf,
 }
 
@@ -99,45 +120,90 @@ pub struct SyncReport
     pub detail_log: PathBuf,
 }
 
-/// Runs both hops, writing the detail and history logs.
+/// One planned copy step.
+struct Hop<'a>
+{
+    from: &'a Path,
+    to: &'a Path,
+    label: &'static str,
+    /// The source is the cache, produced by the preceding hop in this same
+    /// run — so in a dry run its absence is expected, not an error.
+    lenient: bool,
+}
+
+/// Runs the mode's hops through the cache, writing the detail and history
+/// logs.
 ///
-/// Refuses up front when any two of the three paths are equal or nested —
-/// a nested intermediate would otherwise make the copy recurse into its own
-/// output without bound.
+/// Refuses up front when any two of the three paths are equal or nested (a
+/// nested cache would make the copy recurse into its own output without
+/// bound), and when `mirror` is combined with [`Mode::Both`]. A pull with no
+/// remote copy is [`Error::RemoteProjectMissing`]; a bidirectional run skips
+/// the pull phase instead (the push then creates the remote — the first-ever
+/// sync of a project).
 pub fn sync(options: &SyncOptions) -> Result<SyncReport, Error>
 {
+    if options.mirror && options.mode == Mode::Both
+    {
+        return Err(Error::MirrorNeedsDirection);
+    }
     reject_overlaps(&[
-        (&options.source, &options.intermediate),
-        (&options.intermediate, &options.destination),
-        (&options.source, &options.destination),
+        (&options.local, &options.cache),
+        (&options.cache, &options.remote),
+        (&options.local, &options.remote),
     ])?;
 
-    let hops: [(&Path, &Path, &str); 2] = match options.direction
+    let pull: [Hop; 2] = [
+        Hop {
+            from: &options.remote,
+            to: &options.cache,
+            label: "Remote->Cache",
+            lenient: false,
+        },
+        Hop {
+            from: &options.cache,
+            to: &options.local,
+            label: "Cache->Local",
+            lenient: true,
+        },
+    ];
+    let push: [Hop; 2] = [
+        Hop {
+            from: &options.local,
+            to: &options.cache,
+            label: "Local->Cache",
+            lenient: false,
+        },
+        Hop {
+            from: &options.cache,
+            to: &options.remote,
+            label: "Cache->Remote",
+            lenient: true,
+        },
+    ];
+    let mut skipped_pull = false;
+    let hops: Vec<Hop> = match options.mode
     {
-        Direction::Forward => [
-            (
-                &options.source,
-                &options.intermediate,
-                "Source->Intermediate",
-            ),
-            (
-                &options.intermediate,
-                &options.destination,
-                "Intermediate->Destination",
-            ),
-        ],
-        Direction::Reverse => [
-            (
-                &options.destination,
-                &options.intermediate,
-                "Destination->Intermediate",
-            ),
-            (
-                &options.intermediate,
-                &options.source,
-                "Intermediate->Source",
-            ),
-        ],
+        Mode::Pull =>
+        {
+            if !options.remote.is_dir()
+            {
+                return Err(Error::RemoteProjectMissing(options.remote.clone()));
+            }
+            pull.into_iter().collect()
+        }
+        Mode::Push => push.into_iter().collect(),
+        Mode::Both =>
+        {
+            if options.remote.is_dir()
+            {
+                pull.into_iter().chain(push).collect()
+            }
+            else
+            {
+                skipped_pull = true;
+                push.into_iter().collect()
+            }
+        }
     };
 
     std::fs::create_dir_all(&options.log_dir).map_err(Error::io(options.log_dir.clone()))?;
@@ -147,11 +213,15 @@ pub fn sync(options: &SyncOptions) -> Result<SyncReport, Error>
 
     let mut detail = std::fs::File::create(&detail_path).map_err(Error::io(detail_path.clone()))?;
     let dry = if options.dry_run { " (dry run)" } else { "" };
-    let _ = writeln!(
-        detail,
-        "=== {} sync {stamp}{dry} ===",
-        options.direction.as_str()
-    );
+    let _ = writeln!(detail, "=== {} {stamp}{dry} ===", options.mode.as_str());
+    if skipped_pull
+    {
+        let _ = writeln!(
+            detail,
+            "--- pull skipped: no remote copy at '{}' yet (this push creates it)",
+            options.remote.display()
+        );
+    }
 
     let mut excludes: Vec<String> = DEFAULT_EXCLUDES.iter().map(|s| s.to_string()).collect();
     excludes.extend(options.exclude.iter().cloned());
@@ -163,7 +233,7 @@ pub fn sync(options: &SyncOptions) -> Result<SyncReport, Error>
         Ok(reports) => reports,
         Err(e) =>
         {
-            let summary = format!("[{stamp}] {}  => FAIL: {e}", options.direction.as_str());
+            let summary = format!("[{stamp}] {}  => FAIL: {e}", options.mode.as_str());
             let _ = writeln!(detail, "=== {summary} ===");
             append_history(&history_path, &summary)?;
             return Err(e);
@@ -180,7 +250,7 @@ pub fn sync(options: &SyncOptions) -> Result<SyncReport, Error>
     };
     let summary = format!(
         "[{stamp}] {}  {}  => OK{dry}",
-        options.direction.as_str(),
+        options.mode.as_str(),
         reports
             .iter()
             .map(|h| {
@@ -208,24 +278,71 @@ pub fn sync(options: &SyncOptions) -> Result<SyncReport, Error>
     })
 }
 
+/// Inputs for [`clone_project`]: bootstrap a project onto a machine that does
+/// not have it yet.
+pub struct CloneOptions
+{
+    /// The shared copy, `<remote_root>/<slug>` — must exist.
+    pub remote: PathBuf,
+    /// This machine's staging copy, `<cache_root>/<slug>`.
+    pub cache: PathBuf,
+    /// The local directory to create — must not exist, or be empty.
+    pub target: PathBuf,
+    /// Where the two log files are written.
+    pub log_dir: PathBuf,
+}
+
+/// Copies the remote project into a fresh local directory (remote -> cache ->
+/// target).
+///
+/// This is the supported way to get a project onto a second machine. Stamping
+/// `exporgo new` there and pulling would be a trap: freshly stamped files
+/// carry *current* mtimes, newer than the remote's, so a later newest-wins
+/// sync would push the blank stamp over the real project. A clone is a plain
+/// pull into an empty target — no mtime contest.
+pub fn clone_project(options: &CloneOptions) -> Result<SyncReport, Error>
+{
+    if options.target.exists()
+    {
+        let occupied = std::fs::read_dir(&options.target)
+            .map(|mut entries| entries.next().is_some())
+            .unwrap_or(true);
+        if occupied
+        {
+            return Err(Error::CloneTargetNotEmpty(options.target.clone()));
+        }
+    }
+    sync(&SyncOptions {
+        local: options.target.clone(),
+        cache: options.cache.clone(),
+        remote: options.remote.clone(),
+        mode: Mode::Pull,
+        exclude: Vec::new(),
+        mirror: false,
+        dry_run: false,
+        log_dir: options.log_dir.clone(),
+    })
+}
+
 fn run_hops(
     options: &SyncOptions,
-    hops: &[(&Path, &Path, &str); 2],
+    hops: &[Hop],
     excludes: &[String],
     detail: &mut std::fs::File,
 ) -> Result<Vec<HopReport>, Error>
 {
     let log_dir = normalized(&options.log_dir);
     let mut reports = Vec::new();
-    for (index, (from, to, label)) in hops.iter().enumerate()
+    for hop in hops
     {
-        if !from.is_dir() && options.dry_run && index == 1
+        let (from, to, label) = (hop.from, hop.to, hop.label);
+        if !from.is_dir() && hop.lenient && options.dry_run
         {
-            // Hop 1 would have created the intermediate; without it hop 2
+            // The prior hop would have created the cache; without it this hop
             // cannot be planned, which is expected in a dry run.
             let _ = writeln!(
                 detail,
-                "--- {label}: skipped (intermediate does not exist yet; a real run creates it)"
+                "--- {label}: skipped (cache does not exist yet; a real run creates it)"
             );
             reports.push(HopReport {
                 label: label.to_string(),
@@ -245,12 +362,12 @@ fn run_hops(
             from.display(),
             to.display()
         );
-        let mut hop = HopReport {
+        let mut hop_report = HopReport {
             label: label.to_string(),
             copied: 0,
             deleted: 0,
         };
-        copy_tree(from, to, excludes, options.dry_run, &mut hop, detail)?;
+        copy_tree(from, to, excludes, options.dry_run, &mut hop_report, detail)?;
         if options.mirror
         {
             delete_extras(
@@ -259,11 +376,11 @@ fn run_hops(
                 excludes,
                 options.dry_run,
                 &log_dir,
-                &mut hop,
+                &mut hop_report,
                 detail,
             )?;
         }
-        reports.push(hop);
+        reports.push(hop_report);
     }
     Ok(reports)
 }
@@ -339,6 +456,12 @@ fn copy_tree(
             let _ = writeln!(detail, "skip symlink {}", entry.path().display());
             continue;
         }
+        // Exclusion applies to directory names too — most importantly `.git`,
+        // whose live object store must never be mtime-copied between machines.
+        if excluded(&name_str, excludes)
+        {
+            continue;
+        }
         let target = to.join(&name);
         if file_type.is_dir()
         {
@@ -346,10 +469,6 @@ fn copy_tree(
         }
         else
         {
-            if excluded(&name_str, excludes)
-            {
-                continue;
-            }
             if needs_copy(&entry.path(), &target)?
             {
                 let _ = writeln!(detail, "copy {}", target.display());
@@ -496,8 +615,8 @@ fn copy_via_temp(source: &Path, target: &Path, temp: &Path) -> Result<(), Error>
     std::fs::rename(temp, target).map_err(Error::io(target.to_path_buf()))
 }
 
-/// robocopy `/XF`-style match: file names only, `*` wildcards, ASCII
-/// case-insensitive.
+/// robocopy `/XF`-style match on file *and directory* names: `*` wildcards,
+/// ASCII case-insensitive.
 fn excluded(name: &str, patterns: &[String]) -> bool
 {
     patterns.iter().any(|p| wildcard_match(p, name))
