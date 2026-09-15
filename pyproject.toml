@@ -39,7 +39,7 @@ repository = "https://github.com/darikoneil/exporgo"
 monitor = []
 datastore = [
     "numpy",
-    "polars[numpy,pyarrow]>=1.44.1",
+    "polars[numpy,pyarrow]>=1.44.3",
     # Pinned <=24: pyarrow 25.x's _compute.pyd is blocked by Windows Smart App Control
     # (see docs/design/2026-08-23-datastore-design.md).
     "pyarrow<=24.0.0",
@@ -67,7 +67,7 @@ dev = [
     "numpy",
     "polars",
     "tqdm",
-    "pyarrow>=24.0.0",
+    "pyarrow<=24.0.0",
     "xarray>=2026.7.0",
 ]
 
